@@ -30,6 +30,8 @@ export const dictionaries = {
       years: "years",
       kg: "kg",
       cm: "cm",
+      previous: "Previous",
+      next: "Next",
     },
     auth: {
       loginTitle: "Welcome back",
@@ -234,6 +236,8 @@ export const dictionaries = {
       years: "سنة",
       kg: "كجم",
       cm: "سم",
+      previous: "السابق",
+      next: "التالي",
     },
     auth: {
       loginTitle: "مرحبًا بعودتك",
