@@ -104,7 +104,7 @@ export default function SignUpPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="repeatPassword">{dict.auth.password}</Label>
+              <Label htmlFor="repeatPassword">{dict.auth.confirmPassword}</Label>
               <Input
                 id="repeatPassword"
                 type="password"

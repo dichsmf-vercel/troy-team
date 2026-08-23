@@ -40,6 +40,7 @@ export const dictionaries = {
       signUpSubtitle: "Join the squad and start training",
       email: "Email",
       password: "Password",
+      confirmPassword: "Confirm password",
       fullName: "Full name",
       language: "Preferred language",
       loginButton: "Sign in",
