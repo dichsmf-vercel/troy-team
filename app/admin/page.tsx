@@ -8,12 +8,14 @@ export default async function AdminPage() {
   if (!user) redirect("/auth/login")
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
   if (!profile || !["admin", "supporting_coach"].includes(profile.role)) redirect("/dashboard")
-  const [{ data: teams }, { data: sessions }, { data: athletes }, { data: exercises }, { data: selfies }] = await Promise.all([
+  const [{ data: teams }, { data: sessions }, { data: athletes }, { data: exercises }, { data: selfies }, { data: notifications }, { data: rules }] = await Promise.all([
     supabase.from("teams").select("id, name_en, name_ar, color_hex, is_national_team").order("name_en"),
     supabase.from("session_posts").select("id, title_en, title_ar, session_date, period, team_id, teams(name_en, name_ar)").order("session_date", { ascending: false }).limit(20),
     supabase.from("athletes").select("id, tier, intake_completed_at, profiles(full_name), athlete_teams(team_id, teams(name_en, name_ar))").order("created_at", { ascending: false }),
     supabase.from("exercises").select("id, name_en, name_ar, category, image_url, video_youtube_url, default_sets, default_reps").order("name_en"),
     supabase.from("session_selfies").select("id, image_url, uploaded_at, reviewed, session_athletes(athlete_id, profiles(full_name))").eq("reviewed", false).order("uploaded_at", { ascending: false }),
+    supabase.from("notifications").select("id, title, body, is_read, created_at").eq("recipient_id", user.id).order("created_at", { ascending: false }).limit(8),
+    supabase.from("program_rules").select("id, name, rule_type, condition_json, action_json, is_active, created_at").order("created_at", { ascending: false }),
   ])
-  return <AdminBoard teams={teams ?? []} sessions={sessions ?? []} athletes={athletes ?? []} exercises={exercises ?? []} selfies={selfies ?? []} />
+  return <AdminBoard teams={teams ?? []} sessions={sessions ?? []} athletes={athletes ?? []} exercises={exercises ?? []} selfies={selfies ?? []} notifications={notifications ?? []} rules={rules ?? []} />
 }

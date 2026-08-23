@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider"
 import { LanguageProvider } from "@/components/providers/language-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { getLanguage } from "@/lib/i18n/get-language"
+import { BRAND } from "@/lib/brand"
 import "./globals.css"
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -20,8 +21,8 @@ const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
 })
 
 export const metadata: Metadata = {
-  title: "Spartan Training",
-  description: "Team training, attendance, and performance tracking for Coach Ahmed Aly's squads.",
+  title: BRAND.siteName,
+  description: `${BRAND.siteName} training, attendance, and performance with ${BRAND.coachName}.`,
   generator: "v0.app",
   manifest: "/manifest.webmanifest",
   icons: {

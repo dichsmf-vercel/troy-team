@@ -3,8 +3,8 @@ export type Language = "en" | "ar"
 export const dictionaries = {
   en: {
     app: {
-      name: "Spartan Training",
-      tagline: "Discipline. Progress. Repeat.",
+      name: "Troy Team",
+      tagline: "Train with purpose. Perform with confidence.",
     },
     common: {
       continue: "Continue",

@@ -84,10 +84,15 @@ export default function LoginPage() {
               {isLoading ? dict.common.loading : dict.auth.loginButton}
             </Button>
           </form>
-          <div className="mt-5 text-center text-sm text-muted-foreground">
-            {dict.auth.noAccount}{" "}
-            <Link href="/auth/sign-up" className="font-medium text-foreground underline underline-offset-4">
-              {dict.auth.signUpLink}
+          <div className="mt-5 flex flex-col gap-3 text-center text-sm text-muted-foreground">
+            <span>
+              {dict.auth.noAccount}{" "}
+              <Link href="/auth/sign-up" className="font-medium text-foreground underline underline-offset-4">
+                {dict.auth.signUpLink}
+              </Link>
+            </span>
+            <Link href="/parent" className="font-medium text-foreground underline underline-offset-4">
+              Parent View
             </Link>
           </div>
         </CardContent>
