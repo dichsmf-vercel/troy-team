@@ -4,7 +4,7 @@ export const dictionaries = {
   en: {
     app: {
       name: "Troy Team",
-      tagline: "Train with purpose. Perform with confidence.",
+      tagline: "Train with Coach Ahmed Aly",
     },
     common: {
       continue: "Continue",

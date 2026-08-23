@@ -4,5 +4,5 @@ export const BRAND = {
   coachTitle: "Head Coach",
   logoLight: "/logo-light.jpg",
   logoDark: "/logo-dark.jpg",
-  tagline: "Train with purpose. Perform with confidence.",
+  tagline: "Train with Coach Ahmed Aly",
 } as const
