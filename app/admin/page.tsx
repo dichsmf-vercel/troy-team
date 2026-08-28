@@ -12,7 +12,7 @@ export default async function AdminPage() {
   const [{ data: teams }, { data: sessions }, { data: athletes }, { data: exercises }, { data: assignments }, { data: selfies }, { data: notifications }, { data: rules }] = await Promise.all([
     supabase.from("teams").select("id, name_en, name_ar, color_hex, is_national_team").order("name_en"),
     supabase.from("session_posts").select("id, title_en, title_ar, notes_en, notes_ar, session_date, period, team_id, teams(name_en, name_ar)").order("session_date", { ascending: false }).limit(20),
-    supabase.from("athletes").select("id, tier, intake_completed_at, profiles(full_name), athlete_teams(team_id, teams(name_en, name_ar))").order("created_at", { ascending: false }),
+    supabase.from("athletes").select("id, tier, intake_completed_at, profiles(full_name, subscription_tier, renewal_date, coach_private_notes), athlete_teams(team_id, teams(name_en, name_ar))").order("created_at", { ascending: false }),
     supabase.from("exercises").select("id, name_en, name_ar, category, image_url, video_youtube_url, default_sets, default_reps").order("name_en"),
     supabase.from("athlete_exercise_assignments").select("id, athlete_id, exercise_id, sets, reps, notes, exercises(name_en)").order("created_at", { ascending: false }),
     supabase.from("session_selfies").select("id, image_url, uploaded_at, reviewed, session_athletes(athlete_id, profiles(full_name))").eq("reviewed", false).order("uploaded_at", { ascending: false }),
