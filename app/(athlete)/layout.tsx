@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { BottomNav } from "@/components/athlete/bottom-nav"
+import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
 
 export default async function AthleteLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -18,6 +19,7 @@ export default async function AthleteLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      <DashboardTopBar />
       <div className="mx-auto max-w-md">{children}</div>
       <BottomNav />
     </div>
