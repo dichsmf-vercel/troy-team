@@ -44,8 +44,8 @@ export default async function ProgressPage() {
     <ProgressDashboard
       measurements={(measurements ?? []).map((m) => ({
         date: m.recorded_at,
-        weight: m.weight_kg ? Number(m.weight_kg) : null,
-        bodyFat: m.body_fat_pct ? Number(m.body_fat_pct) : null,
+        weight: m.weight_kg == null ? null : Number(m.weight_kg),
+        bodyFat: m.body_fat_pct == null ? null : Number(m.body_fat_pct),
       }))}
       rpeHistory={summaries.map((s) => ({ date: s.submitted_at, rpe: s.rpe ?? 0 }))}
       attendanceRate={attendanceRate}
