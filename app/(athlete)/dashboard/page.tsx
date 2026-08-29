@@ -21,22 +21,21 @@ export default async function DashboardPage() {
 
   let sessions: SessionCardData[] = []
 
-  if (teamIds.length > 0) {
+  const { data: directAssignments } = await supabase.from("session_assignments").select("session_post_id").eq("athlete_id", userData.user.id)
+  const assignedPostIds = (directAssignments ?? []).map((row: any) => row.session_post_id)
+  if (teamIds.length > 0 || assignedPostIds.length > 0) {
+    const filters = [teamIds.length ? `team_id.in.(${teamIds.join(",")})` : null, assignedPostIds.length ? `id.in.(${assignedPostIds.join(",")})` : null].filter(Boolean).join(",")
     const { data: posts } = await supabase
       .from("session_posts")
-      .select("*, session_exercises(id)")
-      .in("team_id", teamIds)
+      .select("*, session_exercises(id), teams(name_en, name_ar, color_hex, is_national_team)")
+      .or(filters)
       .order("session_date", { ascending: true })
 
-    const { data: mySessionAthletes } = await supabase
-      .from("session_athletes")
-      .select("*, session_summaries(id)")
-      .eq("athlete_id", userData.user.id)
-
+    const { data: mySessionAthletes } = await supabase.from("session_athletes").select("*, session_summaries(id)").eq("athlete_id", userData.user.id)
     const sessionAthleteByPost = new Map((mySessionAthletes ?? []).map((sa: any) => [sa.session_post_id, sa]))
 
     sessions = (posts ?? []).map((post: any) => {
-      const team = teamsById.get(post.team_id)
+      const team = post.teams ?? teamsById.get(post.team_id)
       const sa = sessionAthleteByPost.get(post.id)
       return {
         sessionAthleteId: sa?.id ?? "",

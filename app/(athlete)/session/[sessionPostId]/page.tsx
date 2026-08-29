@@ -15,6 +15,9 @@ export default async function SessionPage({
 
   const language = await getLanguage()
 
+  const { data: athleteTeams } = await supabase.from("athlete_teams").select("team_id").eq("athlete_id", userData.user.id)
+  const teamIds = (athleteTeams ?? []).map((row: any) => row.team_id)
+
   const { data: post } = await supabase
     .from("session_posts")
     .select(
@@ -24,6 +27,9 @@ export default async function SessionPage({
     .maybeSingle()
 
   if (!post) notFound()
+  const { data: directAssignment } = await supabase.from("session_assignments").select("id, load_percentage").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
+  const teamVisible = post.team_id && teamIds.includes(post.team_id)
+  if (!teamVisible && !directAssignment) notFound()
 
   const { data: exercises } = await supabase
     .from("session_exercises")
