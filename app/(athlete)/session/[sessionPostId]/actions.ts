@@ -47,6 +47,10 @@ export async function toggleExerciseCompletion(
   completed: boolean,
 ) {
   const supabase = await createClient()
+  if (completed) {
+    const { data: selfie } = await supabase.from("session_selfies").select("id").eq("session_athlete_id", sessionAthleteId).maybeSingle()
+    if (!selfie) return { error: "Upload a selfie before marking exercises complete." }
+  }
   const { error } = await supabase.from("exercise_completions").upsert(
     {
       session_athlete_id: sessionAthleteId,

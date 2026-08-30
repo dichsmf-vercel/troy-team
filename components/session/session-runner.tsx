@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Language } from "@/lib/i18n/dictionaries"
 import { useLanguage } from "@/components/providers/language-provider"
-import { startSession, toggleExerciseCompletion, reportPain } from "@/app/(athlete)/session/[sessionPostId]/actions"
+import { startSession, toggleExerciseCompletion, reportPain, uploadSelfie } from "@/app/(athlete)/session/[sessionPostId]/actions"
 
 type Exercise = {
   sessionExerciseId: string
@@ -48,6 +48,7 @@ export function SessionRunner({
   initialSessionAthleteId,
   initialAttendedAt,
   initialCompletions,
+  initialSelfieUploaded,
 }: {
   language: Language
   sessionPostId: string
@@ -62,6 +63,7 @@ export function SessionRunner({
   initialSessionAthleteId: string | null
   initialAttendedAt: string | null
   initialCompletions: { session_exercise_id: string; completed: boolean }[]
+  initialSelfieUploaded: boolean
 }) {
   const { dict } = useLanguage()
   const [sessionAthleteId, setSessionAthleteId] = useState(initialSessionAthleteId)
@@ -76,6 +78,8 @@ export function SessionRunner({
   const [painNotes, setPainNotes] = useState("")
   const [isPending, startTransition] = useTransition()
   const [showVideo, setShowVideo] = useState(false)
+  const [selfieUploaded, setSelfieUploaded] = useState(initialSelfieUploaded)
+  const [selfieError, setSelfieError] = useState<string | null>(null)
 
   const completedCount = Object.values(completedMap).filter(Boolean).length
   const progressPct = exercises.length > 0 ? Math.round((completedCount / exercises.length) * 100) : 0
@@ -131,7 +135,7 @@ export function SessionRunner({
             month: "long",
             day: "numeric",
           })}{" "}
-          &middot; {period === "morning" ? dict.session.morning : dict.session.evening}
+          &middot; {new Date(`1970-01-01T${period}`).toLocaleTimeString(language === "ar" ? "ar" : "en-US", { hour: "numeric", minute: "2-digit" })}
         </p>
         <Button size="lg" className="mt-2 gap-2" onClick={handleStart} disabled={isPending}>
           <Play className="size-4" />
@@ -219,9 +223,12 @@ export function SessionRunner({
             </div>
           ) : null}
 
+          <div className="grid gap-2 border-t border-border pt-4"><Label htmlFor="session-selfie">Upload a selfie to unlock exercise completion</Label><input id="session-selfie" type="file" accept="image/*" capture="user" disabled={!sessionAthleteId || isPending} onChange={(event) => { const file = event.target.files?.[0]; if (!file || !sessionAthleteId) return; const reader = new FileReader(); reader.onload = () => { startTransition(async () => { const result = await uploadSelfie(sessionAthleteId, String(reader.result)); if (result?.error) setSelfieError(result.error); else { setSelfieUploaded(true); setSelfieError(null) } }) }; reader.readAsDataURL(file) }} className="block w-full text-sm" />{selfieUploaded ? <p className="text-sm text-emerald-600">Selfie uploaded. Exercises unlocked.</p> : null}{selfieError ? <p className="text-sm text-destructive">{selfieError}</p> : null}</div>
+
           <div className="flex items-center gap-3 border-t border-border pt-4">
             <Checkbox
               id={`complete-${active.sessionExerciseId}`}
+              disabled={!selfieUploaded || isPending}
               checked={!!completedMap[active.sessionExerciseId]}
               onCheckedChange={(v) => handleToggle(active.sessionExerciseId, v === true)}
             />

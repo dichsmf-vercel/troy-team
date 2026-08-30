@@ -37,7 +37,7 @@ export default async function SessionPage({
       "id, sort_order, sets, reps, exercises(id, name_en, name_ar, description_en, description_ar, image_url, video_youtube_url)",
     )
     .eq("session_post_id", sessionPostId)
-    .order("sort_order", { ascending: true })
+    .order("exercise_order", { ascending: true })
 
   const { data: sessionAthlete } = await supabase
     .from("session_athletes")
@@ -45,6 +45,8 @@ export default async function SessionPage({
     .eq("session_post_id", sessionPostId)
     .eq("athlete_id", userData.user.id)
     .maybeSingle()
+
+  const { data: existingSelfie } = sessionAthlete?.id ? await supabase.from("session_selfies").select("id").eq("session_athlete_id", sessionAthlete.id).maybeSingle() : { data: null }
 
   let completions: { session_exercise_id: string; completed: boolean }[] = []
   if (sessionAthlete?.id) {
@@ -72,7 +74,7 @@ export default async function SessionPage({
       teamColor={team?.color_hex ?? "#94A3B8"}
       isNationalTeam={team?.is_national_team ?? false}
       sessionDate={post.session_date}
-      period={post.start_time || post.period}
+      period={post.start_time || "00:00"}
       exercises={(exercises ?? []).map((se) => {
         const ex = se.exercises as unknown as {
           id: string
@@ -97,6 +99,7 @@ export default async function SessionPage({
       initialSessionAthleteId={sessionAthlete?.id ?? null}
       initialAttendedAt={sessionAthlete?.attended_at ?? null}
       initialCompletions={completions}
+      initialSelfieUploaded={Boolean(existingSelfie)}
     />
   )
 }
