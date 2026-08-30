@@ -21,14 +21,12 @@ export default async function DashboardPage() {
 
   let sessions: SessionCardData[] = []
 
-  const { data: directAssignments } = await supabase.from("session_assignments").select("session_post_id").eq("athlete_id", userData.user.id)
-  const assignedPostIds = (directAssignments ?? []).map((row: any) => row.session_post_id)
-  if (teamIds.length > 0 || assignedPostIds.length > 0) {
-    const filters = [teamIds.length ? `team_id.in.(${teamIds.join(",")})` : null, assignedPostIds.length ? `id.in.(${assignedPostIds.join(",")})` : null].filter(Boolean).join(",")
+  const sessionFilters = [`athlete_id.eq.${userData.user.id}`, ...(teamIds.length ? [`team_id.in.(${teamIds.join(",")})`] : [])].join(",")
+  if (sessionFilters) {
     const { data: posts } = await supabase
       .from("session_posts")
       .select("*, session_exercises(id), teams(name_en, name_ar, color_hex, is_national_team)")
-      .or(filters)
+      .or(sessionFilters)
       .order("session_date", { ascending: true })
 
     const { data: mySessionAthletes } = await supabase.from("session_athletes").select("*, session_summaries(id)").eq("athlete_id", userData.user.id)

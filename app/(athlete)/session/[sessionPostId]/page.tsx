@@ -21,15 +21,15 @@ export default async function SessionPage({
   const { data: post } = await supabase
     .from("session_posts")
     .select(
-      "id, title_en, title_ar, notes_en, notes_ar, session_date, period, team_id, teams(name_en, name_ar, color_hex, is_national_team)",
+      "id, title_en, title_ar, notes, notes_en, notes_ar, session_date, start_time, period, team_id, athlete_id, teams(name_en, name_ar, color_hex, is_national_team)",
     )
     .eq("id", sessionPostId)
     .maybeSingle()
 
   if (!post) notFound()
-  const { data: directAssignment } = await supabase.from("session_assignments").select("id, load_percentage").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
   const teamVisible = post.team_id && teamIds.includes(post.team_id)
-  if (!teamVisible && !directAssignment) notFound()
+  const athleteVisible = post.athlete_id === userData.user.id
+  if (!teamVisible && !athleteVisible) notFound()
 
   const { data: exercises } = await supabase
     .from("session_exercises")
@@ -67,12 +67,12 @@ export default async function SessionPage({
       language={language}
       sessionPostId={post.id}
       title={language === "ar" ? post.title_ar : post.title_en}
-      notes={language === "ar" ? post.notes_ar : post.notes_en}
+      notes={language === "ar" ? (post.notes_ar || post.notes) : (post.notes_en || post.notes)}
       teamName={team ? (language === "ar" ? team.name_ar : team.name_en) : ""}
       teamColor={team?.color_hex ?? "#94A3B8"}
       isNationalTeam={team?.is_national_team ?? false}
       sessionDate={post.session_date}
-      period={post.period}
+      period={post.start_time || post.period}
       exercises={(exercises ?? []).map((se) => {
         const ex = se.exercises as unknown as {
           id: string
