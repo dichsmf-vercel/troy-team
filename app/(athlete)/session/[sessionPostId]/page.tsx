@@ -74,7 +74,7 @@ export default async function SessionPage({
       teamColor={team?.color_hex ?? "#94A3B8"}
       isNationalTeam={team?.is_national_team ?? false}
       sessionDate={post.session_date}
-      period={post.start_time || "00:00"}
+      period={post.start_time ? String(post.start_time).slice(0, 5) : "00:00"}
       exercises={(exercises ?? []).map((se) => {
         const ex = se.exercises as unknown as {
           id: string

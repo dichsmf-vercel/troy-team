@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Play, Check, TriangleAlert, ChevronLeft, ChevronRight } from "lucide-react"
@@ -80,6 +80,36 @@ export function SessionRunner({
   const [showVideo, setShowVideo] = useState(false)
   const [selfieUploaded, setSelfieUploaded] = useState(initialSelfieUploaded)
   const [selfieError, setSelfieError] = useState<string | null>(null)
+  const [justification, setJustification] = useState("")
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), [])
+
+  async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) return
+    streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+    videoRef.current.srcObject = streamRef.current
+  }
+
+  function captureSelfie() {
+    const video = videoRef.current
+    if (!video || !sessionAthleteId || video.videoWidth === 0) return
+    const canvas = document.createElement("canvas")
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext("2d")?.drawImage(video, 0, 0)
+    startTransition(async () => {
+      const result = await uploadSelfie(sessionAthleteId, canvas.toDataURL("image/jpeg", 0.82))
+      if (result?.error) setSelfieError(result.error)
+      else { setSelfieUploaded(true); setSelfieError(null); streamRef.current?.getTracks().forEach((track) => track.stop()) }
+    })
+  }
+
+  function submitJustification() {
+    if (!sessionAthleteId || !justification.trim()) return
+    startTransition(async () => { const result = await uploadSelfie(sessionAthleteId, "", justification); if (result?.error) setSelfieError(result.error); else { setSelfieUploaded(true); setSelfieError(null) } })
+  }
 
   const completedCount = Object.values(completedMap).filter(Boolean).length
   const progressPct = exercises.length > 0 ? Math.round((completedCount / exercises.length) * 100) : 0
@@ -130,7 +160,7 @@ export function SessionRunner({
         <h1 className="text-balance text-2xl font-semibold tracking-tight">{title}</h1>
         {notes ? <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">{notes}</p> : null}
         <p className="text-sm text-muted-foreground tabular">
-          {new Date(sessionDate).toLocaleDateString(language === "ar" ? "ar" : "en-US", {
+          {new Date(`${sessionDate.slice(0, 10)}T12:00:00`).toLocaleDateString(language === "ar" ? "ar" : "en-US", {
             weekday: "long",
             month: "long",
             day: "numeric",
@@ -223,7 +253,7 @@ export function SessionRunner({
             </div>
           ) : null}
 
-          <div className="grid gap-2 border-t border-border pt-4"><Label htmlFor="session-selfie">Upload a selfie to unlock exercise completion</Label><input id="session-selfie" type="file" accept="image/*" capture="user" disabled={!sessionAthleteId || isPending} onChange={(event) => { const file = event.target.files?.[0]; if (!file || !sessionAthleteId) return; const reader = new FileReader(); reader.onload = () => { startTransition(async () => { const result = await uploadSelfie(sessionAthleteId, String(reader.result)); if (result?.error) setSelfieError(result.error); else { setSelfieUploaded(true); setSelfieError(null) } }) }; reader.readAsDataURL(file) }} className="block w-full text-sm" />{selfieUploaded ? <p className="text-sm text-emerald-600">Selfie uploaded. Exercises unlocked.</p> : null}{selfieError ? <p className="text-sm text-destructive">{selfieError}</p> : null}</div>
+          <div className="grid gap-3 border-t border-border pt-4"><Label>Take a selfie to unlock exercise completion</Label>{!selfieUploaded ? <><video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full rounded-md bg-muted object-cover" /><div className="flex gap-2"><Button type="button" variant="outline" onClick={startCamera} disabled={!sessionAthleteId || isPending}>Open camera</Button><Button type="button" onClick={captureSelfie} disabled={!sessionAthleteId || isPending}>Take selfie</Button></div><details><summary className="cursor-pointer text-xs text-muted-foreground">Can&apos;t use the camera?</summary><div className="mt-2 grid gap-2"><Textarea value={justification} onChange={(event) => setJustification(event.target.value)} placeholder="Explain to Coach Ahmed why you cannot submit an image right now." rows={3} /><Button type="button" variant="ghost" className="w-fit text-xs" onClick={submitJustification} disabled={!sessionAthleteId || isPending || !justification.trim()}>Send justification to Coach Ahmed</Button></div></details></> : <p className="text-sm text-emerald-600">Selfie or justification submitted for review. Exercises unlocked.</p>}{selfieError ? <p className="text-sm text-destructive">{selfieError}</p> : null}</div>
 
           <div className="flex items-center gap-3 border-t border-border pt-4">
             <Checkbox

@@ -97,12 +97,14 @@ export async function completeSession(sessionAthleteId: string, imageUrl: string
   return { success: true }
 }
 
-export async function uploadSelfie(sessionAthleteId: string, imageUrl: string) {
+export async function uploadSelfie(sessionAthleteId: string, imageUrl: string, justification?: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from("session_selfies").insert({
+  const { error } = await supabase.from("session_selfies").upsert({
     session_athlete_id: sessionAthleteId,
     image_url: imageUrl,
-  })
+    justification: justification?.trim() || null,
+    uploaded_at: new Date().toISOString(),
+  }, { onConflict: "session_athlete_id" })
   if (error) return { error: error.message }
   return { success: true }
 }
