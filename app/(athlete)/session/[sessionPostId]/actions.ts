@@ -81,6 +81,18 @@ export async function reportPain(
   return { success: true }
 }
 
+export async function completeSession(sessionAthleteId: string, imageUrl: string) {
+  const supabase = await createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) return { error: "Not authenticated" }
+  const { error } = await supabase.from("session_selfies").upsert({ session_athlete_id: sessionAthleteId, image_url: imageUrl, uploaded_at: new Date().toISOString() }, { onConflict: "session_athlete_id" })
+  if (error) return { error: error.message }
+  const { error: attendanceError } = await supabase.from("session_athletes").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", sessionAthleteId).eq("athlete_id", userData.user.id)
+  if (attendanceError) return { error: attendanceError.message }
+  revalidatePath(`/session/${sessionAthleteId}`)
+  return { success: true }
+}
+
 export async function uploadSelfie(sessionAthleteId: string, imageUrl: string) {
   const supabase = await createClient()
   const { error } = await supabase.from("session_selfies").insert({

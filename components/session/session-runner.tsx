@@ -75,6 +75,7 @@ export function SessionRunner({
   const [painSeverity, setPainSeverity] = useState(3)
   const [painNotes, setPainNotes] = useState("")
   const [isPending, startTransition] = useTransition()
+  const [showVideo, setShowVideo] = useState(false)
 
   const completedCount = Object.values(completedMap).filter(Boolean).length
   const progressPct = exercises.length > 0 ? Math.round((completedCount / exercises.length) * 100) : 0
@@ -212,14 +213,10 @@ export function SessionRunner({
           </div>
 
           {active.videoUrl ? (
-            <a
-              href={active.videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-accent-foreground underline underline-offset-4"
-            >
-              {dict.session.watchDemo}
-            </a>
+            <div className="grid gap-2">
+              <Button type="button" variant="outline" className="w-full" onClick={() => setShowVideo((value) => !value)}>{showVideo ? "Hide video" : dict.session.watchDemo}</Button>
+              {showVideo ? <div className="aspect-video overflow-hidden rounded-md bg-muted"><iframe className="size-full" src={active.videoUrl.replace("watch?v=", "embed/")} title={`${active.name} video`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div> : null}
+            </div>
           ) : null}
 
           <div className="flex items-center gap-3 border-t border-border pt-4">
