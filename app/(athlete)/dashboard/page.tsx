@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   if (sessionFilters) {
     const { data: posts } = await supabase
       .from("session_posts")
-      .select("*, session_exercises(id), teams(name_en, name_ar, color_hex, is_national_team)")
+      .select("*, session_exercises(id), teams(name_en, name_ar, color_hex, image_url, is_national_team)")
       .or(sessionFilters)
       .order("session_date", { ascending: true })
 
@@ -41,10 +41,11 @@ export default async function DashboardPage() {
         titleEn: post.title_en,
         titleAr: post.title_ar,
         sessionDate: post.session_date,
-        period: post.period,
+        period: post.start_time,
         exerciseCount: post.session_exercises?.length ?? 0,
         teamNameEn: team?.name_en ?? "",
         teamNameAr: team?.name_ar ?? "",
+        teamImageUrl: team?.image_url ?? null,
         colorHex: team?.color_hex ?? "#888888",
         isNationalTeam: Boolean(team?.is_national_team),
         hasSummary: Boolean(sa?.session_summaries?.length),

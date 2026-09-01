@@ -1,13 +1,12 @@
 export type AppRole = "admin" | "supporting_coach" | "athlete"
 export type LanguagePref = "en" | "ar"
 export type AthleteTier = "beginner" | "intermediate" | "advanced" | "elite"
-export type SessionPeriod = "morning" | "evening"
-
 export type Team = {
   id: string
   name_en: string
   name_ar: string
   color_hex: string
+  image_url: string | null
   is_national_team: boolean
   created_at: string
 }
@@ -54,13 +53,13 @@ export type Exercise = {
 
 export type SessionPost = {
   id: string
-  team_id: string
+  team_id: string | null
+  athlete_id: string | null
   title_en: string
   title_ar: string
-  notes_en: string | null
-  notes_ar: string | null
+  notes: string | null
   session_date: string
-  period: SessionPeriod
+  start_time: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -70,7 +69,7 @@ export type SessionExercise = {
   id: string
   session_post_id: string
   exercise_id: string
-  sort_order: number
+  exercise_order: number
   sets: number | null
   reps: string | null
   created_at: string
@@ -115,7 +114,8 @@ export type SessionSummary = {
 export type SessionSelfie = {
   id: string
   session_athlete_id: string
-  image_url: string
+  image_url: string | null
+  justification: string | null
   uploaded_at: string
   reviewed: boolean
   reviewed_by: string | null

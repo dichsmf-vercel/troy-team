@@ -11,10 +11,11 @@ export type SessionCardData = {
   titleEn: string
   titleAr: string
   sessionDate: string
-  period: "morning" | "evening"
+  period: string | null
   exerciseCount: number
   teamNameEn: string
   teamNameAr: string
+  teamImageUrl: string | null
   colorHex: string
   isNationalTeam: boolean
   hasSummary: boolean
@@ -25,7 +26,7 @@ export function SessionCard({ session }: { session: SessionCardData }) {
   const { language, dict, dir } = useLanguage()
   const title = language === "ar" ? session.titleAr : session.titleEn
   const teamName = language === "ar" ? session.teamNameAr : session.teamNameEn
-  const periodLabel = session.period === "morning" ? dict.dashboard.morning : dict.dashboard.evening
+  const periodLabel = session.period ? new Date(`1970-01-01T${session.period.slice(0, 5)}`).toLocaleTimeString(language === "ar" ? "ar-SA" : "en-US", { hour: "numeric", minute: "2-digit" }) : "Time not set"
 
   const isComplete = Boolean(session.attendedAt) && session.hasSummary
   const href = isComplete
@@ -46,12 +47,7 @@ export function SessionCard({ session }: { session: SessionCardData }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <span
-            className="text-xs font-medium uppercase tracking-wide"
-            style={{ color: session.colorHex }}
-          >
-            {teamName}
-          </span>
+          <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide" style={{ color: session.colorHex }}>{session.teamImageUrl ? <img src={session.teamImageUrl} alt="" className="size-6 rounded-full object-contain" /> : null}{teamName}</span>
           <h3 className="text-base font-semibold text-balance">{title}</h3>
         </div>
         {isComplete ? (
