@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { safeTime } from "@/lib/formatters"
 
 type Props = { teams: any[]; athletes: any[]; sessions: any[]; exercises: any[] }
 type Row = { exercise: string; sets: string; reps: string; load: string; unit: "percent" | "kg" }
@@ -32,6 +33,6 @@ export function SessionPanel({ teams, athletes, sessions, exercises }: Props) {
         <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save session"}</Button>
       </form>
     </CardContent></Card>
-    <div className="grid content-start gap-3">{sessions.map((session: any) => <Card key={session.id}><CardContent className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold">{session.title_en}</p>{session.notes ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{session.notes}</p> : null}<p className="text-sm text-muted-foreground tabular-nums">{session.session_date} · {session.start_time ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(session.start_time)) : "No start time"}</p></div></CardContent></Card>)}</div>
+    <div className="grid content-start gap-3">{sessions.map((session: any) => <Card key={session.id}><CardContent className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold">{session.title_en}</p>{session.notes ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{session.notes}</p> : null}<p className="text-sm text-muted-foreground tabular-nums">{session.session_date ? session.session_date.slice(0, 10) : "No date"} · {session.start_time ? safeTime(session.start_time) : "No start time"}</p></div></CardContent></Card>)}</div>
   </div>
 }

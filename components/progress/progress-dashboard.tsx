@@ -3,14 +3,14 @@
 import { CalendarCheck, Gauge, Scale, TrendingDown, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useLanguage } from "@/components/providers/language-provider"
+import { safeDate } from "@/lib/formatters"
 
 type Measurement = { date: string; weight: number | null; bodyFat: number | null }
 type RpePoint = { date: string; rpe: number }
 type Props = { measurements: Measurement[]; rpeHistory: RpePoint[]; attendanceRate: number; totalAttended: number; avgRpe: number | null }
 
 function formatDate(value: string, language: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(language === "ar" ? "ar-SA" : "en-GB", { day: "2-digit", month: "short" }).format(date)
+  return safeDate(value, language === "ar" ? "ar-SA" : "en-GB", { day: "2-digit", month: "short" })
 }
 
 function Metric({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail: string }) {

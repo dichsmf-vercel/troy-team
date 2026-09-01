@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useLanguage } from "@/components/providers/language-provider"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { safeTime } from "@/lib/formatters"
 
 export type SessionCardData = {
   sessionAthleteId: string
@@ -26,7 +27,7 @@ export function SessionCard({ session }: { session: SessionCardData }) {
   const { language, dict, dir } = useLanguage()
   const title = language === "ar" ? session.titleAr : session.titleEn
   const teamName = language === "ar" ? session.teamNameAr : session.teamNameEn
-  const periodLabel = session.period ? new Date(`1970-01-01T${session.period.slice(0, 5)}`).toLocaleTimeString(language === "ar" ? "ar-SA" : "en-US", { hour: "numeric", minute: "2-digit" }) : "Time not set"
+  const periodLabel = safeTime(session.period, language === "ar" ? "ar-SA" : "en-US")
 
   const isComplete = Boolean(session.attendedAt) && session.hasSummary
   const href = isComplete

@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import type { Language } from "@/lib/i18n/dictionaries"
 import { useLanguage } from "@/components/providers/language-provider"
 import { startSession, toggleExerciseCompletion, reportPain, uploadSelfie } from "@/app/(athlete)/session/[sessionPostId]/actions"
+import { safeDate, safeTime } from "@/lib/formatters"
 
 type Exercise = {
   sessionExerciseId: string
@@ -160,12 +161,8 @@ export function SessionRunner({
         <h1 className="text-balance text-2xl font-semibold tracking-tight">{title}</h1>
         {notes ? <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">{notes}</p> : null}
         <p className="text-sm text-muted-foreground tabular">
-          {new Date(`${sessionDate.slice(0, 10)}T12:00:00`).toLocaleDateString(language === "ar" ? "ar" : "en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}{" "}
-          &middot; {new Date(`1970-01-01T${period}`).toLocaleTimeString(language === "ar" ? "ar" : "en-US", { hour: "numeric", minute: "2-digit" })}
+          {safeDate(sessionDate, language === "ar" ? "ar" : "en-US", { weekday: "long", month: "long", day: "numeric" })}{" "}
+          &middot; {safeTime(period, language === "ar" ? "ar" : "en-US")}
         </p>
         <Button size="lg" className="mt-2 gap-2" onClick={handleStart} disabled={isPending}>
           <Play className="size-4" />

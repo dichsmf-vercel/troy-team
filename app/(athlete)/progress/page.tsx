@@ -40,6 +40,8 @@ export default async function ProgressPage() {
       ? Math.round((summaries.reduce((sum, s) => sum + (s.rpe ?? 0), 0) / summaries.length) * 10) / 10
       : null
 
+  console.log("[v0] athlete progress health", { measurements: measurements?.length ?? 0, sessionAthletes: sessionAthletes?.length ?? 0, summaries: summaries.length, attendanceRate })
+
   return (
     <ProgressDashboard
       measurements={(measurements ?? []).map((m) => ({

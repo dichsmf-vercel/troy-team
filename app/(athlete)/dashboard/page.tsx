@@ -54,6 +54,7 @@ export default async function DashboardPage() {
     })
   }
 
+  console.log("[v0] athlete dashboard health", { sessions: sessions.length, profileLoaded: Boolean(profile), firstSession: sessions[0] ? { id: sessions[0].sessionPostId, date: sessions[0].sessionDate, time: sessions[0].period } : null })
   const todayStr = new Date().toISOString().slice(0, 10)
   const todaysSessions = sessions.filter((s) => s.sessionDate === todayStr)
   const upcomingSessions = sessions.filter((s) => s.sessionDate > todayStr)
