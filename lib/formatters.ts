@@ -4,7 +4,16 @@ export function safeDate(value: unknown, locale = "en-US", options?: Intl.DateTi
   const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
     ? new Date(`${raw}T12:00:00`)
     : new Date(raw)
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString(locale, options)
+  if (Number.isNaN(date.getTime())) {
+    console.error("[v0] invalid date value", { value, locale })
+    return "—"
+  }
+  try {
+    return date.toLocaleDateString(locale, options)
+  } catch (error) {
+    console.error("[v0] date formatting failed", { value, locale, error })
+    return "—"
+  }
 }
 
 export function safeTime(value: unknown, locale = "en-US") {
@@ -16,7 +25,12 @@ export function safeTime(value: unknown, locale = "en-US") {
   const minutes = Number(match[2])
   if (hours > 23 || minutes > 59) return "—"
   const date = new Date(1970, 0, 1, hours, minutes)
-  return date.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" })
+  try {
+    return date.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" })
+  } catch (error) {
+    console.error("[v0] time formatting failed", { value, locale, error })
+    return "—"
+  }
 }
 
 export function logPageHealth(page: string, details: Record<string, unknown>) {
