@@ -11,9 +11,12 @@ export default async function DashboardPage() {
 
   const { dict } = await getDictionary()
 
-  const [{ data: profile }, { data: athleteTeams }] = await Promise.all([
+  const [{ data: profile }, { data: athleteTeams }, { data: athleteProfile }, { data: latestAssessment }, { data: activeProgram }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", userData.user.id).single(),
     supabase.from("athlete_teams").select("team_id, teams(*)").eq("athlete_id", userData.user.id),
+    supabase.from("athletes").select("assessment_status, medical_clearance_status, intake_completed_at").eq("id", userData.user.id).maybeSingle(),
+    supabase.from("athlete_assessments").select("status").eq("athlete_id", userData.user.id).order("updated_at", { ascending: false }).limit(1),
+    supabase.from("athlete_programs").select("status, programs(name_en)").eq("athlete_id", userData.user.id).in("status", ["approved", "active"]).order("month_start", { ascending: false }).limit(1),
   ])
 
   const teamIds = (athleteTeams ?? []).map((row: any) => row.team_id)
@@ -65,7 +68,7 @@ export default async function DashboardPage() {
     <div>
       <AthleteHeader title={`${dict.dashboard.greeting}${firstName ? ", " + firstName : ""}`} />
 
-      <div className="flex flex-col gap-8 px-4 py-6">
+      <div className="flex flex-col gap-8 px-4 py-6"><section className="grid grid-cols-3 gap-2" aria-label="Athlete readiness"><div className="rounded-xl border bg-card p-3"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Assessment</p><p className="mt-1 truncate text-sm font-semibold">{latestAssessment?.[0]?.status ?? athleteProfile?.assessment_status ?? "Not started"}</p></div><div className="rounded-xl border bg-card p-3"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Program</p><p className="mt-1 truncate text-sm font-semibold">{(activeProgram?.[0] as any)?.programs?.name_en ?? "None"}</p></div><div className="rounded-xl border bg-card p-3"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Medical</p><p className="mt-1 truncate text-sm font-semibold">{athleteProfile?.medical_clearance_status ?? "Pending"}</p></div></section>
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             {dict.dashboard.todaysSessions}
