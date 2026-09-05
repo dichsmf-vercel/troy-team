@@ -38,7 +38,7 @@ export function IntakeStepper({ initial }: { initial: IntakeData }) {
   const [data, setData] = useState<IntakeData>(initial)
   const [isPending, startTransition] = useTransition()
 
-  const logoSrc = resolvedTheme === "dark" ? "/logo-dark.jpg" : "/logo-light.jpg"
+  const logoSrc = resolvedTheme === "dark" ? "/logo-dark-2.jpg" : "/logo-light-2.jpg"
 
   function update<K extends keyof IntakeData>(key: K, value: IntakeData[K]) {
     setData((prev) => ({ ...prev, [key]: value }))

@@ -7,7 +7,7 @@ import { useLanguage } from "@/components/providers/language-provider"
 export function AthleteHeader({ title }: { title: string }) {
   const { resolvedTheme } = useTheme()
   const { dir } = useLanguage()
-  const logoSrc = resolvedTheme === "dark" ? "/logo-dark.jpg" : "/logo-light.jpg"
+  const logoSrc = resolvedTheme === "dark" ? "/logo-dark-2.jpg" : "/logo-light-2.jpg"
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">

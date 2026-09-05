@@ -20,7 +20,7 @@ export function AuthShell({
           <div className="mb-8 flex flex-col items-center gap-3 text-center">
             <div className="flex size-16 items-center justify-center rounded-md bg-card ring-1 ring-border">
               <Image
-                src="/logo-dark.jpg"
+                src="/logo-dark-2.jpg"
                 alt=""
                 width={40}
                 height={40}
@@ -28,7 +28,7 @@ export function AuthShell({
                 priority
               />
               <Image
-                src="/logo-light.jpg"
+                src="/logo-light-2.jpg"
                 alt=""
                 width={40}
                 height={40}

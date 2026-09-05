@@ -4,8 +4,8 @@ This file tracks every image asset the app needs. Please upload these into the c
 
 ## Already received
 
-- `public/logo-light.jpg` — Spartan helmet logo (dark mark, for light backgrounds)
-- `public/logo-dark.jpg` — Spartan helmet logo (light mark, for dark backgrounds)
+- `public/logo-light-2.jpg` — Spartan helmet logo (dark mark, for light backgrounds)
+- `public/logo-dark-2.jpg` — Spartan helmet logo (light mark, for dark backgrounds)
 
 ## Still needed
 
