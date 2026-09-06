@@ -18,24 +18,17 @@ export function AuthShell({
       <div className="flex flex-1 items-center justify-center px-6 pb-16">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center gap-3 text-center">
-            <div className="flex size-24 items-center justify-center rounded-xl bg-card p-2 ring-1 ring-border">
+            <picture>
+              <source media="(prefers-color-scheme: dark)" srcSet="/logo-dark-2.jpg" />
               <Image
-                src="/minilogo-removebg-preview.png"
+                src="/logo-light-2.jpg"
                 alt="Troy Team"
-                width={80}
-                height={80}
-                className="hidden size-20 object-contain dark:block"
+                width={160}
+                height={160}
+                className="size-32 object-contain"
                 priority
               />
-              <Image
-                src="/minilogo-removebg-preview.png"
-                alt="Troy Team"
-                width={80}
-                height={80}
-                className="block size-20 object-contain dark:hidden"
-                priority
-              />
-            </div>
+            </picture>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-balance">{appName}</h1>
               <p className="text-sm text-muted-foreground">{tagline}</p>

@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useLanguage } from "@/components/providers/language-provider"
 import { RulesPanel } from "@/components/admin/rules-panel"
-import { ProgramsPanel } from "@/components/admin/programs-panel"
 import { SessionPanel } from "@/components/admin/session-panel"
 import { createExercise, createProgramRule, createSessionPost, deleteExercise, markNotificationRead, reviewSelfie, updateAthleteAccountFromForm, updateExercise } from "@/app/admin/actions"
 
