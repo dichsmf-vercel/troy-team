@@ -18,8 +18,8 @@ export function DashboardTopBar({ compact = false }: { compact?: boolean }) {
   return (
     <header className="flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:px-8">
       <div className="flex min-w-0 items-center gap-3">
-        <Image src={BRAND.logoDark} alt={BRAND.siteName} width={36} height={36} className="size-9 rounded-md object-cover dark:hidden" />
-        <Image src={BRAND.logoLight} alt={BRAND.siteName} width={36} height={36} className="hidden size-9 rounded-md object-cover dark:block" />
+        <Image src={BRAND.logoDark} alt={BRAND.siteName} width={52} height={52} className="size-13 object-contain dark:hidden" />
+        <Image src={BRAND.logoLight} alt={BRAND.siteName} width={52} height={52} className="hidden size-13 object-contain dark:block" />
         {!compact && <div className="min-w-0"><p className="truncate text-sm font-semibold">{BRAND.siteName}</p><p className="truncate text-xs text-muted-foreground">{BRAND.coachName}</p></div>}
       </div>
       <div className="flex shrink-0 items-center gap-2">

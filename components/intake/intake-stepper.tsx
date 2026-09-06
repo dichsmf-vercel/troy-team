@@ -38,7 +38,7 @@ export function IntakeStepper({ initial }: { initial: IntakeData }) {
   const [data, setData] = useState<IntakeData>(initial)
   const [isPending, startTransition] = useTransition()
 
-  const logoSrc = resolvedTheme === "dark" ? "/logo-dark-2.jpg" : "/logo-light-2.jpg"
+  const logoSrc = "/minilogo-removebg-preview.png"
 
   function update<K extends keyof IntakeData>(key: K, value: IntakeData[K]) {
     setData((prev) => ({ ...prev, [key]: value }))
@@ -74,7 +74,7 @@ export function IntakeStepper({ initial }: { initial: IntakeData }) {
   return (
     <div className="flex flex-col gap-8" dir={dir}>
       <div className="flex flex-col items-center gap-4">
-        <Image src={logoSrc || "/placeholder.svg"} alt="" width={56} height={56} className="rounded-lg" priority />
+        <Image src={logoSrc || "/placeholder.svg"} alt="" width={80} height={80} className="size-20 object-contain" priority />
         <div className="w-full flex flex-col gap-2">
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span className="tabular">

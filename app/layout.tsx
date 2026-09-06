@@ -27,10 +27,10 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/logo-light-2.jpg", media: "(prefers-color-scheme: light)" },
-      { url: "/logo-dark-2.jpg", media: "(prefers-color-scheme: dark)" },
+      { url: "/minilogo-removebg-preview.png", media: "(prefers-color-scheme: light)" },
+      { url: "/minilogo-removebg-preview.png", media: "(prefers-color-scheme: dark)" },
     ],
-    apple: "/logo-dark-2.jpg",
+    apple: "/minilogo-removebg-preview.png",
   },
 }
 
