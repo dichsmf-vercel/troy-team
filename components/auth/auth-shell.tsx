@@ -19,13 +19,13 @@ export function AuthShell({
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center gap-3 text-center">
             <picture>
-              <source media="(prefers-color-scheme: dark)" srcSet="/logo-dark-2.jpg" />
+              <source media="(prefers-color-scheme: dark)" srcSet="/main-logo.png" />
               <Image
-                src="/logo-light-2.jpg"
+                src="/main-logo.png"
                 alt="Troy Team"
-                width={160}
-                height={160}
-                className="size-32 object-contain"
+                width={240}
+                height={240}
+                className="size-48 object-contain"
                 priority
               />
             </picture>

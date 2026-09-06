@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminBoard } from "@/components/admin/admin-board"
-import { AthleteOperations } from "@/components/admin/athlete-operations"
 import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
 
 export default async function AdminPage() {
@@ -22,5 +21,5 @@ export default async function AdminPage() {
   ])
   console.log("[v0] admin datasets", { teams: teams?.length ?? 0, sessions: sessions?.length ?? 0, athletes: athletes?.length ?? 0, exercises: exercises?.length ?? 0, selfies: selfies?.length ?? 0, notifications: notifications?.length ?? 0, rules: rules?.length ?? 0, programs: programs?.length ?? 0, sessionSample: sessions?.[0] ? { id: sessions[0].id, session_date: sessions[0].session_date, start_time: sessions[0].start_time } : null })
   if (!teams || !sessions || !athletes || !exercises || !selfies || !notifications || !rules || !programs) console.error("[v0] admin dataset query returned null", { teams: !teams, sessions: !sessions, athletes: !athletes, exercises: !exercises, selfies: !selfies, notifications: !notifications, rules: !rules, programs: !programs })
-  return <><DashboardTopBar /><AdminBoard teams={teams ?? []} sessions={sessions ?? []} athletes={athletes ?? []} exercises={exercises ?? []} selfies={selfies ?? []} notifications={notifications ?? []} rules={rules ?? []} programs={programs ?? []} /><AthleteOperations athletes={(athletes ?? []) as any[]} /></>
+  return <><DashboardTopBar /><AdminBoard teams={teams ?? []} sessions={sessions ?? []} athletes={athletes ?? []} exercises={exercises ?? []} selfies={selfies ?? []} notifications={notifications ?? []} rules={rules ?? []} programs={programs ?? []} /></>
 }
