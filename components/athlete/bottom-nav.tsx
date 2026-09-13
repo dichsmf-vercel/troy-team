@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutGrid, TrendingUp, User } from "lucide-react"
+import { LayoutGrid, TrendingUp, User, CalendarDays } from "lucide-react"
 import { useLanguage } from "@/components/providers/language-provider"
 import { cn } from "@/lib/utils"
 
@@ -12,13 +12,14 @@ export function BottomNav() {
 
   const items = [
     { href: "/dashboard", label: dict.dashboard.todaysSessions.split(" ")[0], icon: LayoutGrid },
+    { href: "/program", label: "Program", icon: CalendarDays },
     { href: "/progress", label: dict.progress.title, icon: TrendingUp },
     { href: "/profile", label: dict.profile.title, icon: User },
   ]
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card">
-      <div className="mx-auto max-w-md grid grid-cols-3">
+      <div className="mx-auto max-w-md grid grid-cols-4">
         {items.map((item) => {
           const active = pathname === item.href
           const Icon = item.icon

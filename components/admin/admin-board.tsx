@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { SessionPanel } from "@/components/admin/session-panel"
 import { RulesPanel } from "@/components/admin/rules-panel"
 import { createExercise } from "@/app/admin/actions"
+import { ProgramGenerator } from "@/components/admin/program-generator"
 
 type Props = { teams: any[]; sessions: any[]; athletes: any[]; exercises: any[]; selfies: any[]; notifications: any[]; rules: any[]; programs: any[] }
 
@@ -27,10 +28,11 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
         <h1 className="text-3xl font-bold">Coach operations</h1>
       </header>
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 overflow-hidden p-1">
+        <TabsList className="grid h-auto w-full grid-cols-4 gap-1 overflow-hidden p-1">
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="exercises">Exercises</TabsTrigger>
           <TabsTrigger value="rules">Rules</TabsTrigger>
+          <TabsTrigger value="programs">Programs</TabsTrigger>
         </TabsList>
         <TabsContent value="sessions" className="mt-6">
           <SessionPanel teams={safeTeams} athletes={safeAthletes} sessions={safeSessions} exercises={safeExercises} />
@@ -40,6 +42,9 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
         </TabsContent>
         <TabsContent value="rules" className="mt-6">
           <RulesPanel rules={safeRules} exercises={safeExercises} />
+        </TabsContent>
+        <TabsContent value="programs" className="mt-6">
+          <ProgramGenerator athletes={safeAthletes} exercises={safeExercises} />
         </TabsContent>
       </Tabs>
     </main>
@@ -52,7 +57,7 @@ function ExercisePanel({ exercises }: { exercises: any[] }) {
       <Card>
         <CardHeader><CardTitle>Add exercise</CardTitle></CardHeader>
         <CardContent>
-          <form action={createExercise} className="grid gap-3 sm:grid-cols-2">
+          <form action={async (formData) => { await createExercise(formData) }} className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-2"><Label htmlFor="new-exercise-en">Name</Label><Input id="new-exercise-en" name="name_en" required /></div>
             <div className="grid gap-2"><Label htmlFor="new-exercise-ar">Arabic name</Label><Input id="new-exercise-ar" name="name_ar" /></div>
             <div className="grid gap-2"><Label htmlFor="new-exercise-category">Category</Label><Input id="new-exercise-category" name="category" /></div>
