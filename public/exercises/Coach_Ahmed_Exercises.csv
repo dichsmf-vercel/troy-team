@@ -1,0 +1,102 @@
+Exercise_ID,Exercise_Name,Category,Movement_Pattern,Difficulty
+E001,Barbell Back Squat,Lower Body,Squat,Advanced
+E002,Barbell Front Squat,Lower Body,Squat,Advanced
+E003,Goblet Squat,Lower Body,Squat,Beginner
+E004,Overhead Squat,Lower Body,Squat,Advanced
+E005,Box Squat,Lower Body,Squat,Intermediate
+E006,Heel-Elevated DB Squat,Lower Body,Squat,Beginner
+E007,Walking Barbell Lunges,Lower Body,Lunge,Intermediate
+E008,Heavy Box Step-Ups,Lower Body,Lunge,Intermediate
+E009,Barbell Split Squat,Lower Body,Lunge,Intermediate
+E010,Bulgarian Split Squat,Lower Body,Lunge,Advanced
+E011,Supported Split Squat Isometric,Lower Body,Lunge,Beginner
+E012,Conventional Barbell Deadlift,Lower Body,Hinge,Advanced
+E013,Stiff-Legged Deadlift,Lower Body,Hinge,Advanced
+E014,Trap Bar Deadlift,Lower Body,Hinge,Beginner
+E015,Kettlebell Romanian Deadlift,Lower Body,Hinge,Beginner
+E016,Single-Leg Barbell RDL,Lower Body,Hinge,Advanced
+E017,Barbell Overhead Press,Upper Body,Vertical Push,Advanced
+E018,Half-Kneeling Landmine Press,Upper Body,Vertical Push,Intermediate
+E019,Dumbbell Arnold Press,Upper Body,Vertical Push,Intermediate
+E020,Barbell Bench Press,Upper Body,Horizontal Push,Advanced
+E021,Dumbbell Floor Press,Upper Body,Horizontal Push,Beginner
+E022,Incline Push-Up,Upper Body,Horizontal Push,Beginner
+E023,Weighted Push-Ups,Upper Body,Horizontal Push,Intermediate
+E024,Behind the Neck Lat Pulldown,Upper Body,Vertical Pull,Advanced
+E025,Face Pulls,Upper Body,Horizontal Pull,Beginner
+E026,Half-Kneeling Cable Chop,Core,Anti-Rotation,Intermediate
+E027,Pallof Press,Core,Anti-Rotation,Beginner
+E028,Suitcase Carry,Core,Anti-Lateral Flexion,Intermediate
+E029,RKC Plank,Core,Anti-Extension,Beginner
+E030,Dead Bug,Core,Anti-Extension,Beginner
+E031,Ab Wheel Rollout,Core,Anti-Extension,Advanced
+E032,Bird Dog,Core,Anti-Rotation,Beginner
+E033,Dynamic Cable Woodchops,Core,Rotational,Intermediate
+E034,Box Jumps,Power,Plyometric,Intermediate
+E035,Depth Jumps,Power,Plyometric,Advanced
+E036,Kettlebell Swings,Power,Hinge,Intermediate
+E037,Prowler Sled Push,Conditioning,Sled,Beginner
+E038,Seated Box Jumps,Power,Plyometric,Beginner
+E039,Trap Bar Jumps,Power,Plyometric,Advanced
+E040,Barbell Power Clean,Power,Olympic Weightlifting,Advanced
+E041,Heavy Sled Pushes,Power,Sled,Intermediate
+E042,Broad Jumps,Power,Plyometric,Beginner
+E043,Lateral Shuffle Drills,Agility,Change of Direction,Beginner
+E044,Skater Jumps,Agility,Plyometric,Intermediate
+E045,Extensive Tempo Runs,Conditioning,Aerobic,Beginner
+E046,Assault Bike Aerobic Intervals,Conditioning,Aerobic,Beginner
+E047,Maximal Aerobic Speed Runs,Conditioning,Aerobic,Advanced
+E048,Nordic Hamstring Curls,Lower Body,Knee Flexion,Advanced
+E049,Adductor Copenhagen Planks,Core,Anti-Lateral Flexion,Advanced
+E050,Cable Internal/External Rotation,Upper Body,Shoulder Health,Beginner
+E051,Leg Press,Lower Body,Squat,Beginner
+E052,Zercher Squat,Lower Body,Squat,Advanced
+E053,TRX Assisted Squat,Lower Body,Squat,Beginner
+E054,Cossack Squat,Lower Body,Squat,Intermediate
+E055,Glute Ham Raise,Lower Body,Hinge,Advanced
+E056,Glute Bridge,Lower Body,Hinge,Beginner
+E057,Barbell Hip Thrust,Lower Body,Hinge,Intermediate
+E058,Cable Pull-Through,Lower Body,Hinge,Beginner
+E059,Reverse Hyperextension,Lower Body,Hinge,Intermediate
+E060,Dumbbell Reverse Lunge,Lower Body,Lunge,Beginner
+E061,Dumbbell Forward Lunge,Lower Body,Lunge,Intermediate
+E062,Pistol Squat,Lower Body,Lunge,Advanced
+E063,Skater Squat,Lower Body,Lunge,Advanced
+E064,Barbell Push-Press,Upper Body,Vertical Push,Advanced
+E065,Seated Dumbbell Shoulder Press,Upper Body,Vertical Push,Intermediate
+E066,Triceps Dips,Upper Body,Vertical Push,Intermediate
+E067,Standing Cable Chest Press,Upper Body,Horizontal Push,Intermediate
+E068,Decline Bench Press,Upper Body,Horizontal Push,Intermediate
+E069,Tall-Kneeling Landmine Press,Upper Body,Vertical Push,Beginner
+E070,Pull-Ups,Upper Body,Vertical Pull,Intermediate
+E071,Chin-Ups,Upper Body,Vertical Pull,Intermediate
+E072,TRX Inverted Row,Upper Body,Horizontal Pull,Beginner
+E073,Single-Arm Dumbbell Row,Upper Body,Horizontal Pull,Intermediate
+E074,Seated Cable Row,Upper Body,Horizontal Pull,Beginner
+E075,Lat Pulldown,Upper Body,Vertical Pull,Beginner
+E076,Band Pull-Aparts,Upper Body,Horizontal Pull,Beginner
+E077,Russian Twists,Core,Rotational,Intermediate
+E078,Hanging Leg Raises,Core,Anti-Extension,Advanced
+E079,Kneeling Cable Crunch,Core,Trunk Flexion,Intermediate
+E080,Side Plank,Core,Anti-Lateral Flexion,Beginner
+E081,Farmer's Carry,Core,Anti-Lateral Flexion,Intermediate
+E082,Medicine Ball Slams,Power,Plyometric,Beginner
+E083,Wall Ball Shots,Power,Plyometric,Intermediate
+E084,Kettlebell Snatch,Power,Olympic Weightlifting,Advanced
+E085,Dumbbell Snatch,Power,Olympic Weightlifting,Intermediate
+E086,Pogo Jumps,Power,Plyometric,Beginner
+E087,Tuck Jumps,Power,Plyometric,Intermediate
+E088,Single-Leg Broad Jump,Power,Plyometric,Advanced
+E089,Agility Ladder Drills,Agility,Coordination,Beginner
+E090,5-10-5 Pro Agility Shuttle,Agility,Change of Direction,Intermediate
+E091,Resisted Sprints,Power,Sprint,Intermediate
+E092,Downhill Overspeed Running,Power,Sprint,Advanced
+E093,Carioca Drill,Agility,Coordination,Beginner
+E094,Rowing Machine,Conditioning,Aerobic,Beginner
+E095,Swimming Freestyle,Conditioning,Aerobic,Beginner
+E096,SkiErg Intervals,Conditioning,Aerobic,Beginner
+E097,Wall Slides,Mobility,Shoulder Health,Beginner
+E098,90/90 Hip Stretch,Mobility,Hip Health,Beginner
+E099,Cat-Cow,Mobility,Spine Health,Beginner
+E100,Brettzel Stretch,Mobility,Full Body,Intermediate
+E101,Banded Lateral Step-Ups,Lower Body,Lunge,Intermediate
