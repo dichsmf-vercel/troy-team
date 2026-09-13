@@ -8,13 +8,14 @@ import { reviewSelfie } from "@/app/admin/actions"
 
 export function AthleteSelfies({ selfies }: { selfies: any[] }) {
   const [items, setItems] = useState(Array.isArray(selfies) ? selfies : [])
-  const groups = items.reduce<Record<string, any[]>>((result, selfie) => {
+  const safeItems = Array.isArray(items) ? items : []
+  const groups = safeItems.reduce<Record<string, any[]>>((result, selfie) => {
     const athleteId = selfie?.session_athletes?.athlete_id ?? "unassigned"
     result[athleteId] = [...(result[athleteId] ?? []), selfie]
     return result
   }, {})
 
-  if (!items.length) return null
+  if (!safeItems.length) return null
 
   return <Card className="lg:col-span-2">
     <CardHeader><CardTitle>Submitted athlete selfies</CardTitle></CardHeader>
