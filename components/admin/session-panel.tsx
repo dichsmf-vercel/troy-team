@@ -1,8 +1,8 @@
 "use client"
 
-import { useActionState, useState } from "react"
-import { Plus, GripVertical, X } from "lucide-react"
-import { createSessionPost } from "@/app/admin/actions"
+import { useActionState, useState, useTransition } from "react"
+import { Plus, GripVertical, X, Trash2 } from "lucide-react"
+import { createSessionPost, deleteSessionPost } from "@/app/admin/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,10 @@ const initialRow: Row = { exercise: "", sets: "3", reps: "8", load: "", unit: "p
 
 export function SessionPanel({ teams, athletes, sessions, exercises }: Props) {
   const [targetType, setTargetType] = useState<"team" | "athlete">("team")
+  const [visibleSessions, setVisibleSessions] = useState(Array.isArray(sessions) ? sessions : [])
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, startDeleting] = useTransition()
   const [rows, setRows] = useState<Row[]>([{ ...initialRow }])
   const [state, action, pending] = useActionState(async (_: { error: string | null } | null, form: FormData) => createSessionPost(form), { error: null })
   const addRow = () => setRows((current) => [...current, { ...initialRow }])
@@ -33,6 +37,6 @@ export function SessionPanel({ teams, athletes, sessions, exercises }: Props) {
         <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save session"}</Button>
       </form>
     </CardContent></Card>
-    <div className="grid content-start gap-3">{sessions.map((session: any) => <Card key={session.id}><CardContent className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold">{session.title_en}</p>{session.notes ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{session.notes}</p> : null}<p className="text-sm text-muted-foreground tabular-nums">{session.session_date ? session.session_date.slice(0, 10) : "No date"} · {session.start_time ? safeTime(session.start_time) : "No start time"}</p></div></CardContent></Card>)}</div>
+    <section className="grid content-start gap-3" aria-labelledby="existing-sessions-title"><div className="flex items-center justify-between gap-3"><h2 id="existing-sessions-title" className="text-lg font-semibold">Existing sessions</h2><span className="text-sm text-muted-foreground">{visibleSessions.length}</span></div>{deleteError ? <p role="alert" className="text-sm text-destructive">{deleteError}</p> : null}{visibleSessions.length ? visibleSessions.map((session: any) => <Card key={session.id}><CardContent className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold">{session.title_en}</p>{session.notes ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{session.notes}</p> : null}<p className="text-sm text-muted-foreground tabular-nums">{session.session_date ? session.session_date.slice(0, 10) : "No date"} · {session.start_time ? safeTime(session.start_time) : "No start time"}</p></div><Button type="button" variant="ghost" size="icon" aria-label={`Delete ${session.title_en || "session"}`} disabled={isDeleting} onClick={() => { if (!window.confirm(`Delete ${session.title_en || "this session"}?`)) return; setDeletingId(session.id); setDeleteError(null); startDeleting(async () => { const result = await deleteSessionPost(session.id); if (result.error) setDeleteError(result.error); else setVisibleSessions((current) => current.filter((item: any) => item.id !== session.id)); setDeletingId(null) }) }}>{deletingId === session.id ? <span className="text-xs">…</span> : <Trash2 className="size-4" />}</Button></CardContent></Card>) : <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No sessions created yet.</p>}</section>
   </div>
 }
