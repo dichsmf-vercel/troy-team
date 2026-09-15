@@ -10,10 +10,12 @@ import { SessionPanel } from "@/components/admin/session-panel"
 import { RulesPanel } from "@/components/admin/rules-panel"
 import { createExercise } from "@/app/admin/actions"
 import { ProgramGenerator } from "@/components/admin/program-generator"
+import { AthletesPanel } from "@/components/admin/athletes-panel"
+import { ProgramReviewPanel } from "@/components/admin/program-review-panel"
 
 type Props = { teams: any[]; sessions: any[]; athletes: any[]; exercises: any[]; selfies: any[]; notifications: any[]; rules: any[]; programs: any[] }
 
-export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises = [], rules = [] }: Props) {
+export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises = [], rules = [], programs = [] }: Props) {
   const [tab, setTab] = useState("sessions")
   const safeTeams = Array.isArray(teams) ? teams : []
   const safeSessions = Array.isArray(sessions) ? sessions : []
@@ -28,14 +30,18 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
         <h1 className="text-3xl font-bold">Coach operations</h1>
       </header>
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-4 gap-1 overflow-hidden p-1">
+        <TabsList className="grid h-auto w-full grid-cols-5 gap-1 overflow-hidden p-1">
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
+          <TabsTrigger value="athletes">Athletes</TabsTrigger>
           <TabsTrigger value="exercises">Exercises</TabsTrigger>
           <TabsTrigger value="rules">Rules</TabsTrigger>
           <TabsTrigger value="programs">Programs</TabsTrigger>
         </TabsList>
         <TabsContent value="sessions" className="mt-6">
           <SessionPanel teams={safeTeams} athletes={safeAthletes} sessions={safeSessions} exercises={safeExercises} />
+        </TabsContent>
+        <TabsContent value="athletes" className="mt-6">
+          <AthletesPanel athletes={safeAthletes} />
         </TabsContent>
         <TabsContent value="exercises" className="mt-6">
           <ExercisePanel exercises={safeExercises} />
@@ -44,7 +50,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
           <RulesPanel rules={safeRules} exercises={safeExercises} />
         </TabsContent>
         <TabsContent value="programs" className="mt-6">
-          <ProgramGenerator athletes={safeAthletes} exercises={safeExercises} />
+          <div className="grid gap-6"><ProgramGenerator athletes={safeAthletes} exercises={safeExercises} /><ProgramReviewPanel programs={programs} /></div>
         </TabsContent>
       </Tabs>
     </main>
