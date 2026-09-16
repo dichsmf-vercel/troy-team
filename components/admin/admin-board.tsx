@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Plus } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -42,7 +43,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
           <SessionPanel teams={safeTeams} athletes={safeAthletes} sessions={safeSessions} exercises={safeExercises} />
         </TabsContent>
         <TabsContent value="athletes" className="mt-6">
-          <div className="grid gap-6"><AthleteCreateForm teams={safeTeams} /><AthletesPanel athletes={safeAthletes} /></div>
+          <AthletesWorkspace teams={safeTeams} athletes={safeAthletes} />
         </TabsContent>
         <TabsContent value="exercises" className="mt-6">
           <ExercisePanel exercises={safeExercises} />
@@ -56,6 +57,11 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
       </Tabs>
     </main>
   )
+}
+
+function AthletesWorkspace({ teams, athletes }: { teams: any[]; athletes: any[] }) {
+  const [showCreate, setShowCreate] = useState(false)
+  return <div className="grid gap-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold tracking-tight">Athletes</h2><p className="text-sm text-muted-foreground">{athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster</p></div><Button type="button" onClick={() => setShowCreate((value) => !value)}><Plus className="mr-2 size-4" />{showCreate ? "Close form" : "Create athlete"}</Button></div>{showCreate ? <AthleteCreateForm teams={teams} /> : null}<AthletesPanel athletes={athletes} /></div>
 }
 
 function ExercisePanel({ exercises }: { exercises: any[] }) {
@@ -75,7 +81,7 @@ function ExercisePanel({ exercises }: { exercises: any[] }) {
         </CardContent>
       </Card>
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Exercise catalog">
-        {exercises.map((exercise) => <Card key={exercise.id}><CardHeader><CardTitle className="text-base">{exercise.name_en}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{exercise.category || "Uncategorized"}</p></CardContent></Card>)}
+        {exercises.map((exercise) => <Card key={exercise.id} className="overflow-hidden"><CardHeader><CardTitle className="text-base">{exercise.name_en}</CardTitle></CardHeader><CardContent className="grid gap-3"><p className="text-sm text-muted-foreground">{exercise.category || "Uncategorized"}</p>{exercise.image_url ? <img src={exercise.image_url} alt={`${exercise.name_en} exercise`} className="aspect-video w-full rounded-lg object-cover" /> : <div className="flex aspect-video items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">No photo</div>}{exercise.video_youtube_url ? <div className="aspect-video overflow-hidden rounded-lg"><iframe title={`${exercise.name_en} video`} src={exercise.video_youtube_url.replace("watch?v=", "embed/").split("&")[0]} className="h-full w-full" allowFullScreen /></div> : <p className="text-xs text-muted-foreground">No video</p>}</CardContent></Card>)}
       </section>
     </div>
   )
