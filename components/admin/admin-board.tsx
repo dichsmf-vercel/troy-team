@@ -11,6 +11,7 @@ import { RulesPanel } from "@/components/admin/rules-panel"
 import { createExercise } from "@/app/admin/actions"
 import { ProgramGenerator } from "@/components/admin/program-generator"
 import { AthletesPanel } from "@/components/admin/athletes-panel"
+import { AthleteCreateForm } from "@/components/admin/athlete-create-form"
 import { ProgramReviewPanel } from "@/components/admin/program-review-panel"
 
 type Props = { teams: any[]; sessions: any[]; athletes: any[]; exercises: any[]; selfies: any[]; notifications: any[]; rules: any[]; programs: any[] }
@@ -41,7 +42,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
           <SessionPanel teams={safeTeams} athletes={safeAthletes} sessions={safeSessions} exercises={safeExercises} />
         </TabsContent>
         <TabsContent value="athletes" className="mt-6">
-          <AthletesPanel athletes={safeAthletes} />
+          <div className="grid gap-6"><AthleteCreateForm teams={safeTeams} /><AthletesPanel athletes={safeAthletes} /></div>
         </TabsContent>
         <TabsContent value="exercises" className="mt-6">
           <ExercisePanel exercises={safeExercises} />
