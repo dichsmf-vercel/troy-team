@@ -19,9 +19,7 @@ export default async function SignUpSuccessPage() {
             <h2 className="text-lg font-semibold">{dict.auth.signUpSuccessTitle}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{dict.auth.signUpSuccessBody}</p>
           </div>
-          <Button asChild className="w-full">
-            <Link href="/auth/login">{dict.auth.backToLogin}</Link>
-          </Button>
+          <Link href="/auth/login" className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80">{dict.auth.backToLogin}</Link>
         </CardContent>
       </Card>
     </AuthShell>
