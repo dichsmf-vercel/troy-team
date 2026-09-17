@@ -11,12 +11,13 @@ export function AthletesPanel({ athletes }: { athletes: any[] }) {
   const [query, setQuery] = useState("")
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null)
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     if (!term) return athletes
     return athletes.filter((athlete) => {
       const name = athlete.profiles?.full_name ?? athlete.full_name ?? ""
-      const email = athlete.profiles?.email ?? athlete.email ?? ""
+      const email = athlete.auth_email ?? athlete.profiles?.email ?? athlete.email ?? ""
       return `${name} ${email}`.toLowerCase().includes(term)
     })
   }, [athletes, query])
@@ -37,7 +38,7 @@ export function AthletesPanel({ athletes }: { athletes: any[] }) {
           <CardContent className="grid gap-4 p-5">
             <div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-full bg-accent/15 text-accent"><UserRound className="size-5" /></div><div className="min-w-0"><h2 className="truncate font-semibold">{name}</h2><p className="truncate text-sm text-muted-foreground">{profile.email ?? athlete.email ?? "No email"}</p></div></div>
             <dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-muted-foreground">Phone</dt><dd>{athlete.phone ?? "—"}</dd></div><div><dt className="text-muted-foreground">Team</dt><dd>{team?.name_en ?? "Individual"}</dd></div><div><dt className="text-muted-foreground">Height</dt><dd>{athlete.height_cm ? `${athlete.height_cm} cm` : "—"}</dd></div><div><dt className="text-muted-foreground">Weight</dt><dd>{athlete.weight_kg ? `${athlete.weight_kg} kg` : "—"}</dd></div><div><dt className="text-muted-foreground">Tier</dt><dd className="capitalize">{athlete.tier ?? "—"}</dd></div><div><dt className="text-muted-foreground">Assessment</dt><dd className="capitalize">{athlete.assessment_status?.replaceAll("_", " ") ?? "—"}</dd></div></dl>
-            <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">Coach notes</p><p className="mt-1 line-clamp-3 text-muted-foreground">{profile.coach_private_notes ?? athlete.injury_notes ?? athlete.goals ?? "No notes recorded."}</p></div><form action={async () => { await sendAthleteInvitation(athlete.id) }}><Button type="submit" variant="outline" className="w-full">Send invitation</Button></form>
+            <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">Coach notes</p><p className="mt-1 line-clamp-3 text-muted-foreground">{profile.coach_private_notes ?? athlete.injury_notes ?? athlete.goals ?? "No notes recorded."}</p></div><form onSubmit={async (event) => { event.preventDefault(); setInviteMessage(null); const result = await sendAthleteInvitation(athlete.id); setInviteMessage(result.error ?? `Invitation sent to ${athlete.auth_email || "the athlete"}. They should use the email link to set a password.`) }}><Button type="submit" variant="outline" className="w-full">Send invitation</Button></form>{inviteMessage ? <p role="status" className="text-xs text-muted-foreground">{inviteMessage}</p> : null}
           </CardContent>
         </Card>
       })}

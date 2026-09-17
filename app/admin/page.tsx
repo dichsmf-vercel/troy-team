@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { AdminBoard } from "@/components/admin/admin-board"
 import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
 import { AdminErrorBoundary } from "@/components/admin/admin-error-boundary"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 export default async function AdminPage() {
   const requestId = `admin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -25,7 +26,11 @@ export default async function AdminPage() {
     supabase.from("program_rules").select("id, name, rule_type, condition_json, action_json, is_active, created_at").order("created_at", { ascending: false }),
     supabase.from("athlete_programs").select("id, athlete_id, status, month_start, month_end, generation_reason, athletes(profiles(full_name))").order("created_at", { ascending: false }),
   ])
-  console.log("[v0] admin query complete", { requestId, elapsedMs: Date.now() - startedAt, datasets: { teams: teams?.length ?? 0, sessions: sessions?.length ?? 0, athletes: athletes?.length ?? 0, exercises: exercises?.length ?? 0, selfies: selfies?.length ?? 0, notifications: notifications?.length ?? 0, rules: rules?.length ?? 0, programs: programs?.length ?? 0 }, queryErrors: { teams: teamsError?.message, sessions: sessionsError?.message, athletes: athletesError?.message, exercises: exercisesError?.message, selfies: selfiesError?.message, notifications: notificationsError?.message, rules: rulesError?.message, programs: programsError?.message }, queryDataShapes: { selfies: selfies?.slice(0, 3).map((selfie) => ({ keys: Object.keys(selfie ?? {}), relationKind: Array.isArray(selfie?.session_athletes) ? "array" : typeof selfie?.session_athletes, relationSample: selfie?.session_athletes })) }, athleteShape: athletes?.slice(0, 5).map((athlete) => ({ keys: Object.keys(athlete ?? {}), idType: typeof athlete?.id, profileKind: Array.isArray(athlete?.profiles) ? "array" : typeof athlete?.profiles, teamKind: Array.isArray(athlete?.athlete_teams) ? "array" : typeof athlete?.athlete_teams })) })
+  const service = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  const authEmailById = new Map(authUsers.data.users.map((authUser) => [authUser.id, authUser.email ?? ""]))
+  const enrichedAthletes = (athletes ?? []).map((athlete) => ({ ...athlete, auth_email: authEmailById.get(athlete.id) ?? "" }))
+  console.log("[v0] admin query complete", { requestId, elapsedMs: Date.now() - startedAt, datasets: { teams: teams?.length ?? 0, sessions: sessions?.length ?? 0, athletes: enrichedAthletes.length, exercises: exercises?.length ?? 0, selfies: selfies?.length ?? 0, notifications: notifications?.length ?? 0, rules: rules?.length ?? 0, programs: programs?.length ?? 0 }, queryErrors: { teams: teamsError?.message, sessions: sessionsError?.message, athletes: athletesError?.message, exercises: exercisesError?.message, selfies: selfiesError?.message, notifications: notificationsError?.message, rules: rulesError?.message, programs: programsError?.message } })
   if (!teams || !sessions || !athletes || !exercises || !selfies || !notifications || !rules || !programs) console.error("[v0] admin dataset query returned null", { teams: !teams, sessions: !sessions, athletes: !athletes, exercises: !exercises, selfies: !selfies, notifications: !notifications, rules: !rules, programs: !programs })
-  return <><DashboardTopBar /><AdminErrorBoundary><AdminBoard teams={teams ?? []} sessions={sessions ?? []} athletes={athletes ?? []} exercises={exercises ?? []} selfies={selfies ?? []} notifications={notifications ?? []} rules={rules ?? []} programs={programs ?? []} /></AdminErrorBoundary></>
+  return <><DashboardTopBar /><AdminErrorBoundary><AdminBoard teams={teams ?? []} sessions={sessions ?? []} athletes={enrichedAthletes} exercises={exercises ?? []} selfies={selfies ?? []} notifications={notifications ?? []} rules={rules ?? []} programs={programs ?? []} /></AdminErrorBoundary></>
 }
