@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from "react"
 import { Search, UserRound } from "lucide-react"
-import { sendAthleteInvitation } from "@/app/admin/actions"
+import { importAthletesCsv, sendAthleteInvitation } from "@/app/admin/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 
 export function AthletesPanel({ athletes }: { athletes: any[] }) {
   const [query, setQuery] = useState("")
+  const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     if (!term) return athletes
@@ -22,7 +24,7 @@ export function AthletesPanel({ athletes }: { athletes: any[] }) {
   return <div className="grid gap-6">
     <Card>
       <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div><CardTitle>Athletes</CardTitle><p className="mt-1 text-sm text-muted-foreground">Read-only athlete information for admin review.</p></div>
+        <div><CardTitle>Athletes</CardTitle><p className="mt-1 text-sm text-muted-foreground">Read-only athlete information for admin review.</p></div><form onSubmit={async (event) => { event.preventDefault(); setImporting(true); setImportMessage(null); const result = await importAthletesCsv(new FormData(event.currentTarget)); setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`); setImporting(false) }} className="flex flex-wrap items-center gap-2"><Input type="file" name="file" accept=".csv,text/csv" className="max-w-xs" /><Button type="submit" variant="outline" disabled={importing}>{importing ? "Importing..." : "Import athletes CSV"}</Button></form>{importMessage ? <p role="status" className="text-xs text-muted-foreground">{importMessage}</p> : null}
         <div className="relative w-full sm:max-w-xs"><Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="Search athletes" placeholder="Search athletes" value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" /></div>
       </CardHeader>
     </Card>
