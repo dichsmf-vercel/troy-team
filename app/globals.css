@@ -6,6 +6,7 @@
 
 @theme inline {
   --font-sans: var(--font-ibm-plex-sans), var(--font-ibm-plex-arabic), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
   --font-arabic: var(--font-ibm-plex-arabic), var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
   --color-team-national: var(--team-national);
   --color-team-academy: var(--team-academy);
@@ -52,24 +53,24 @@
 
 :root {
   color-scheme: light;
-  --background: oklch(0.98 0.003 90);
+  --background: #FAFAF7;
   --foreground: oklch(0.19 0.006 90);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.19 0.006 90);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.19 0.006 90);
-  --primary: oklch(0.52 0.19 25);
-  --primary-foreground: oklch(0.98 0.003 90);
+  --primary: #D2FF00;
+  --primary-foreground: #111112;
   --secondary: oklch(0.94 0.006 90);
   --secondary-foreground: oklch(0.19 0.006 90);
   --muted: oklch(0.94 0.006 90);
   --muted-foreground: oklch(0.47 0.008 90);
-  --accent: oklch(0.62 0.19 25);
+  --accent: #D2FF00;
   --accent-foreground: oklch(0.98 0.003 90);
   --destructive: oklch(0.55 0.2 24);
   --border: oklch(0.86 0.035 25);
   --input: oklch(0.86 0.035 25);
-  --ring: oklch(0.62 0.19 25);
+  --ring: #7C8A00;
   --chart-1: oklch(0.7 0.1 78);
   --chart-2: oklch(0.55 0.16 258);
   --chart-3: oklch(0.55 0.14 148);
@@ -109,19 +110,19 @@
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.16 0.004 90);
+  --background: #111112;
   --foreground: oklch(0.96 0.003 90);
-  --card: oklch(0.2 0.005 90);
+  --card: #1B1B1C;
   --card-foreground: oklch(0.96 0.003 90);
   --popover: oklch(0.2 0.005 90);
   --popover-foreground: oklch(0.96 0.003 90);
-  --primary: oklch(0.68 0.19 25);
-  --primary-foreground: oklch(0.16 0.004 90);
+  --primary: #D2FF00;
+  --primary-foreground: #111112;
   --secondary: oklch(0.25 0.006 90);
   --secondary-foreground: oklch(0.96 0.003 90);
   --muted: oklch(0.25 0.006 90);
   --muted-foreground: oklch(0.66 0.008 90);
-  --accent: oklch(0.72 0.18 25);
+  --accent: #D2FF00;
   --accent-foreground: oklch(0.16 0.004 90);
   --destructive: oklch(0.65 0.19 24);
   --border: oklch(1 0 0 / 10%);
@@ -151,6 +152,23 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-ibm-plex-sans), var(--font-ibm-plex-arabic), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    line-height: 0.98;
+  }
+  button, input, textarea, select {
+    font-family: inherit;
+  }
+  [dir='rtl'] h1, [dir='rtl'] h2, [dir='rtl'] h3, [dir='rtl'] h4, [dir='rtl'] h5, [dir='rtl'] h6 {
+    font-family: var(--font-ibm-plex-arabic), var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0;
   }
   [dir='rtl'] {
     font-family: var(--font-arabic);
