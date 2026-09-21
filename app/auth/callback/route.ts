@@ -9,10 +9,10 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
-    }
+    if (!error) return NextResponse.redirect(`${origin}${next}`)
   }
 
-  return NextResponse.redirect(`${origin}/auth/error`)
+  // Supabase email invites deliver an implicit-flow access token in the URL hash.
+  // The browser Supabase client consumes that hash on the destination page.
+  return NextResponse.redirect(`${origin}${next}`)
 }
