@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { SessionPanel } from "@/components/admin/session-panel"
 import { RulesPanel } from "@/components/admin/rules-panel"
-import { createExercise } from "@/app/admin/actions"
+import { createExercise, updateExerciseVideo } from "@/app/admin/actions"
 import { ProgramGenerator } from "@/components/admin/program-generator"
 import { AthletesPanel } from "@/components/admin/athletes-panel"
 import { AthleteCreateForm } from "@/components/admin/athlete-create-form"
@@ -81,7 +81,7 @@ function ExercisePanel({ exercises }: { exercises: any[] }) {
         </CardContent>
       </Card>
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Exercise catalog">
-        {exercises.map((exercise) => <Card key={exercise.id} className="overflow-hidden"><CardHeader><CardTitle className="text-base">{exercise.name_en}</CardTitle></CardHeader><CardContent className="grid gap-3"><p className="text-sm text-muted-foreground">{exercise.category || "Uncategorized"}</p>{exercise.image_url ? <img src={exercise.image_url} alt={`${exercise.name_en} exercise`} className="aspect-video w-full rounded-lg object-cover" /> : <div className="flex aspect-video items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">No photo</div>}{exercise.video_youtube_url ? <div className="aspect-video overflow-hidden rounded-lg"><iframe title={`${exercise.name_en} video`} src={exercise.video_youtube_url.replace("watch?v=", "embed/").split("&")[0]} className="h-full w-full" allowFullScreen /></div> : <p className="text-xs text-muted-foreground">No video</p>}</CardContent></Card>)}
+        {exercises.map((exercise) => <Card key={exercise.id} className="overflow-hidden"><CardHeader><CardTitle className="text-base">{exercise.name_en}</CardTitle></CardHeader><CardContent className="grid gap-3"><p className="text-sm text-muted-foreground">{exercise.category || "Uncategorized"}</p>{exercise.image_url ? <img src={exercise.image_url} alt={`${exercise.name_en} exercise`} className="aspect-video w-full rounded-lg object-cover" /> : <div className="flex aspect-video items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">No photo</div>}{exercise.video_youtube_url ? <div className="aspect-video overflow-hidden rounded-lg"><iframe title={`${exercise.name_en} video`} src={exercise.video_youtube_url.replace("watch?v=", "embed/").split("&")[0]} className="h-full w-full" allowFullScreen /></div> : <p className="text-xs text-muted-foreground">No video</p>}<form action={updateExerciseVideo} className="grid gap-2 border-t pt-3"><input type="hidden" name="exercise_id" value={exercise.id} /><Label htmlFor={`youtube-${exercise.id}`}>YouTube link</Label><div className="flex gap-2"><Input id={`youtube-${exercise.id}`} name="video_youtube_url" type="url" placeholder="https://www.youtube.com/watch?v=..." defaultValue={exercise.video_youtube_url ?? ""} /><Button type="submit" variant="outline">Save video</Button></div></form></CardContent></Card>)}
       </section>
     </div>
   )

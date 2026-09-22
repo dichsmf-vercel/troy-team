@@ -12,6 +12,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
   const sessions: GeneratedSession[] = []
   const start = new Date(`${input.startDate}T12:00:00`)
   let lastPatterns = new Set<string>()
+  let sessionNumber = 0
   for (let day = 0; day < weeks * 7; day++) {
     const date = new Date(start)
     date.setDate(start.getDate() + day)
@@ -21,16 +22,18 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
     const picked: ProgramExercise[] = []
     const usedSections = new Set<string>()
     const available = candidates.filter((exercise) => !lastPatterns.has(String(exercise.movement_pattern ?? exercise.category ?? "").toLowerCase()))
-    const pool = available.length >= 7 ? available : candidates
+    const rotated = candidates.map((_, index) => candidates[(index + sessionNumber * 3) % candidates.length])
+    const pool = available.length >= 7 ? available : rotated
     sections.forEach((section, index) => {
-      const candidate = pool.find((exercise) => !usedSections.has(String(exercise.category ?? "").toLowerCase())) ?? pool[index % Math.max(pool.length, 1)]
+      const candidate = pool.find((exercise) => !usedSections.has(String(exercise.category ?? "").toLowerCase())) ?? pool[(index + sessionNumber) % Math.max(pool.length, 1)]
       if (!candidate) return
       const pattern = String(candidate.movement_pattern ?? candidate.category ?? "").toLowerCase()
       usedSections.add(String(candidate.category ?? "").toLowerCase())
-      picked.push({ id: candidate.id, name_en: candidate.name_en, category: candidate.category, movement_pattern: candidate.movement_pattern, section, sets: section === "Warm-up" || section === "Cooldown" ? 1 : week, reps: section === "Conditioning" ? "30 sec" : section === "Power" ? "5" : "8–12", loadPercentage: section === "Strength" ? percentages[Math.min(week, percentages.length - 1)] : null, date: iso(date), time: input.time })
+      picked.push({ id: candidate.id, name_en: candidate.name_en, category: candidate.category, movement_pattern: candidate.movement_pattern, section, sets: section === "Warm-up" || section === "Cooldown" ? 1 : Number(candidate.default_sets) || week, reps: section === "Conditioning" ? "30 sec" : section === "Power" ? "5" : String(candidate.default_reps || "8–12"), loadPercentage: section === "Strength" ? percentages[Math.min(week, percentages.length - 1)] : null, date: iso(date), time: input.time })
     })
     lastPatterns = new Set(picked.map((item) => String(item.movement_pattern ?? item.category ?? "").toLowerCase()).filter(Boolean))
     sessions.push({ date: iso(date), time: input.time, week, exercises: picked, tooFewExercises: picked.length < 6 })
+    sessionNumber += 1
   }
   return sessions
 }
