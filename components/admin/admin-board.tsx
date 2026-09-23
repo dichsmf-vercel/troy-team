@@ -52,7 +52,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
           <RulesPanel rules={safeRules} exercises={safeExercises} />
         </TabsContent>
         <TabsContent value="programs" className="mt-6">
-          <div className="grid gap-6"><ProgramGenerator athletes={safeAthletes} exercises={safeExercises} /><ProgramReviewPanel programs={programs} /></div>
+          <div className="grid gap-6"><ProgramGenerator athletes={safeAthletes} exercises={safeExercises} rules={safeRules} /><ProgramReviewPanel programs={programs} /></div>
         </TabsContent>
       </Tabs>
     </main>
