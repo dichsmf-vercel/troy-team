@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 const fms = ["deep_squat", "hurdle_step", "inline_lunge", "shoulder_mobility", "active_straight_leg_raise", "trunk_stability", "rotary_stability"]
-const performance = ["v_jump_cm", "sprint_30m_seconds", "t_test_seconds", "beep_test_level", "beep_test_speed", "beep_test_vo2_max", "star_balance", "agility_rshaqah_seconds"]
+const performance = ["v_jump_cm", "sprint_30m_seconds", "t_test_seconds", "beep_test_level", "beep_test_speed", "beep_test_vo2_max", "star_balance", "agility_y ah_seconds"]
 const maxes = ["squat_1rm_kg", "bench_press_1rm_kg", "deadlift_1rm_kg", "power_clean_1rm_kg", "shoulder_press_1rm_kg"]
 
 export function AthleteCreateForm({ teams = [] }: { teams: any[] }) {
