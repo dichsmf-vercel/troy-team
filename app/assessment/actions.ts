@@ -8,10 +8,12 @@ export async function submitAssessment(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "Please sign in first." }
   const injuryFlags = String(formData.get("injury_flags") || "").split(",").map((v) => v.trim()).filter(Boolean)
+  const trainingDays = Number(formData.get("training_days"))
+  if (formData.get("training_days") && (!Number.isInteger(trainingDays) || trainingDays < 1 || trainingDays > 7)) return { error: "Training days must be a whole number from 1 to 7." }
   const goals = String(formData.get("goals") || "").split(",").map((v) => v.trim()).filter(Boolean)
   const { data: assessment, error } = await supabase.from("athlete_assessments").insert({ athlete_id: user.id, status: "submitted", submitted_at: new Date().toISOString(), injury_flags: injuryFlags, goals }).select("id").single()
   if (error || !assessment) return { error: error?.message || "Unable to submit assessment." }
-  const answers = ["training_days", "experience", "equipment", "medical_notes"].map((key) => ({ assessment_id: assessment.id, question_key: key, answer_json: { value: String(formData.get(key) || "").trim() } }))
+  const answers = ["training_days", "experience", "equipment", "medical_notes"].map((key) => ({ assessment_id: assessment.id, question_key: key, answer_json: { value: key === "training_days" ? trainingDays || null : String(formData.get(key) || "").trim() } }))
   const { error: answerError } = await supabase.from("athlete_assessment_answers").insert(answers)
   if (answerError) return { error: answerError.message }
   await supabase.from("athletes").update({ assessment_status: "submitted", injury_notes: injuryFlags.join(", "), goals: goals.join(", ") }).eq("id", user.id)
