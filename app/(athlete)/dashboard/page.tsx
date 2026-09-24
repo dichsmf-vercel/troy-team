@@ -14,10 +14,11 @@ export default async function DashboardPage() {
   const [{ data: profile }, { data: athleteTeams }, { data: athleteProfile }, { data: sessionAthletes }, { data: athleteProgram }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", userData.user.id).single(),
     supabase.from("athlete_teams").select("team_id, teams(*)").eq("athlete_id", userData.user.id),
-    supabase.from("athletes").select("*").eq("id", userData.user.id).maybeSingle(),
+    supabase.from("athletes").select("id,account_status,assessment_status,medical_clearance_status,goals,injury_notes,height_cm,weight_kg").eq("id", userData.user.id).maybeSingle(),
     supabase.from("session_athletes").select("*, session_summaries(id)").eq("athlete_id", userData.user.id),
     supabase.from("athlete_programs").select("*").eq("athlete_id", userData.user.id).in("status", ["approved", "active"]).order("month_start", { ascending: false }).limit(1).maybeSingle(),
   ])
+  if (athleteProfile?.account_status === "paused") return <main className="grid min-h-screen place-items-center p-6"><Card className="max-w-md"><CardHeader><CardTitle>Account paused</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Your account is currently paused. Please contact your coach when you are ready to resume training.</p></CardContent></Card></main>
   const teamIds = (athleteTeams ?? []).map((team: any) => team.team_id).filter(Boolean)
   const sessionFilter = teamIds.length ? `athlete_id.eq.${userData.user.id},team_id.in.(${teamIds.join(",")})` : `athlete_id.eq.${userData.user.id}`
   const { data: sessionPosts } = await supabase.from("session_posts").select("*, session_exercises(id), teams(name_en, name_ar, color_hex, image_url, is_national_team)").or(sessionFilter).order("session_date", { ascending: true })
@@ -79,6 +80,8 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </section>
+
+        {athleteProfile?.assessment_status !== "approved" && <Card className="border-amber-500/40 bg-amber-500/5"><CardContent className="flex gap-3 p-4"><AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-600" /><div><p className="text-sm font-medium">Assessment incomplete</p><p className="mt-1 text-xs text-muted-foreground">Complete your athlete assessment so your coach can tailor your program safely.</p></div></CardContent></Card>}
 
         {/* Today's sessions */}
         <section className="flex flex-col gap-3">
