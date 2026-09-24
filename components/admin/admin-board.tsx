@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +24,16 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
   const safeAthletes = Array.isArray(athletes) ? athletes : []
   const safeExercises = Array.isArray(exercises) ? exercises : []
   const safeRules = Array.isArray(rules) ? rules : []
+
+  useEffect(() => {
+    console.groupCollapsed("[athlete-debug] Admin roster received in browser")
+    console.log("Roster counts", { athletes: safeAthletes.length, sessions: safeSessions.length, programs: Array.isArray(programs) ? programs.length : 0, teams: safeTeams.length })
+    console.log("Athlete records", safeAthletes.map((athlete: any) => ({ id: athlete.id, name: athlete.profiles?.full_name ?? "Unnamed athlete", role: athlete.profiles?.role ?? "missing", email: athlete.auth_email || "missing", teams: athlete.athlete_teams?.length ?? 0 })))
+    console.log("Session athlete IDs", safeSessions.map((session: any) => ({ sessionId: session.id, athleteId: session.athlete_id ?? null })))
+    console.log("Program athlete IDs", (Array.isArray(programs) ? programs : []).map((program: any) => ({ programId: program.id, athleteId: program.athlete_id ?? null, status: program.status })))
+    if (!safeAthletes.length) console.warn("[athlete-debug] No athletes reached the browser. Inspect the server query result and profile join.")
+    console.groupEnd()
+  }, [programs, safeAthletes, safeSessions, safeTeams])
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8">
