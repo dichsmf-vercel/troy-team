@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutGrid, TrendingUp, User, CalendarDays } from "lucide-react"
+import { Home, TrendingUp, User, CalendarDays } from "lucide-react"
 import { useLanguage } from "@/components/providers/language-provider"
 import { cn } from "@/lib/utils"
 
