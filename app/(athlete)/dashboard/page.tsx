@@ -4,6 +4,7 @@ import { AthleteHeader } from "@/components/athlete/athlete-header"
 import { SessionCard, type SessionCardData } from "@/components/dashboard/session-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import Link from "next/link"
 import { CheckCircle2, Calendar, AlertCircle } from "lucide-react"
 
 export default async function DashboardPage() {
@@ -22,11 +23,14 @@ export default async function DashboardPage() {
   const teamIds = (athleteTeams ?? []).map((team: any) => team.team_id).filter(Boolean)
   const sessionFilter = teamIds.length ? `athlete_id.eq.${userData.user.id},team_id.in.(${teamIds.join(",")})` : `athlete_id.eq.${userData.user.id}`
   const { data: sessionPosts } = await supabase.from("session_posts").select("*, session_exercises(id), teams(name_en, name_ar, color_hex, image_url, is_national_team)").or(sessionFilter).order("session_date", { ascending: true })
+  const assignedPostIds = (sessionAthletes ?? []).map((row: any) => row.session_post_id).filter(Boolean)
+  const { data: directlyAssignedPosts } = assignedPostIds.length ? await supabase.from("session_posts").select("*, session_exercises(id), teams(name_en, name_ar, color_hex, image_url, is_national_team)").in("id", assignedPostIds) : { data: [] }
+  const mergedSessionPosts = [...new Map([...(sessionPosts ?? []), ...(directlyAssignedPosts ?? [])].map((post: any) => [post.id, post])).values()]
 
   const teamsById = new Map((athleteTeams ?? []).map((row: any) => [row.team_id, row.teams]))
   const sessionAthleteByPost = new Map((sessionAthletes ?? []).map((sa: any) => [sa.session_post_id, sa]))
 
-  const sessions: SessionCardData[] = (sessionPosts ?? []).map((post: any) => {
+  const sessions: SessionCardData[] = mergedSessionPosts.map((post: any) => {
     const team = post.teams ?? teamsById.get(post.team_id)
     const sa = sessionAthleteByPost.get(post.id)
     const isComplete = Boolean(sa?.completed_at) && sa?.session_summaries?.length
@@ -81,7 +85,7 @@ export default async function DashboardPage() {
           </Card>
         </section>
 
-        {athleteProfile?.assessment_status !== "approved" && <Card className="border-amber-500/40 bg-amber-500/5"><CardContent className="flex gap-3 p-4"><AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-600" /><div><p className="text-sm font-medium">Assessment incomplete</p><p className="mt-1 text-xs text-muted-foreground">Complete your athlete assessment so your coach can tailor your program safely.</p></div></CardContent></Card>}
+        {athleteProfile?.assessment_status !== "approved" && <Card className="border-amber-500/40 bg-amber-500/5"><CardContent className="flex gap-3 p-4"><AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-600" /><div><p className="text-sm font-medium">Assessment incomplete</p><p className="mt-1 text-xs text-muted-foreground">Complete your athlete assessment so your coach can tailor your program safely.</p><Link href="/assessment" className="mt-2 inline-flex text-xs font-semibold text-primary underline underline-offset-4">Complete assessment</Link></div></CardContent></Card>}
 
         {/* Today's sessions */}
         <section className="flex flex-col gap-3">

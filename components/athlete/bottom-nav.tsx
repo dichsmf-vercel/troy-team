@@ -11,7 +11,7 @@ export function BottomNav() {
   const { dict } = useLanguage()
 
   const items = [
-    { href: "/dashboard", label: dict.dashboard.todaysSessions.split(" ")[0], icon: LayoutGrid },
+    { href: "/dashboard", label: "Home", icon: Home },
     { href: "/program", label: "Program", icon: CalendarDays },
     { href: "/progress", label: dict.progress.title, icon: TrendingUp },
     { href: "/profile", label: dict.profile.title, icon: User },

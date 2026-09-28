@@ -26,10 +26,11 @@ export default async function SessionPage({
     .eq("id", sessionPostId)
     .maybeSingle()
 
+  const { data: sessionAthlete } = await supabase.from("session_athletes").select("id, attended_at").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
   if (!post) notFound()
   const teamVisible = post.team_id && teamIds.includes(post.team_id)
   const athleteVisible = post.athlete_id === userData.user.id
-  if (!teamVisible && !athleteVisible) notFound()
+  if (!teamVisible && !athleteVisible && !sessionAthlete) notFound()
 
   const { data: exercises } = await supabase
     .from("session_exercises")
@@ -38,13 +39,6 @@ export default async function SessionPage({
     )
     .eq("session_post_id", sessionPostId)
     .order("exercise_order", { ascending: true })
-
-  const { data: sessionAthlete } = await supabase
-    .from("session_athletes")
-    .select("id, attended_at")
-    .eq("session_post_id", sessionPostId)
-    .eq("athlete_id", userData.user.id)
-    .maybeSingle()
 
   const { data: existingSelfie } = sessionAthlete?.id ? await supabase.from("session_selfies").select("id").eq("session_athlete_id", sessionAthlete.id).maybeSingle() : { data: null }
 
