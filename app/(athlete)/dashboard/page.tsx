@@ -58,6 +58,8 @@ export default async function DashboardPage() {
   const completedSessions = sessions.filter((s) => Boolean(s.attendedAt)).length
   const firstName = profile?.full_name?.split(" ")[0] ?? ""
   const programStatus = athleteProgram?.status === "approved" ? "Ready" : athleteProgram?.status === "active" ? "Active" : "Pending"
+  const programSessions = Array.isArray((athleteProgram?.generation_reason as any)?.sessions) ? (athleteProgram?.generation_reason as any).sessions : []
+  const programToday = programSessions.find((session: any) => session.date === todayStr)
 
   return (
     <div>
@@ -93,7 +95,7 @@ export default async function DashboardPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Today's training</h2>
             {todaysSessions.length > 0 && <Badge variant="secondary" className="text-xs">Ready</Badge>}
           </div>
-          {todaysSessions.length === 0 ? (
+          {todaysSessions.length === 0 && !programToday ? (
             <div className="rounded-2xl border border-dashed p-5 text-center">
               <Calendar className="mx-auto size-8 text-muted-foreground" />
               <p className="mt-2 text-sm font-medium">Rest day</p>
@@ -104,6 +106,7 @@ export default async function DashboardPage() {
               {todaysSessions.map((s) => (
                 <SessionCard key={s.sessionPostId} session={s} />
               ))}
+              {programToday ? <Link href={`/program/session/${programToday.date}`} className="rounded-2xl border border-accent/40 bg-accent/5 p-5 transition-colors hover:bg-accent/10"><p className="text-xs font-semibold uppercase tracking-wide text-accent">Program session</p><p className="mt-1 font-semibold">Today&apos;s program training</p><p className="mt-1 text-xs text-muted-foreground">{programToday.exercises?.length ?? 0} exercises · Start sequential training</p></Link> : null}
             </div>
           )}
         </section>
