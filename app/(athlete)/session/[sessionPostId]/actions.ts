@@ -41,6 +41,8 @@ export async function startSession(sessionPostId: string) {
   return { sessionAthleteId }
 }
 
+export async function saveExerciseFeedback(sessionAthleteId: string, sessionExerciseId: string, input: { difficulty: number; painNotes: string; enjoyment: number }) { const supabase = await createClient(); if (input.difficulty < 0 || input.difficulty > 5 || input.enjoyment < 0 || input.enjoyment > 5) return { error: "Ratings must be between 0 and 5." }; const { error } = await supabase.from("exercise_completions").upsert({ session_athlete_id: sessionAthleteId, session_exercise_id: sessionExerciseId, difficulty: input.difficulty, enjoyment: input.enjoyment, pain_notes: input.painNotes.trim() || null, pain_reported: Boolean(input.painNotes.trim()) }, { onConflict: "session_athlete_id,session_exercise_id" }); if (error) return { error: error.message }; return { success: true } }
+
 export async function toggleExerciseCompletion(
   sessionAthleteId: string,
   sessionExerciseId: string,

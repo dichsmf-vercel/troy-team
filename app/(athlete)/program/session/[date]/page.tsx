@@ -12,5 +12,6 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
   const sessions = Array.isArray((assignment?.generation_reason as any)?.sessions) ? (assignment?.generation_reason as any).sessions : []
   const session = sessions.find((item: any) => item.date === date)
   if (!session) notFound()
-  return <div><AthleteHeader title="Program training" /><main className="px-4 py-6"><ProgramSessionRunner date={date} time={session.time} exercises={session.exercises ?? []} /></main></div>
+  const { data: feedback } = await supabase.from("program_session_feedback").select("exercise_index,difficulty,pain_notes,enjoyment").eq("athlete_id", user.id).eq("athlete_program_id", assignment.id).eq("session_date", date)
+  return <div><AthleteHeader title="Program training" /><main className="px-4 py-6"><ProgramSessionRunner programId={assignment.id} date={date} time={session.time} exercises={session.exercises ?? []} initialFeedback={feedback ?? []} /></main></div>
 }

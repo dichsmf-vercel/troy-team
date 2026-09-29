@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Language } from "@/lib/i18n/dictionaries"
 import { useLanguage } from "@/components/providers/language-provider"
-import { startSession, toggleExerciseCompletion, reportPain, uploadSelfie } from "@/app/(athlete)/session/[sessionPostId]/actions"
+import { startSession, toggleExerciseCompletion, reportPain, uploadSelfie, saveExerciseFeedback } from "@/app/(athlete)/session/[sessionPostId]/actions"
 import { safeDate, safeTime } from "@/lib/formatters"
 
 type Exercise = {
@@ -81,6 +81,9 @@ export function SessionRunner({
   const [showVideo, setShowVideo] = useState(false)
   const [selfieUploaded, setSelfieUploaded] = useState(initialSelfieUploaded)
   const [selfieError, setSelfieError] = useState<string | null>(null)
+  const [difficulty, setDifficulty] = useState(3)
+  const [enjoyment, setEnjoyment] = useState(3)
+  const [feedbackNotes, setFeedbackNotes] = useState("")
   const [justification, setJustification] = useState("")
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -128,8 +131,14 @@ export function SessionRunner({
     if (!sessionAthleteId) return
     setCompletedMap((prev) => ({ ...prev, [sessionExerciseId]: next }))
     startTransition(async () => {
-      await toggleExerciseCompletion(sessionAthleteId, sessionExerciseId, next)
+      const result = await toggleExerciseCompletion(sessionAthleteId, sessionExerciseId, next)
+      if (result?.error) setSelfieError(result.error)
     })
+  }
+
+  function handleFeedback() {
+    if (!sessionAthleteId || !active) return
+    startTransition(async () => { const result = await saveExerciseFeedback(sessionAthleteId, active.sessionExerciseId, { difficulty, enjoyment, painNotes: feedbackNotes }); if (result?.error) setSelfieError(result.error); else setFeedbackNotes("") })
   }
 
   function handleReportPain() {
@@ -251,6 +260,8 @@ export function SessionRunner({
           ) : null}
 
           <div className="grid gap-3 border-t border-border pt-4"><Label>Take a selfie to unlock exercise completion</Label>{!selfieUploaded ? <><video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full rounded-md bg-muted object-cover" /><div className="flex gap-2"><Button type="button" variant="outline" onClick={startCamera} disabled={!sessionAthleteId || isPending}>Open camera</Button><Button type="button" onClick={captureSelfie} disabled={!sessionAthleteId || isPending}>Take selfie</Button></div><details><summary className="cursor-pointer text-xs text-muted-foreground">Can&apos;t use the camera?</summary><div className="mt-2 grid gap-2"><Textarea value={justification} onChange={(event) => setJustification(event.target.value)} placeholder="Explain to Coach Ahmed why you cannot submit an image right now." rows={3} /><Button type="button" variant="ghost" className="w-fit text-xs" onClick={submitJustification} disabled={!sessionAthleteId || isPending || !justification.trim()}>Send justification to Coach Ahmed</Button></div></details></> : <p className="text-sm text-emerald-600">Selfie or justification submitted for review. Exercises unlocked.</p>}{selfieError ? <p className="text-sm text-destructive">{selfieError}</p> : null}</div>
+
+          <div className="grid gap-3 border-t border-border pt-4"><Label>How hard was this exercise? (0–5)</Label><input type="range" min="0" max="5" value={difficulty} onChange={(event) => setDifficulty(Number(event.target.value))} /><span className="text-xs text-muted-foreground">{difficulty}/5</span><Label>Any unnatural pains?</Label><Textarea value={feedbackNotes} onChange={(event) => setFeedbackNotes(event.target.value)} placeholder="Describe pain or discomfort" /><Label>How did it feel overall? (0–5)</Label><input type="range" min="0" max="5" value={enjoyment} onChange={(event) => setEnjoyment(Number(event.target.value))} /><Button type="button" variant="outline" onClick={handleFeedback} disabled={!sessionAthleteId || isPending}>Save exercise feedback</Button></div>
 
           <div className="flex items-center gap-3 border-t border-border pt-4">
             <Checkbox
