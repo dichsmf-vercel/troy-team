@@ -36,7 +36,7 @@ export default async function AthleteProgramPage() {
       day: date.getDate(),
       weekday: date.toLocaleDateString("en", { weekday: "short" }),
       date: date.toISOString().slice(0, 10),
-      hasSession: sessionDates.has(date.toISOString().slice(0, 10)) && date.toISOString().slice(0, 10) <= today,
+      hasSession: sessionDates.has(date.toISOString().slice(0, 10)),
     }
   })
 
@@ -92,11 +92,11 @@ export default async function AthleteProgramPage() {
                 {days.map((item) => (
                   <div
                     key={item.date}
-                    className={`min-h-14 rounded-xl border-2 p-1 flex flex-col items-center justify-center transition-colors ${
-                      item.hasSession ? "border-accent bg-accent/10" : "border-border bg-card hover:bg-muted/50"
+                    className={`min-h-14 rounded-xl border-2 p-1 flex flex-col items-center justify-center transition-colors ${item.date < today ? "opacity-55" : ""} ${
+                      item.date === today ? "border-primary bg-primary/10 ring-2 ring-primary/30" : item.hasSession ? "border-accent bg-accent/10" : "border-border bg-card hover:bg-muted/50"
                     }`}
                   >
-                    <span className="text-xs font-bold">{item.day}</span>
+                    <span className={`text-xs font-bold ${item.date === today ? "text-primary" : ""}`}>{item.day}{item.date === today ? <span className="sr-only"> today</span> : null}</span>
                     {item.hasSession && completionByDate.get(item.date)?.status === "completed" ? <CheckCircle2 className="mt-1 size-4 text-emerald-500" aria-label="Attended" /> : item.hasSession && item.date < today ? <span className="mt-1 text-[9px] font-semibold text-amber-500">Missed</span> : item.hasSession ? <span className="mt-1 size-1.5 rounded-full bg-accent" /> : null}
                   </div>
                 ))}
