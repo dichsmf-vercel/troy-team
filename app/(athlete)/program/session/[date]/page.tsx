@@ -13,5 +13,6 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
   const session = sessions.find((item: any) => item.date === date)
   if (!session) notFound()
   const { data: feedback } = await supabase.from("program_session_feedback").select("exercise_index,difficulty,pain_notes,enjoyment").eq("athlete_id", user.id).eq("athlete_program_id", assignment.id).eq("session_date", date)
-  return <div><AthleteHeader title="Program training" /><main className="px-4 py-6"><ProgramSessionRunner programId={assignment.id} date={date} time={session.time} exercises={session.exercises ?? []} initialFeedback={feedback ?? []} /></main></div>
+  const { data: completion } = await supabase.from("program_session_completions").select("status").eq("athlete_id", user.id).eq("athlete_program_id", assignment.id).eq("session_date", date).maybeSingle()
+  return <div><AthleteHeader title="Program training" /><main className="px-4 py-6"><ProgramSessionRunner programId={assignment.id} date={date} time={session.time} exercises={session.exercises ?? []} initialFeedback={feedback ?? []} initialCompleted={completion?.status === "completed"} /></main></div>
 }
