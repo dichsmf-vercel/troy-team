@@ -52,10 +52,8 @@ export function SessionCard({ session }: { session: SessionCardData }) {
           <h3 className="text-base font-semibold text-balance">{title}</h3>
         </div>
         {isComplete ? (
-          <Badge variant="secondary" className="rounded-md shrink-0">
-            {dict.dashboard.completed}
-          </Badge>
-        ) : null}
+          <Badge variant="secondary" className="rounded-md shrink-0 gap-1 bg-emerald-500/15 text-emerald-500"><span aria-hidden="true">✓</span>{dict.dashboard.completed}</Badge>
+        ) : <Badge className="shrink-0">Start training</Badge>}
       </div>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">

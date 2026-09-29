@@ -22,6 +22,10 @@ export default async function AthleteProgramPage() {
 
   const monthStart = assignment?.month_start ? new Date(`${assignment.month_start}T12:00:00`) : new Date()
   const programSessions = Array.isArray((assignment?.generation_reason as any)?.sessions) ? (assignment?.generation_reason as any).sessions : []
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: completionRows } = assignment ? await supabase.from("program_session_completions").select("session_date,status,completed_at").eq("athlete_program_id", assignment.id).eq("athlete_id", user.id) : { data: [] }
+  const completionByDate = new Map((completionRows ?? []).map((row: any) => [row.session_date, row]))
+  const visibleSessions = programSessions.filter((session: any) => session.date <= today)
   const sessionDates = new Set(programSessions.map((session: any) => session.date))
   
   const monthTitle = monthStart.toLocaleDateString("en", { month: "long", year: "numeric" })
@@ -32,7 +36,7 @@ export default async function AthleteProgramPage() {
       day: date.getDate(),
       weekday: date.toLocaleDateString("en", { weekday: "short" }),
       date: date.toISOString().slice(0, 10),
-      hasSession: sessionDates.has(date.toISOString().slice(0, 10)),
+      hasSession: sessionDates.has(date.toISOString().slice(0, 10)) && date.toISOString().slice(0, 10) <= today,
     }
   })
 
@@ -93,7 +97,7 @@ export default async function AthleteProgramPage() {
                     }`}
                   >
                     <span className="text-xs font-bold">{item.day}</span>
-                    {item.hasSession && <span className="mt-1 size-1.5 rounded-full bg-accent" />}
+                    {item.hasSession && completionByDate.get(item.date)?.status === "completed" ? <CheckCircle2 className="mt-1 size-4 text-emerald-500" aria-label="Attended" /> : item.hasSession && item.date < today ? <span className="mt-1 text-[9px] font-semibold text-amber-500">Missed</span> : item.hasSession ? <span className="mt-1 size-1.5 rounded-full bg-accent" /> : null}
                   </div>
                 ))}
               </div>
@@ -103,10 +107,10 @@ export default async function AthleteProgramPage() {
             <section className="grid gap-3">
               <h2 className="text-lg font-semibold">Training sessions</h2>
               <div className="flex flex-col gap-3">
-                {programSessions.map((session: any, idx: number) => (
+                {visibleSessions.map((session: any, idx: number) => (
                   <Card key={idx} className="border-0 overflow-hidden">
                     <CardContent className="p-4">
-                      <div className="mb-3 flex justify-end"><Link href={`/program/session/${session.date}`} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">Start training</Link></div>
+                      <div className="mb-3 flex items-center justify-between gap-2"><span className={completionByDate.get(session.date)?.status === "completed" ? "font-semibold text-emerald-500" : "text-xs text-muted-foreground"}>{completionByDate.get(session.date)?.status === "completed" ? "Attended" : session.date < today ? "Missed" : "Available today"}</span>{completionByDate.get(session.date)?.status === "completed" ? <CheckCircle2 className="size-5 text-emerald-500" aria-label="Attended" /> : session.date === today ? <Link href={`/program/session/${session.date}`} className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">Start training</Link> : null}</div>
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
