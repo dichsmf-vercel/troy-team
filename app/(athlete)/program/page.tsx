@@ -93,7 +93,7 @@ export default async function AthleteProgramPage() {
                   <div
                     key={item.date}
                     className={`min-h-14 rounded-xl border-2 p-1 flex flex-col items-center justify-center transition-colors ${item.date < today ? "opacity-55" : ""} ${
-                      item.date === today ? "border-primary bg-primary/10 ring-2 ring-primary/30" : item.hasSession ? "border-accent bg-accent/10" : "border-border bg-card hover:bg-muted/50"
+                      item.date === today ? "border-4 border-primary bg-primary/10 ring-2 ring-primary/30" : item.hasSession ? "border-accent bg-accent/10" : "border-border bg-card hover:bg-muted/50"
                     }`}
                   >
                     <span className={`text-xs font-bold ${item.date === today ? "text-primary" : ""}`}>{item.day}{item.date === today ? <span className="sr-only"> today</span> : null}</span>

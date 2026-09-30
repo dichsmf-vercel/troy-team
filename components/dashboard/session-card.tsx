@@ -37,6 +37,7 @@ export function SessionCard({ session }: { session: SessionCardData }) {
   return (
     <Link
       href={href}
+      onClick={() => console.log("[assigned-session-debug] Start training clicked", { sessionPostId: session.sessionPostId, sessionAthleteId: session.sessionAthleteId, sessionDate: session.sessionDate, exerciseCount: session.exerciseCount, completed: isComplete, destination: href })}
       dir={dir}
       className={cn(
         "relative flex flex-col gap-3 rounded-2xl border p-5 transition-colors",
