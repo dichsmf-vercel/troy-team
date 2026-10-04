@@ -120,10 +120,13 @@ export function SessionRunner({
   const allDone = exercises.length > 0 && completedCount === exercises.length
 
   function handleStart() {
+    console.log("[v0] start training request", { sessionPostId, initialSessionAthleteId, exerciseCount: exercises.length, exerciseIds: exercises.map((exercise) => exercise.exerciseId) })
     startTransition(async () => {
       const result = await startSession(sessionPostId)
+      console.log("[v0] start training response", { sessionPostId, result, exerciseCount: exercises.length })
+      if (result?.error) setSelfieError(result.error)
       if (result?.sessionAthleteId) setSessionAthleteId(result.sessionAthleteId)
-      if (!attendedAt) setAttendedAt(new Date().toISOString())
+      if (!attendedAt && !result?.error) setAttendedAt(new Date().toISOString())
     })
   }
 
@@ -173,7 +176,7 @@ export function SessionRunner({
           {safeDate(sessionDate, language === "ar" ? "ar" : "en-US", { weekday: "long", month: "long", day: "numeric" })}{" "}
           &middot; {safeTime(period, language === "ar" ? "ar" : "en-US")}
         </p>
-        <Button size="lg" className="mt-2 gap-2" onClick={handleStart} disabled={isPending}>
+        <Button size="lg" className="mt-3 h-14 w-full gap-3 rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90" onClick={handleStart} disabled={isPending}>
           <Play className="size-4" />
           {dict.session.startSession}
         </Button>
