@@ -1,19 +1,15 @@
 "use client"
 
-import Image from "next/image"
 import { useTheme } from "next-themes"
 import { useLanguage } from "@/components/providers/language-provider"
 
 export function AthleteHeader({ title }: { title: string }) {
   const { resolvedTheme } = useTheme()
   const { dir } = useLanguage()
-  const logoSrc = "/minilogo-removebg-preview.png"
-
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto max-w-md flex items-center gap-3 px-4 py-4" dir={dir}>
-        <Image src={logoSrc || "/placeholder.svg"} alt="" width={48} height={48} className="size-12 object-contain" />
-        <h1 className="text-lg font-semibold text-balance">{title}</h1>
+      <div className="mx-auto flex max-w-md items-center px-4 py-5" dir={dir}>
+        <h1 className="text-2xl font-bold tracking-tight text-balance">{title}</h1>
       </div>
     </header>
   )

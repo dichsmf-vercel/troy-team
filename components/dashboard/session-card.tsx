@@ -40,7 +40,7 @@ export function SessionCard({ session }: { session: SessionCardData }) {
       onClick={() => console.log("[assigned-session-debug] Start training clicked", { sessionPostId: session.sessionPostId, sessionAthleteId: session.sessionAthleteId, sessionDate: session.sessionDate, exerciseCount: session.exerciseCount, completed: isComplete, destination: href })}
       dir={dir}
       className={cn(
-        "relative flex flex-col gap-3 rounded-2xl border p-5 transition-colors",
+        "group relative flex flex-col gap-4 rounded-2xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg",
         session.isNationalTeam
           ? "border-team-national/40 bg-gradient-to-br from-team-national/10 via-card to-card"
           : "border-border bg-card",
