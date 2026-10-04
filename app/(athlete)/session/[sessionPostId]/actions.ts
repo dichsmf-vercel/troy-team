@@ -11,12 +11,14 @@ export async function startSession(sessionPostId: string) {
   const { data: post, error: postError } = await supabase.from("session_posts").select("id,athlete_id,team_id").eq("id", sessionPostId).maybeSingle()
   const { count: exerciseCount, error: exerciseError } = await supabase.from("session_exercises").select("id", { count: "exact", head: true }).eq("session_post_id", sessionPostId)
   console.log("[v0] startSession server lookup", { sessionPostId, postFound: Boolean(post), postError: postError?.message, exerciseCount, exerciseError: exerciseError?.message })
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("session_athletes")
     .select("id, attended_at")
     .eq("session_post_id", sessionPostId)
     .eq("athlete_id", userData.user.id)
     .maybeSingle()
+  console.log("[v0] startSession attendance lookup", { sessionPostId, athleteId: userData.user.id, existingId: existing?.id ?? null, existingError: existingError?.message })
+  if (existingError) return { error: existingError.message }
 
   let sessionAthleteId = existing?.id
 

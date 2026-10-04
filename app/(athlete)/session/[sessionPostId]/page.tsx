@@ -34,7 +34,7 @@ export default async function SessionPage({
 
   const { data: exercises, error: exercisesError } = await supabase
     .from("session_exercises")
-    .select("id, exercise_id, sort_order, exercise_order, sets, reps, exercises(id, name_en, name_ar, description_en, description_ar, image_url, video_youtube_url)")
+    .select("id, exercise_id, exercise_order, sets, reps, exercises(id, name_en, name_ar, description_en, description_ar, image_url, video_youtube_url)")
     .eq("session_post_id", sessionPostId)
     .order("exercise_order", { ascending: true })
   console.log("[v0] session exercise resolution", { sessionPostId, athleteId: userData.user.id, postFound: Boolean(post), sessionAthleteId: sessionAthlete?.id ?? null, exerciseCount: exercises?.length ?? 0, exerciseError: exercisesError?.message, exerciseIds: (exercises ?? []).map((row: any) => row.exercise_id), rows: exercises })
