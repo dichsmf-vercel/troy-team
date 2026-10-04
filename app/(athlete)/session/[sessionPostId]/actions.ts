@@ -7,7 +7,10 @@ export async function startSession(sessionPostId: string) {
   const supabase = await createClient()
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) return { error: "Not authenticated" }
-
+  console.log("[v0] startSession server request", { sessionPostId, athleteId: userData.user.id })
+  const { data: post, error: postError } = await supabase.from("session_posts").select("id,athlete_id,team_id").eq("id", sessionPostId).maybeSingle()
+  const { count: exerciseCount, error: exerciseError } = await supabase.from("session_exercises").select("id", { count: "exact", head: true }).eq("session_post_id", sessionPostId)
+  console.log("[v0] startSession server lookup", { sessionPostId, postFound: Boolean(post), postError: postError?.message, exerciseCount, exerciseError: exerciseError?.message })
   const { data: existing } = await supabase
     .from("session_athletes")
     .select("id, attended_at")
@@ -28,8 +31,9 @@ export async function startSession(sessionPostId: string) {
       })
       .select("id")
       .single()
-    if (error) return { error: error.message }
+    if (error) { console.error("[v0] startSession insert failed", { sessionPostId, athleteId: userData.user.id, error: error.message }); return { error: error.message } }
     sessionAthleteId = inserted.id
+    console.log("[v0] startSession attendance created", { sessionPostId, sessionAthleteId })
   } else if (!existing?.attended_at) {
     await supabase
       .from("session_athletes")
