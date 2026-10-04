@@ -22,9 +22,15 @@ export default async function DashboardPage() {
   if (athleteProfile?.account_status === "paused") return <main className="grid min-h-screen place-items-center p-6"><Card className="max-w-md"><CardHeader><CardTitle>Account paused</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Your account is currently paused. Please contact your coach when you are ready to resume training.</p></CardContent></Card></main>
   const teamIds = (athleteTeams ?? []).map((team: any) => team.team_id).filter(Boolean)
   const sessionFilter = teamIds.length ? `athlete_id.eq.${userData.user.id},team_id.in.(${teamIds.join(",")})` : `athlete_id.eq.${userData.user.id}`
-  const { data: sessionPosts } = await supabase.from("session_posts").select("*, session_exercises(id), teams(name_en, name_ar, color_hex, image_url, is_national_team)").or(sessionFilter).order("session_date", { ascending: true })
+  const { data: sessionPosts } = await supabase.from("session_posts").select("*, teams(name_en, name_ar, color_hex, image_url, is_national_team)").or(sessionFilter).order("session_date", { ascending: true })
+  const postIds = (sessionPosts ?? []).map((post: any) => post.id)
+  const { data: sessionExerciseRows } = postIds.length ? await supabase.from("session_exercises").select("id,session_post_id").in("session_post_id", postIds) : { data: [] }
+  const exerciseCountByPost = new Map<string, number>()
+  for (const row of sessionExerciseRows ?? []) exerciseCountByPost.set(row.session_post_id, (exerciseCountByPost.get(row.session_post_id) ?? 0) + 1)
   const assignedPostIds = (sessionAthletes ?? []).map((row: any) => row.session_post_id).filter(Boolean)
-  const { data: directlyAssignedPosts } = assignedPostIds.length ? await supabase.from("session_posts").select("*, session_exercises(id), teams(name_en, name_ar, color_hex, image_url, is_national_team)").in("id", assignedPostIds) : { data: [] }
+  const { data: directlyAssignedPosts } = assignedPostIds.length ? await supabase.from("session_posts").select("*, teams(name_en, name_ar, color_hex, image_url, is_national_team)").in("id", assignedPostIds) : { data: [] }
+  const directPostIds = (directlyAssignedPosts ?? []).map((post: any) => post.id).filter((id: string) => !postIds.includes(id))
+  if (directPostIds.length) { const { data: directExercises } = await supabase.from("session_exercises").select("id,session_post_id").in("session_post_id", directPostIds); for (const row of directExercises ?? []) exerciseCountByPost.set(row.session_post_id, (exerciseCountByPost.get(row.session_post_id) ?? 0) + 1) }
   const mergedSessionPosts = [...new Map([...(sessionPosts ?? []), ...(directlyAssignedPosts ?? [])].map((post: any) => [post.id, post])).values()]
 
   const teamsById = new Map((athleteTeams ?? []).map((row: any) => [row.team_id, row.teams]))
@@ -41,7 +47,7 @@ export default async function DashboardPage() {
       titleAr: post.title_ar,
       sessionDate: post.session_date,
       period: post.start_time,
-      exerciseCount: post.session_exercises?.length ?? 0,
+      exerciseCount: exerciseCountByPost.get(post.id) ?? 0,
       teamNameEn: team?.name_en ?? "",
       teamNameAr: team?.name_ar ?? "",
       teamImageUrl: team?.image_url ?? null,
@@ -87,7 +93,6 @@ export default async function DashboardPage() {
           </Card>
         </section>
 
-        {athleteProfile?.assessment_status !== "approved" && <Card className="border-amber-500/40 bg-amber-500/5"><CardContent className="flex gap-3 p-4"><AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-600" /><div><p className="text-sm font-medium">Assessment incomplete</p><p className="mt-1 text-xs text-muted-foreground">Complete your athlete assessment so your coach can tailor your program safely.</p><Link href="/assessment" className="mt-2 inline-flex text-xs font-semibold text-primary underline underline-offset-4">Complete assessment</Link></div></CardContent></Card>}
 
         {/* Today's sessions */}
         <section className="flex flex-col gap-3">

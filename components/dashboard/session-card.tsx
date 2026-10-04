@@ -54,7 +54,7 @@ export function SessionCard({ session }: { session: SessionCardData }) {
         </div>
         {isComplete ? (
           <Badge variant="secondary" className="rounded-md shrink-0 gap-1 bg-emerald-500/15 text-emerald-500"><span aria-hidden="true">✓</span>{dict.dashboard.completed}</Badge>
-        ) : <Badge className="shrink-0">Start training</Badge>}
+        ) : <Badge className="shrink-0 bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25">Start training</Badge>}
       </div>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
