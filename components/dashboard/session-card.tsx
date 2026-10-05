@@ -37,7 +37,34 @@ export function SessionCard({ session }: { session: SessionCardData }) {
   return (
     <Link
       href={href}
-      onClick={() => console.log("[assigned-session-debug] Start training clicked", { sessionPostId: session.sessionPostId, sessionAthleteId: session.sessionAthleteId, sessionDate: session.sessionDate, exerciseCount: session.exerciseCount, completed: isComplete, destination: href })}
+      onClick={() => {
+        const debugPayload = {
+          sessionPostId: session.sessionPostId,
+          sessionAthleteId: session.sessionAthleteId || null,
+          sessionDate: session.sessionDate,
+          exerciseCount: session.exerciseCount,
+          completed: isComplete,
+          destination: href,
+          checks: {
+            hasSessionPostId: Boolean(session.sessionPostId),
+            hasAthleteAssignment: Boolean(session.sessionAthleteId),
+            hasExercises: session.exerciseCount > 0,
+            willOpenRunner: !isComplete,
+            willOpenSummary: isComplete,
+          },
+        }
+        console.groupCollapsed("[assigned-session-debug] Start training clicked")
+        console.log(debugPayload)
+        console.table({
+          "session post exists": debugPayload.checks.hasSessionPostId,
+          "athlete assignment exists": debugPayload.checks.hasAthleteAssignment,
+          "exercise rows available": debugPayload.checks.hasExercises,
+          "destination": href,
+        })
+        if (!debugPayload.checks.hasSessionPostId) console.error("[assigned-session-debug] Missing session post id")
+        if (!debugPayload.checks.hasExercises && !isComplete) console.warn("[assigned-session-debug] Start training has zero resolved exercises; inspect session page/server logs")
+        console.groupEnd()
+      }}
       dir={dir}
       className={cn(
         "group relative flex flex-col gap-4 rounded-2xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg",

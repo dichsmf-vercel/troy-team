@@ -37,7 +37,26 @@ export default async function SessionPage({
     .select("id, exercise_id, exercise_order, sets, reps, exercises(id, name_en, name_ar, description_en, description_ar, image_url, video_youtube_url)")
     .eq("session_post_id", sessionPostId)
     .order("exercise_order", { ascending: true })
-  console.log("[v0] session exercise resolution", { sessionPostId, athleteId: userData.user.id, postFound: Boolean(post), sessionAthleteId: sessionAthlete?.id ?? null, exerciseCount: exercises?.length ?? 0, exerciseError: exercisesError?.message, exerciseIds: (exercises ?? []).map((row: any) => row.exercise_id), rows: exercises })
+  const resolvedExercises = (exercises ?? []).filter((row: any) => Boolean(row.exercises?.id))
+  console.log("[assigned-session-debug] Session page resolution", {
+    sessionPostId,
+    athleteId: userData.user.id,
+    postFound: Boolean(post),
+    sessionAthleteId: sessionAthlete?.id ?? null,
+    rawExerciseRowCount: exercises?.length ?? 0,
+    linkedExerciseCount: resolvedExercises.length,
+    exerciseError: exercisesError?.message ?? null,
+    exerciseIds: (exercises ?? []).map((row: any) => row.exercise_id),
+    unresolvedRows: (exercises ?? []).filter((row: any) => !row.exercises?.id).map((row: any) => ({ id: row.id, exerciseId: row.exercise_id })),
+    checks: {
+      postLoaded: Boolean(post),
+      exerciseQuerySucceeded: !exercisesError,
+      hasExerciseRows: Boolean(exercises?.length),
+      allRowsLinked: resolvedExercises.length === (exercises?.length ?? 0),
+    },
+  })
+  if (exercisesError) console.error("[assigned-session-debug] Session exercise query failed", exercisesError)
+  if (!exercises?.length) console.warn("[assigned-session-debug] No session_exercises rows resolved for this session post")
 
   const { data: existingSelfie } = sessionAthlete?.id ? await supabase.from("session_selfies").select("id").eq("session_athlete_id", sessionAthlete.id).maybeSingle() : { data: null }
 

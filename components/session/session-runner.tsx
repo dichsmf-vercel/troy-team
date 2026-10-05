@@ -120,10 +120,29 @@ export function SessionRunner({
   const allDone = exercises.length > 0 && completedCount === exercises.length
 
   function handleStart() {
-    console.log("[v0] start training request", { sessionPostId, initialSessionAthleteId, exerciseCount: exercises.length, exerciseIds: exercises.map((exercise) => exercise.exerciseId) })
+    const startPayload = {
+      sessionPostId,
+      initialSessionAthleteId: initialSessionAthleteId || null,
+      exerciseCount: exercises.length,
+      exerciseIds: exercises.map((exercise) => exercise.exerciseId),
+      exerciseRowIds: exercises.map((exercise) => exercise.sessionExerciseId),
+      checks: {
+        sessionPostIdPresent: Boolean(sessionPostId),
+        exercisesResolved: exercises.length > 0,
+        exerciseIdsResolved: exercises.every((exercise) => Boolean(exercise.exerciseId)),
+        alreadyAttended: Boolean(attendedAt),
+      },
+    }
+    console.groupCollapsed("[assigned-session-debug] Runner start clicked")
+    console.log(startPayload)
+    console.table(startPayload.checks)
+    if (!startPayload.checks.exercisesResolved) console.error("[assigned-session-debug] Runner opened with zero exercises")
+    if (!startPayload.checks.exerciseIdsResolved) console.error("[assigned-session-debug] One or more session exercises has no linked exercise")
+    console.groupEnd()
     startTransition(async () => {
+      const requestStartedAt = performance.now()
       const result = await startSession(sessionPostId)
-      console.log("[v0] start training response", { sessionPostId, result, exerciseCount: exercises.length })
+      console.log("[assigned-session-debug] startSession response", { sessionPostId, result, exerciseCount: exercises.length, durationMs: Math.round(performance.now() - requestStartedAt), authenticatedSessionCreated: Boolean(result?.sessionAthleteId), errorReturned: Boolean(result?.error) })
       if (result?.error) setSelfieError(result.error)
       if (result?.sessionAthleteId) setSessionAthleteId(result.sessionAthleteId)
       if (!attendedAt && !result?.error) setAttendedAt(new Date().toISOString())
