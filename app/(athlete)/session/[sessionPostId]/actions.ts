@@ -11,6 +11,11 @@ export async function startSession(sessionPostId: string) {
   const { data: post, error: postError } = await supabase.from("session_posts").select("id,athlete_id,team_id").eq("id", sessionPostId).maybeSingle()
   const { count: exerciseCount, error: exerciseError } = await supabase.from("session_exercises").select("id", { count: "exact", head: true }).eq("session_post_id", sessionPostId)
   console.log("[v0] startSession server lookup", { sessionPostId, postFound: Boolean(post), postError: postError?.message, exerciseCount, exerciseError: exerciseError?.message })
+  if (postError) return { error: `Unable to load session: ${postError.message}` }
+  if (!post) return { error: "Session not found." }
+  if (exerciseError) return { error: `Unable to load session exercises: ${exerciseError.message}` }
+  if (!exerciseCount) return { error: "This session has no exercises assigned yet." }
+
   const { data: existing, error: existingError } = await supabase
     .from("session_athletes")
     .select("id, attended_at")
