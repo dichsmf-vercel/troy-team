@@ -55,6 +55,14 @@ export function SessionCard({ session }: { session: SessionCardData }) {
         }
         console.groupCollapsed("[assigned-session-debug] Start training clicked")
         console.log(debugPayload)
+        console.log("[assigned-session-debug] Navigation handoff", {
+          href,
+          currentPath: window.location.pathname,
+          sameOrigin: href.startsWith("/"),
+          defaultPrevented: false,
+          timestamp: new Date().toISOString(),
+        })
+        if (!session.sessionAthleteId) console.warn("[assigned-session-debug] Dashboard card has no session_athlete assignment; session page must authorize by team/athlete post or create attendance on start")
         console.table({
           "session post exists": debugPayload.checks.hasSessionPostId,
           "athlete assignment exists": debugPayload.checks.hasAthleteAssignment,

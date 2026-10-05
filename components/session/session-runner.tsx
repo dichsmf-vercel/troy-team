@@ -119,6 +119,23 @@ export function SessionRunner({
   const progressPct = exercises.length > 0 ? Math.round((completedCount / exercises.length) * 100) : 0
   const allDone = exercises.length > 0 && completedCount === exercises.length
 
+  useEffect(() => {
+    console.log("[assigned-session-debug] Runner mounted", {
+      sessionPostId,
+      initialSessionAthleteId: initialSessionAthleteId || null,
+      initialAttendedAt: initialAttendedAt || null,
+      exerciseCount: exercises.length,
+      exerciseIds: exercises.map((exercise) => exercise.exerciseId),
+      sessionExerciseIds: exercises.map((exercise) => exercise.sessionExerciseId),
+      completionCount: Object.values(completedMap).filter(Boolean).length,
+      checks: {
+        runnerReceivedExercises: exercises.length > 0,
+        runnerReceivedLinkedExerciseIds: exercises.every((exercise) => Boolean(exercise.exerciseId)),
+        attendanceRequiredBeforeStart: !initialSessionAthleteId,
+      },
+    })
+  }, [sessionPostId, initialSessionAthleteId, initialAttendedAt, exercises, completedMap])
+
   function handleStart() {
     const startPayload = {
       sessionPostId,
@@ -146,6 +163,13 @@ export function SessionRunner({
       if (result?.error) setSelfieError(result.error)
       if (result?.sessionAthleteId) setSessionAthleteId(result.sessionAthleteId)
       if (!attendedAt && !result?.error) setAttendedAt(new Date().toISOString())
+      console.log("[assigned-session-debug] Runner state after start response", {
+        sessionPostId,
+        previousSessionAthleteId: initialSessionAthleteId || null,
+        returnedSessionAthleteId: result?.sessionAthleteId ?? null,
+        error: result?.error ?? null,
+        nextStep: result?.error ? "blocked" : "attendance-ready",
+      })
     })
   }
 
