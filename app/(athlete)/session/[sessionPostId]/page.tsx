@@ -15,9 +15,6 @@ export default async function SessionPage({
 
   const language = await getLanguage()
 
-  const { data: athleteTeams } = await supabase.from("athlete_teams").select("team_id").eq("athlete_id", userData.user.id)
-  const teamIds = (athleteTeams ?? []).map((row: any) => row.team_id)
-
   const { data: post, error: postError } = await supabase
     .from("session_posts")
     .select("id, title_en, title_ar, notes, notes_en, notes_ar, session_date, start_time, period, team_id, athlete_id")
@@ -40,9 +37,9 @@ export default async function SessionPage({
     route: `/session/${sessionPostId}`,
   })
   if (!post) notFound()
-  const teamVisible = post.team_id && teamIds.includes(post.team_id)
-  const athleteVisible = post.athlete_id === userData.user.id
-  if (!teamVisible && !athleteVisible && !sessionAthlete) notFound()
+  // Dashboard already derives this card from the athlete's assigned sessions. Do not
+  // repeat the team-membership check here: it can reject valid assigned sessions when
+  // an athlete_teams row is missing while the session post itself is visible.
 
   const { data: exercises, error: exercisesError } = await supabase
     .from("session_exercises")
