@@ -97,26 +97,19 @@ export default async function SessionPage({
       isNationalTeam={team?.is_national_team ?? false}
       sessionDate={post.session_date}
       period={post.start_time ? String(post.start_time).slice(0, 5) : "00:00"}
-      exercises={(exercises ?? []).map((se) => {
-        const ex = se.exercises as unknown as {
-          id: string
-          name_en: string
-          name_ar: string
-          description_en: string | null
-          description_ar: string | null
-          image_url: string | null
-          video_youtube_url: string | null
-        }
-        return {
+      exercises={(exercises ?? []).flatMap((se: any) => {
+        const related = Array.isArray(se.exercises) ? se.exercises[0] : se.exercises
+        if (!related?.id) return []
+        return [{
           sessionExerciseId: se.id,
-          exerciseId: ex.id,
-          name: language === "ar" ? ex.name_ar : ex.name_en,
-          description: language === "ar" ? ex.description_ar : ex.description_en,
-          imageUrl: ex.image_url,
-          videoUrl: ex.video_youtube_url,
+          exerciseId: related.id,
+          name: language === "ar" ? related.name_ar : related.name_en,
+          description: language === "ar" ? related.description_ar : related.description_en,
+          imageUrl: related.image_url,
+          videoUrl: related.video_youtube_url,
           sets: se.sets,
           reps: se.reps,
-        }
+        }]
       })}
       initialSessionAthleteId={sessionAthlete?.id ?? null}
       initialAttendedAt={sessionAthlete?.attended_at ?? null}
