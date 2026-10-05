@@ -26,7 +26,17 @@ export default async function SessionPage({
     .eq("id", sessionPostId)
     .maybeSingle()
 
-  const { data: sessionAthlete } = await supabase.from("session_athletes").select("id, attended_at").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
+  const { data: sessionAthlete, error: sessionAthleteError } = await supabase.from("session_athletes").select("id, attended_at").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
+  console.log("[assigned-session-debug] Session page handoff", {
+    sessionPostId,
+    athleteId: userData.user.id,
+    postFound: Boolean(post),
+    postAthleteId: post?.athlete_id ?? null,
+    teamId: post?.team_id ?? null,
+    sessionAthleteId: sessionAthlete?.id ?? null,
+    sessionAthleteError: sessionAthleteError?.message ?? null,
+    route: `/session/${sessionPostId}`,
+  })
   if (!post) notFound()
   const teamVisible = post.team_id && teamIds.includes(post.team_id)
   const athleteVisible = post.athlete_id === userData.user.id
