@@ -18,19 +18,21 @@ export default async function SessionPage({
   const { data: athleteTeams } = await supabase.from("athlete_teams").select("team_id").eq("athlete_id", userData.user.id)
   const teamIds = (athleteTeams ?? []).map((row: any) => row.team_id)
 
-  const { data: post } = await supabase
+  const { data: post, error: postError } = await supabase
     .from("session_posts")
-    .select(
-      "id, title_en, title_ar, notes, notes_en, notes_ar, session_date, start_time, period, team_id, athlete_id, teams(name_en, name_ar, color_hex, is_national_team)",
-    )
+    .select("id, title_en, title_ar, notes, notes_en, notes_ar, session_date, start_time, period, team_id, athlete_id")
     .eq("id", sessionPostId)
     .maybeSingle()
+  const { data: team } = post?.team_id
+    ? await supabase.from("teams").select("name_en, name_ar, color_hex, is_national_team").eq("id", post.team_id).maybeSingle()
+    : { data: null }
 
   const { data: sessionAthlete, error: sessionAthleteError } = await supabase.from("session_athletes").select("id, attended_at").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
   console.log("[assigned-session-debug] Session page handoff", {
     sessionPostId,
     athleteId: userData.user.id,
     postFound: Boolean(post),
+    postError: postError?.message ?? null,
     postAthleteId: post?.athlete_id ?? null,
     teamId: post?.team_id ?? null,
     sessionAthleteId: sessionAthlete?.id ?? null,
@@ -78,13 +80,6 @@ export default async function SessionPage({
       .eq("session_athlete_id", sessionAthlete.id)
     completions = data ?? []
   }
-
-  const team = post.teams as unknown as {
-    name_en: string
-    name_ar: string
-    color_hex: string
-    is_national_team: boolean
-  } | null
 
   return (
     <SessionRunner
