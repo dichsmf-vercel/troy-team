@@ -22,6 +22,23 @@ export async function generateTemporaryAthletePassword(athleteId: string) { cons
 
 export async function sendAthleteInvitation(athleteId: string) { const supabase = await createClient(); const { data: { user: admin } } = await supabase.auth.getUser(); if (!admin) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can send invitations." }; const service = createServiceClient(); const { data: athleteUser } = await service.auth.admin.getUserById(athleteId); const email = athleteUser.user?.email; if (!email) return { error: "Athlete email not found." }; const { error } = await service.auth.admin.inviteUserByEmail(email, { data: { role: "athlete" }, redirectTo: `${process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || "http://localhost:3000"}/auth/callback?next=/auth/set-password` }); if (error) return { error: error.message }; revalidatePath("/admin"); return { error: null } }
 
+export async function markExerciseSelfieReviewed(selfieId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized" }
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+  if (!profile || !["admin", "supporting_coach"].includes(profile.role)) return { error: "Forbidden" }
+  const service = createServiceClient()
+  const { data: selfie, error: loadError } = await service.from("program_exercise_selfies").select("storage_path").eq("id", selfieId).single()
+  if (loadError || !selfie) return { error: loadError?.message || "Selfie not found." }
+  const { error: deleteFileError } = await service.storage.from("exercise-selfies").remove([selfie.storage_path])
+  if (deleteFileError) return { error: deleteFileError.message }
+  const { error } = await service.from("program_exercise_selfies").delete().eq("id", selfieId)
+  if (error) return { error: error.message }
+  revalidatePath("/admin")
+  return { error: null }
+}
+
 export async function createTeam(form: FormData) { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { error } = await supabase.from("teams").insert({ name_en: String(form.get("name_en") || "").trim(), name_ar: String(form.get("name_ar") || form.get("name_en") || "").trim(), color_hex: String(form.get("color_hex") || "#2563eb"), image_url: String(form.get("image_url") || "").trim() || null, created_by: user.id }); revalidatePath("/admin"); return { error: error?.message ?? null } }
 export async function updateTeam(id: string, values: { name_en: string; name_ar: string; color_hex: string }) { const supabase = await createClient(); const { error } = await supabase.from("teams").update(values).eq("id", id); revalidatePath("/admin"); return { error: error?.message ?? null } }
 export async function deleteTeam(id: string) { const supabase = await createClient(); const { error } = await supabase.from("teams").delete().eq("id", id); revalidatePath("/admin"); return { error: error?.message ?? null } }
