@@ -21,8 +21,20 @@ export default async function DashboardPage() {
   if (athleteProfile?.account_status === "paused") return <main className="grid min-h-screen place-items-center p-6"><Card className="max-w-md"><CardHeader><CardTitle>Account paused</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Your account is currently paused. Please contact your coach when you are ready to resume training.</p></CardContent></Card></main>
   const todayStr = new Date().toISOString().slice(0, 10)
   const teamIds = (athleteTeams ?? []).map((row: any) => row.team_id).filter(Boolean)
-  const sessionFilter = teamIds.length ? `athlete_id.eq.${userData.user.id},team_id.in.(${teamIds.join(",")})` : `athlete_id.eq.${userData.user.id}`
-  const { data: assignedPosts } = await supabase.from("session_posts").select("id,title_en,title_ar,session_date,start_time,team_id,athlete_id,teams(name_en,name_ar,color_hex,image_url,is_national_team)").or(sessionFilter).order("session_date", { ascending: true })
+  const assignedPostQuery = "id,title_en,title_ar,session_date,start_time,team_id,athlete_id,teams(name_en,name_ar,color_hex,image_url,is_national_team)"
+  const [{ data: directPosts, error: directPostsError }, { data: teamPosts, error: teamPostsError }] = await Promise.all([
+    supabase.from("session_posts").select(assignedPostQuery).eq("athlete_id", userData.user.id),
+    teamIds.length ? supabase.from("session_posts").select(assignedPostQuery).in("team_id", teamIds) : Promise.resolve({ data: [], error: null } as any),
+  ])
+  const assignedPosts = [...new Map([...(directPosts ?? []), ...(teamPosts ?? [])].map((post: any) => [post.id, post])).values()]
+  console.log("[assigned-session-debug] Dashboard assignment visibility", {
+    athleteId: userData.user.id,
+    teamIds,
+    directPosts: directPosts?.map((post: any) => ({ id: post.id, title: post.title_en })) ?? [],
+    teamPosts: teamPosts?.map((post: any) => ({ id: post.id, title: post.title_en })) ?? [],
+    directPostsError: directPostsError?.message ?? null,
+    teamPostsError: teamPostsError?.message ?? null,
+  })
   const assignedPostIds = (assignedPosts ?? []).map((post: any) => post.id)
   const [{ data: assignedRows }, { data: attendanceRows }] = assignedPostIds.length ? await Promise.all([
     supabase.from("session_exercises").select("id,session_post_id").in("session_post_id", assignedPostIds),
