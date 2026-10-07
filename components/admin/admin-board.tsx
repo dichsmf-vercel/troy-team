@@ -17,7 +17,7 @@ import { ProgramReviewPanel } from "@/components/admin/program-review-panel"
 
 type Props = { teams: any[]; sessions: any[]; athletes: any[]; exercises: any[]; selfies: any[]; notifications: any[]; rules: any[]; programs: any[] }
 
-export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises = [], rules = [], programs = [] }: Props) {
+export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises = [], selfies = [], rules = [], programs = [] }: Props) {
   const [tab, setTab] = useState("sessions")
   const safeTeams = Array.isArray(teams) ? teams : []
   const safeSessions = Array.isArray(sessions) ? sessions : []
@@ -53,7 +53,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
           <SessionPanel teams={safeTeams} athletes={safeAthletes} sessions={safeSessions} exercises={safeExercises} />
         </TabsContent>
         <TabsContent value="athletes" className="mt-6">
-          <AthletesWorkspace teams={safeTeams} athletes={safeAthletes} />
+          <AthletesWorkspace teams={safeTeams} athletes={safeAthletes} selfies={Array.isArray(selfies) ? selfies : []} />
         </TabsContent>
         <TabsContent value="exercises" className="mt-6">
           <ExercisePanel exercises={safeExercises} />
@@ -69,9 +69,9 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
   )
 }
 
-function AthletesWorkspace({ teams, athletes }: { teams: any[]; athletes: any[] }) {
+function AthletesWorkspace({ teams, athletes, selfies }: { teams: any[]; athletes: any[]; selfies: any[] }) {
   const [showCreate, setShowCreate] = useState(false)
-  return <div className="grid gap-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold tracking-tight">Athletes</h2><p className="text-sm text-muted-foreground">{athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster</p></div><Button type="button" onClick={() => setShowCreate((value) => !value)}><Plus className="mr-2 size-4" />{showCreate ? "Close form" : "Create athlete"}</Button></div>{showCreate ? <AthleteCreateForm teams={teams} /> : null}<TeamManagementForm /><AthletesPanel athletes={athletes} /></div>
+  return <div className="grid gap-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold tracking-tight">Athletes</h2><p className="text-sm text-muted-foreground">{athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster</p></div><Button type="button" onClick={() => setShowCreate((value) => !value)}><Plus className="mr-2 size-4" />{showCreate ? "Close form" : "Create athlete"}</Button></div>{showCreate ? <AthleteCreateForm teams={teams} /> : null}<TeamManagementForm /><AthletesPanel athletes={athletes} selfies={selfies} /></div>
 }
 
 function TeamManagementForm() {

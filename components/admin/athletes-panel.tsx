@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 
-export function AthletesPanel({ athletes }: { athletes: any[] }) {
+export function AthletesPanel({ athletes, selfies = [] }: { athletes: any[]; selfies?: any[] }) {
   const [query, setQuery] = useState("")
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
@@ -24,6 +24,7 @@ export function AthletesPanel({ athletes }: { athletes: any[] }) {
   }, [athletes, query])
 
   return <div className="grid gap-6">
+    {selfies.length ? <Card><CardHeader><CardTitle>Exercise selfie review</CardTitle><p className="text-sm text-muted-foreground">Review uploaded exercise selfies from athlete accounts before deleting them.</p></CardHeader><CardContent className="grid gap-3">{selfies.map((selfie: any) => <div key={selfie.id} className="flex items-center gap-3 rounded-lg border p-3"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{selfie.athlete_id ?? "Athlete"}</p><p className="text-xs text-muted-foreground">{selfie.uploaded_at ? new Date(selfie.uploaded_at).toLocaleString() : "Uploaded selfie"}</p></div>{selfie.image_url ? <a href={selfie.image_url} target="_blank" rel="noreferrer" className="text-sm text-primary underline">View image</a> : <span className="text-xs text-muted-foreground">Private storage image</span>}</div>)}</CardContent></Card> : null}
     <Card>
       <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div><CardTitle>Athletes</CardTitle><p className="mt-1 text-sm text-muted-foreground">Read-only athlete information for admin review.</p></div><form onSubmit={async (event) => { event.preventDefault(); setImporting(true); setImportMessage(null); const result = await importAthletesCsv(new FormData(event.currentTarget)); setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`); setImporting(false) }} className="flex flex-wrap items-center gap-2"><Input type="file" name="file" accept=".csv,text/csv" className="max-w-xs" /><Button type="submit" variant="outline" disabled={importing}>{importing ? "Importing..." : "Import athletes CSV"}</Button></form>{importMessage ? <p role="status" className="text-xs text-muted-foreground">{importMessage}</p> : null}
