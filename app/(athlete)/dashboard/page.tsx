@@ -30,8 +30,15 @@ export default async function DashboardPage() {
   ]) : [{ data: [] }, { data: [] }]
   const exerciseCountByPost = new Map<string, number>()
   for (const row of assignedRows ?? []) exerciseCountByPost.set(row.session_post_id, (exerciseCountByPost.get(row.session_post_id) ?? 0) + 1)
+  console.log("[assigned-session-debug] Dashboard assigned exercise resolution", {
+    assignedPostIds,
+    assignedPostCount: assignedPosts?.length ?? 0,
+    sessionExerciseRowCount: assignedRows?.length ?? 0,
+    exerciseCountByPost: Object.fromEntries(exerciseCountByPost),
+    zeroExercisePosts: (assignedPosts ?? []).filter((post: any) => !exerciseCountByPost.has(post.id)).map((post: any) => post.id),
+  })
   const attendanceByPost = new Map((attendanceRows ?? []).map((row: any) => [row.session_post_id, row]))
-  const assignedSessions: SessionCardData[] = (assignedPosts ?? []).map((post: any) => { const attendance = attendanceByPost.get(post.id); const team = post.teams ?? {}; return { sessionPostId: post.id, sessionAthleteId: attendance?.id ?? "", titleEn: post.title_en, titleAr: post.title_ar, sessionDate: post.session_date, period: post.start_time, exerciseCount: exerciseCountByPost.get(post.id) ?? 0, teamNameEn: team.name_en ?? "", teamNameAr: team.name_ar ?? "", teamImageUrl: team.image_url ?? null, colorHex: team.color_hex ?? "#888888", isNationalTeam: Boolean(team.is_national_team), hasSummary: Boolean(attendance?.session_summaries?.length), attendedAt: attendance?.attended_at ?? null } })
+  const assignedSessions: SessionCardData[] = (assignedPosts ?? []).filter((post: any) => (exerciseCountByPost.get(post.id) ?? 0) > 0).map((post: any) => { const attendance = attendanceByPost.get(post.id); const team = post.teams ?? {}; return { sessionPostId: post.id, sessionAthleteId: attendance?.id ?? "", titleEn: post.title_en, titleAr: post.title_ar, sessionDate: post.session_date, period: post.start_time, exerciseCount: exerciseCountByPost.get(post.id) ?? 0, teamNameEn: team.name_en ?? "", teamNameAr: team.name_ar ?? "", teamImageUrl: team.image_url ?? null, colorHex: team.color_hex ?? "#888888", isNationalTeam: Boolean(team.is_national_team), hasSummary: Boolean(attendance?.session_summaries?.length), attendedAt: attendance?.attended_at ?? null } })
   const assignedToday = assignedSessions.filter((session) => session.sessionDate === todayStr)
   const assignedUpcoming = assignedSessions.filter((session) => session.sessionDate >= todayStr).slice(0, 5)
   const completedSessions = (attendanceRows ?? []).filter((row: any) => row.completed_at).length
