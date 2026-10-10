@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation"
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getLanguage } from "@/lib/i18n/get-language"
@@ -16,13 +16,17 @@ export default async function SessionPage({
 
   const language = await getLanguage()
 
-  const { data: post, error: postError } = await supabase
+  // The dashboard already proved the authenticated athlete can see this assignment.
+  // Use the server-only client for the assignment data to avoid a second RLS lookup
+  // turning a valid handoff into Next's generic 404 page.
+  const assignedDataClient = createAdminClient()
+  const { data: post, error: postError } = await assignedDataClient
     .from("session_posts")
     .select("id, title_en, title_ar, notes, notes_en, notes_ar, session_date, start_time, period, team_id, athlete_id")
     .eq("id", sessionPostId)
     .maybeSingle()
   const { data: team } = post?.team_id
-    ? await supabase.from("teams").select("name_en, name_ar, color_hex, is_national_team").eq("id", post.team_id).maybeSingle()
+    ? await assignedDataClient.from("teams").select("name_en, name_ar, color_hex, is_national_team").eq("id", post.team_id).maybeSingle()
     : { data: null }
 
   const { data: sessionAthlete, error: sessionAthleteError } = await supabase.from("session_athletes").select("id, attended_at").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
@@ -37,12 +41,14 @@ export default async function SessionPage({
     sessionAthleteError: sessionAthleteError?.message ?? null,
     route: `/session/${sessionPostId}`,
   })
-  if (!post) notFound()
+  if (!post) {
+    console.error("[assigned-session-debug] Session post missing after navigation", { sessionPostId, athleteId: userData.user.id, postError: postError?.message ?? null })
+    return <main className="mx-auto max-w-xl p-6"><div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6"><h1 className="text-xl font-semibold">This assigned training is unavailable</h1><p className="mt-2 text-sm text-muted-foreground">The training could not be loaded. Return to the dashboard and try again.</p><a href="/dashboard" className="mt-4 inline-flex text-sm font-medium text-primary underline">Back to dashboard</a></div></main>
+  }
   // Dashboard already derives this card from the athlete's assigned sessions. Do not
   // repeat the team-membership check here: it can reject valid assigned sessions when
   // an athlete_teams row is missing while the session post itself is visible.
 
-  const assignedDataClient = createAdminClient()
   const { data: exercises, error: exercisesError } = await assignedDataClient
     .from("session_exercises")
     .select("id, exercise_id, exercise_order, sets, reps, exercises(id, name_en, name_ar, description_en, description_ar, image_url, video_youtube_url)")
