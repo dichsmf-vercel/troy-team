@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { AthleteHeader } from "@/components/athlete/athlete-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -37,8 +38,9 @@ export default async function DashboardPage() {
     teamPostsError: teamPostsError?.message ?? null,
   })
   const assignedPostIds = (assignedPosts ?? []).map((post: any) => post.id)
+  const assignedDataClient = createAdminClient()
   const [{ data: assignedRows, error: assignedRowsError }, { data: attendanceRows, error: attendanceRowsError }] = assignedPostIds.length ? await Promise.all([
-    supabase.from("session_exercises").select("id,session_post_id").in("session_post_id", assignedPostIds),
+    assignedDataClient.from("session_exercises").select("id,session_post_id").in("session_post_id", assignedPostIds),
     supabase.from("session_athletes").select("id,session_post_id,attended_at,completed_at,session_summaries(id)").eq("athlete_id", userData.user.id).in("session_post_id", assignedPostIds),
   ]) : [{ data: [], error: null }, { data: [], error: null }]
   const exerciseCountByPost = new Map<string, number>()

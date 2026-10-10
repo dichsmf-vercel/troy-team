@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getLanguage } from "@/lib/i18n/get-language"
 import { SessionRunner } from "@/components/session/session-runner"
 
@@ -41,7 +42,8 @@ export default async function SessionPage({
   // repeat the team-membership check here: it can reject valid assigned sessions when
   // an athlete_teams row is missing while the session post itself is visible.
 
-  const { data: exercises, error: exercisesError } = await supabase
+  const assignedDataClient = createAdminClient()
+  const { data: exercises, error: exercisesError } = await assignedDataClient
     .from("session_exercises")
     .select("id, exercise_id, exercise_order, sets, reps, exercises(id, name_en, name_ar, description_en, description_ar, image_url, video_youtube_url)")
     .eq("session_post_id", sessionPostId)
