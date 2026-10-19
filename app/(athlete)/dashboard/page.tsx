@@ -39,10 +39,23 @@ export default async function DashboardPage() {
   })
   const assignedPostIds = (assignedPosts ?? []).map((post: any) => post.id)
   const assignedDataClient = createAdminClient()
+
+  // Verify service role key is present — if not, exercise counts will be empty
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[session-debug] ❌ SUPABASE_SERVICE_ROLE_KEY is not set — admin client will fail silently")
+  }
+
   const [{ data: assignedRows, error: assignedRowsError }, { data: attendanceRows, error: attendanceRowsError }] = assignedPostIds.length ? await Promise.all([
     assignedDataClient.from("session_exercises").select("id,session_post_id").in("session_post_id", assignedPostIds),
     supabase.from("session_athletes").select("id,session_post_id,attended_at,completed_at,session_summaries(id)").eq("athlete_id", userData.user.id).in("session_post_id", assignedPostIds),
   ]) : [{ data: [], error: null }, { data: [], error: null }]
+
+  console.log("[session-debug] exercise rows query", {
+    assignedPostIds,
+    rowsReturned: assignedRows?.length ?? 0,
+    error: assignedRowsError?.message ?? "none",
+    serviceKeyPresent: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  })
   const exerciseCountByPost = new Map<string, number>()
   for (const row of assignedRows ?? []) exerciseCountByPost.set(row.session_post_id, (exerciseCountByPost.get(row.session_post_id) ?? 0) + 1)
   console.log("[assigned-session-debug] Dashboard assigned exercise resolution", {

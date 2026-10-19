@@ -22,7 +22,7 @@ export default async function SessionPage({
   const assignedDataClient = createAdminClient()
   const { data: post, error: postError } = await assignedDataClient
     .from("session_posts")
-    .select("id, title_en, title_ar, notes, notes_en, notes_ar, session_date, start_time, period, team_id, athlete_id")
+    .select("id, title_en, title_ar, notes, session_date, start_time, team_id, athlete_id")
     .eq("id", sessionPostId)
     .maybeSingle()
   const { data: team } = post?.team_id
@@ -89,7 +89,7 @@ export default async function SessionPage({
       language={language}
       sessionPostId={post.id}
       title={language === "ar" ? post.title_ar : post.title_en}
-      notes={language === "ar" ? (post.notes_ar || post.notes) : (post.notes_en || post.notes)}
+      notes={post.notes ?? null}
       teamName={team ? (language === "ar" ? team.name_ar : team.name_en) : ""}
       teamColor={team?.color_hex ?? "#94A3B8"}
       isNationalTeam={team?.is_national_team ?? false}
