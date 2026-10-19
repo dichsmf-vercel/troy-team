@@ -14,10 +14,11 @@ import { ProgramGenerator } from "@/components/admin/program-generator"
 import { AthletesPanel } from "@/components/admin/athletes-panel"
 import { AthleteCreateForm } from "@/components/admin/athlete-create-form"
 import { ProgramReviewPanel } from "@/components/admin/program-review-panel"
+import { AthleteFeedbackPanel, type AthleteSessionSummary, type AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 
-type Props = { teams: any[]; sessions: any[]; athletes: any[]; exercises: any[]; selfies: any[]; notifications: any[]; rules: any[]; programs: any[] }
+type Props = { teams: any[]; sessions: any[]; athletes: any[]; exercises: any[]; selfies: any[]; notifications: any[]; rules: any[]; programs: any[]; feedbackSummaries?: AthleteSessionSummary[]; feedbackPainReports?: AthleteExercisePain[] }
 
-export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises = [], selfies = [], rules = [], programs = [] }: Props) {
+export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises = [], selfies = [], rules = [], programs = [], feedbackSummaries = [], feedbackPainReports = [] }: Props) {
   const [tab, setTab] = useState("sessions")
   const safeTeams = Array.isArray(teams) ? teams : []
   const safeSessions = Array.isArray(sessions) ? sessions : []
@@ -42,9 +43,17 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
         <h1 className="text-3xl font-bold">Coach operations</h1>
       </header>
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-5 gap-1 overflow-hidden p-1">
+        <TabsList className="grid h-auto w-full grid-cols-6 gap-1 overflow-hidden p-1">
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="athletes">Athletes</TabsTrigger>
+          <TabsTrigger value="feedback">
+            Feedback
+            {feedbackPainReports.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {feedbackPainReports.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="exercises">Exercises</TabsTrigger>
           <TabsTrigger value="rules">Rules</TabsTrigger>
           <TabsTrigger value="programs">Programs</TabsTrigger>
@@ -54,6 +63,9 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
         </TabsContent>
         <TabsContent value="athletes" className="mt-6">
           <AthletesWorkspace teams={safeTeams} athletes={safeAthletes} selfies={Array.isArray(selfies) ? selfies : []} />
+        </TabsContent>
+        <TabsContent value="feedback" className="mt-6">
+          <AthleteFeedbackPanel athletes={safeAthletes} summaries={feedbackSummaries} painReports={feedbackPainReports} />
         </TabsContent>
         <TabsContent value="exercises" className="mt-6">
           <ExercisePanel exercises={safeExercises} />
