@@ -13,19 +13,36 @@ type Props = {
 
 export function AssignedTrainingDiagnostics({ athleteId, directPosts, teamPosts, teamIds, exerciseCounts, errors }: Props) {
   useEffect(() => {
-    const payload = { athleteId, teamIds, directPosts, teamPosts, exerciseCounts, errors, timestamp: new Date().toISOString() }
-    console.groupCollapsed("[assigned-session-debug] Athlete assignment visibility")
-    console.log(payload)
+    console.groupCollapsed("[session-debug] 📋 Dashboard — assigned session visibility")
     console.table({
-      "direct assignments returned": directPosts.length,
-      "team assignments returned": teamPosts.length,
-      "exercise rows by session": JSON.stringify(exerciseCounts),
-      "direct query error": errors.direct ?? "none",
-      "team query error": errors.team ?? "none",
-      "exercise query error": errors.exercises ?? "none",
-      "attendance query error": errors.attendance ?? "none",
+      athleteId,
+      teamCount: teamIds.length,
+      directAssignments: directPosts.length,
+      teamAssignments: teamPosts.length,
+      totalUnique: directPosts.length + teamPosts.length,
+      directQueryError: errors.direct ?? "none",
+      teamQueryError: errors.team ?? "none",
+      exerciseQueryError: errors.exercises ?? "none",
+      attendanceQueryError: errors.attendance ?? "none",
     })
-    if (!directPosts.length && !teamPosts.length) console.warn("[assigned-session-debug] No assigned sessions reached the browser. Check direct/team query errors and Supabase RLS policies.")
+    if (directPosts.length) {
+      console.log("[session-debug] Direct assignments:", directPosts.map((p) => ({ id: p.id, title: p.title })))
+    }
+    if (teamPosts.length) {
+      console.log("[session-debug] Team assignments:", teamPosts.map((p) => ({ id: p.id, title: p.title })))
+    }
+    console.log("[session-debug] Exercise counts by session post:", exerciseCounts)
+    const zeroPosts = [...directPosts, ...teamPosts].filter((p) => !exerciseCounts[p.id])
+    if (zeroPosts.length) {
+      console.error("[session-debug] ❌ These sessions have 0 exercises — athletes cannot start them:", zeroPosts.map((p) => p.id))
+    }
+    if (!directPosts.length && !teamPosts.length) {
+      console.warn("[session-debug] ⚠️ No assigned sessions reached the browser — check RLS policies and Supabase query errors above")
+    }
+    if (errors.direct) console.error("[session-debug] ❌ Direct query error:", errors.direct)
+    if (errors.team) console.error("[session-debug] ❌ Team query error:", errors.team)
+    if (errors.exercises) console.error("[session-debug] ❌ Exercise query error:", errors.exercises)
+    if (errors.attendance) console.error("[session-debug] ❌ Attendance query error:", errors.attendance)
     console.groupEnd()
   }, [athleteId, directPosts, teamPosts, teamIds, exerciseCounts, errors])
 

@@ -34,45 +34,29 @@ export function SessionCard({ session }: { session: SessionCardData }) {
     ? `/session/${session.sessionPostId}/summary`
     : `/session/${session.sessionPostId}`
 
+  function handleCardClick() {
+    console.groupCollapsed("[session-debug] 🃏 Dashboard card clicked")
+    console.table({
+      sessionPostId: session.sessionPostId,
+      sessionAthleteId: session.sessionAthleteId || "none — will be created on Start",
+      title,
+      teamName,
+      sessionDate: session.sessionDate,
+      exerciseCount: session.exerciseCount,
+      attendedAt: session.attendedAt ?? "not started",
+      hasSummary: session.hasSummary,
+      isComplete,
+      navigatingTo: href,
+    })
+    if (!session.sessionAthleteId) console.warn("[session-debug] ⚠️ No session_athlete row on dashboard — normal if athlete hasn't started yet")
+    if (session.exerciseCount === 0) console.error("[session-debug] ❌ This session has 0 exercises — runner will fail to start")
+    console.groupEnd()
+  }
+
   return (
     <Link
       href={href}
-      onClick={() => {
-        const debugPayload = {
-          sessionPostId: session.sessionPostId,
-          sessionAthleteId: session.sessionAthleteId || null,
-          sessionDate: session.sessionDate,
-          exerciseCount: session.exerciseCount,
-          completed: isComplete,
-          destination: href,
-          checks: {
-            hasSessionPostId: Boolean(session.sessionPostId),
-            hasAthleteAssignment: Boolean(session.sessionAthleteId),
-            hasExercises: session.exerciseCount > 0,
-            willOpenRunner: !isComplete,
-            willOpenSummary: isComplete,
-          },
-        }
-        console.groupCollapsed("[assigned-session-debug] Start training clicked")
-        console.log(debugPayload)
-        console.log("[assigned-session-debug] Navigation handoff", {
-          href,
-          currentPath: window.location.pathname,
-          sameOrigin: href.startsWith("/"),
-          defaultPrevented: false,
-          timestamp: new Date().toISOString(),
-        })
-        if (!session.sessionAthleteId) console.warn("[assigned-session-debug] Dashboard card has no session_athlete assignment; session page must authorize by team/athlete post or create attendance on start")
-        console.table({
-          "session post exists": debugPayload.checks.hasSessionPostId,
-          "athlete assignment exists": debugPayload.checks.hasAthleteAssignment,
-          "exercise rows available": debugPayload.checks.hasExercises,
-          "destination": href,
-        })
-        if (!debugPayload.checks.hasSessionPostId) console.error("[assigned-session-debug] Missing session post id")
-        if (!debugPayload.checks.hasExercises && !isComplete) console.warn("[assigned-session-debug] Start training has zero resolved exercises; inspect session page/server logs")
-        console.groupEnd()
-      }}
+      onClick={handleCardClick}
       dir={dir}
       className={cn(
         "group relative flex flex-col gap-4 rounded-2xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg",
