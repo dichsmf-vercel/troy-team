@@ -1,26 +1,26 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { useState, useTransition } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Play, Check, TriangleAlert, ChevronLeft, ChevronRight } from "lucide-react"
+import { Play, Check, TriangleAlert, ChevronLeft, ChevronRight, Camera, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Language } from "@/lib/i18n/dictionaries"
 import { useLanguage } from "@/components/providers/language-provider"
-import { startSession, toggleExerciseCompletion, reportPain, uploadSelfie, saveExerciseFeedback } from "@/app/(athlete)/session/[sessionPostId]/actions"
+import {
+  startSession,
+  toggleExerciseCompletion,
+  reportPain,
+  uploadExerciseSelfie,
+  saveExerciseFeedback,
+} from "@/app/(athlete)/session/[sessionPostId]/actions"
 import { safeDate, safeTime } from "@/lib/formatters"
 
 type Exercise = {
@@ -33,6 +33,8 @@ type Exercise = {
   sets: number | null
   reps: string | null
 }
+
+type SelfieState = "idle" | "uploading" | "done" | "error"
 
 export function SessionRunner({
   language,
@@ -66,124 +68,84 @@ export function SessionRunner({
   initialSelfieUploaded: boolean
 }) {
   const { dict } = useLanguage()
+
+  // Session state
   const [sessionAthleteId, setSessionAthleteId] = useState(initialSessionAthleteId)
   const [attendedAt, setAttendedAt] = useState(initialAttendedAt)
-  const [completedMap, setCompletedMap] = useState<Record<string, boolean>>(
-    Object.fromEntries(initialCompletions.map((c) => [c.session_exercise_id, c.completed])),
+  const [activeIndex, setActiveIndex] = useState(() => {
+    // start on the first incomplete exercise
+    const firstIncomplete = initialCompletions.findIndex((c) => !c.completed)
+    return firstIncomplete >= 0 ? firstIncomplete : 0
+  })
+  const [completedSet, setCompletedSet] = useState<Set<string>>(
+    new Set(initialCompletions.filter((c) => c.completed).map((c) => c.session_exercise_id)),
   )
-  const [activeIndex, setActiveIndex] = useState(0)
+
+  // Per-exercise selfie state
+  const [selfieStates, setSelfieStates] = useState<Record<string, SelfieState>>({})
+  const [selfieErrors, setSelfieErrors] = useState<Record<string, string>>({})
+
+  // Pain dialog
   const [painDialogFor, setPainDialogFor] = useState<string | null>(null)
   const [painLocation, setPainLocation] = useState("")
-  const [painSeverity, setPainSeverity] = useState(3)
+  const [painSeverity, setPainSeverity] = useState(5)
   const [painNotes, setPainNotes] = useState("")
-  const [isPending, startTransition] = useTransition()
+
+  // Video
   const [showVideo, setShowVideo] = useState(false)
-  const [selfieUploaded, setSelfieUploaded] = useState(initialSelfieUploaded)
-  const [selfieError, setSelfieError] = useState<string | null>(null)
-  const [difficulty, setDifficulty] = useState(3)
-  const [enjoyment, setEnjoyment] = useState(3)
-  const [feedbackNotes, setFeedbackNotes] = useState("")
-  const [justification, setJustification] = useState("")
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
 
-  useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), [])
+  // General error / pending
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  async function startCamera() {
-    if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) return
-    streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
-    videoRef.current.srcObject = streamRef.current
-  }
-
-  function captureSelfie() {
-    const video = videoRef.current
-    if (!video || !sessionAthleteId || video.videoWidth === 0) return
-    const canvas = document.createElement("canvas")
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext("2d")?.drawImage(video, 0, 0)
-    startTransition(async () => {
-      const result = await uploadSelfie(sessionAthleteId, canvas.toDataURL("image/jpeg", 0.82))
-      if (result?.error) setSelfieError(result.error)
-      else { setSelfieUploaded(true); setSelfieError(null); streamRef.current?.getTracks().forEach((track) => track.stop()) }
-    })
-  }
-
-  function submitJustification() {
-    if (!sessionAthleteId || !justification.trim()) return
-    startTransition(async () => { const result = await uploadSelfie(sessionAthleteId, "", justification); if (result?.error) setSelfieError(result.error); else { setSelfieUploaded(true); setSelfieError(null) } })
-  }
-
-  const completedCount = Object.values(completedMap).filter(Boolean).length
+  const active = exercises[activeIndex]
+  const completedCount = completedSet.size
   const progressPct = exercises.length > 0 ? Math.round((completedCount / exercises.length) * 100) : 0
   const allDone = exercises.length > 0 && completedCount === exercises.length
 
-  useEffect(() => {
-    console.log("[assigned-session-debug] Runner mounted", {
-      sessionPostId,
-      initialSessionAthleteId: initialSessionAthleteId || null,
-      initialAttendedAt: initialAttendedAt || null,
-      exerciseCount: exercises.length,
-      exerciseIds: exercises.map((exercise) => exercise.exerciseId),
-      sessionExerciseIds: exercises.map((exercise) => exercise.sessionExerciseId),
-      completionCount: Object.values(completedMap).filter(Boolean).length,
-      checks: {
-        runnerReceivedExercises: exercises.length > 0,
-        runnerReceivedLinkedExerciseIds: exercises.every((exercise) => Boolean(exercise.exerciseId)),
-        attendanceRequiredBeforeStart: !initialSessionAthleteId,
-      },
-    })
-  }, [sessionPostId, initialSessionAthleteId, initialAttendedAt, exercises, completedMap])
+  // ─── handlers ────────────────────────────────────────────────────────────────
 
   function handleStart() {
-    const startPayload = {
-      sessionPostId,
-      initialSessionAthleteId: initialSessionAthleteId || null,
-      exerciseCount: exercises.length,
-      exerciseIds: exercises.map((exercise) => exercise.exerciseId),
-      exerciseRowIds: exercises.map((exercise) => exercise.sessionExerciseId),
-      checks: {
-        sessionPostIdPresent: Boolean(sessionPostId),
-        exercisesResolved: exercises.length > 0,
-        exerciseIdsResolved: exercises.every((exercise) => Boolean(exercise.exerciseId)),
-        alreadyAttended: Boolean(attendedAt),
-      },
-    }
-    console.groupCollapsed("[assigned-session-debug] Runner start clicked")
-    console.log(startPayload)
-    console.table(startPayload.checks)
-    if (!startPayload.checks.exercisesResolved) console.error("[assigned-session-debug] Runner opened with zero exercises")
-    if (!startPayload.checks.exerciseIdsResolved) console.error("[assigned-session-debug] One or more session exercises has no linked exercise")
-    console.groupEnd()
     startTransition(async () => {
-      const requestStartedAt = performance.now()
       const result = await startSession(sessionPostId)
-      console.log("[assigned-session-debug] startSession response", { sessionPostId, result, exerciseCount: exercises.length, durationMs: Math.round(performance.now() - requestStartedAt), authenticatedSessionCreated: Boolean(result?.sessionAthleteId), errorReturned: Boolean(result?.error) })
-      if (result?.error) setSelfieError(result.error)
+      if (result?.error) { setError(result.error); return }
       if (result?.sessionAthleteId) setSessionAthleteId(result.sessionAthleteId)
-      if (!attendedAt && !result?.error) setAttendedAt(new Date().toISOString())
-      console.log("[assigned-session-debug] Runner state after start response", {
-        sessionPostId,
-        previousSessionAthleteId: initialSessionAthleteId || null,
-        returnedSessionAthleteId: result?.sessionAthleteId ?? null,
-        error: result?.error ?? null,
-        nextStep: result?.error ? "blocked" : "attendance-ready",
-      })
+      if (!attendedAt) setAttendedAt(new Date().toISOString())
     })
   }
 
-  function handleToggle(sessionExerciseId: string, next: boolean) {
+  function handleSelfieUpload(sessionExerciseId: string, file: File) {
     if (!sessionAthleteId) return
-    setCompletedMap((prev) => ({ ...prev, [sessionExerciseId]: next }))
+    setSelfieStates((prev) => ({ ...prev, [sessionExerciseId]: "uploading" }))
+    setSelfieErrors((prev) => { const next = { ...prev }; delete next[sessionExerciseId]; return next })
     startTransition(async () => {
-      const result = await toggleExerciseCompletion(sessionAthleteId, sessionExerciseId, next)
-      if (result?.error) setSelfieError(result.error)
+      const result = await uploadExerciseSelfie(sessionAthleteId, sessionExerciseId, file)
+      if (result?.error) {
+        setSelfieStates((prev) => ({ ...prev, [sessionExerciseId]: "error" }))
+        setSelfieErrors((prev) => ({ ...prev, [sessionExerciseId]: result.error! }))
+      } else {
+        setSelfieStates((prev) => ({ ...prev, [sessionExerciseId]: "done" }))
+      }
     })
   }
 
-  function handleFeedback() {
-    if (!sessionAthleteId || !active) return
-    startTransition(async () => { const result = await saveExerciseFeedback(sessionAthleteId, active.sessionExerciseId, { difficulty, enjoyment, painNotes: feedbackNotes }); if (result?.error) setSelfieError(result.error); else setFeedbackNotes("") })
+  function handleCompleteExercise(sessionExerciseId: string) {
+    if (!sessionAthleteId) return
+    if (selfieStates[sessionExerciseId] !== "done") {
+      setSelfieErrors((prev) => ({ ...prev, [sessionExerciseId]: "Upload a selfie first to mark this exercise complete." }))
+      return
+    }
+    startTransition(async () => {
+      const result = await toggleExerciseCompletion(sessionAthleteId, sessionExerciseId, true)
+      if (result?.error) { setError(result.error); return }
+      setCompletedSet((prev) => new Set([...prev, sessionExerciseId]))
+      // auto-advance to next incomplete
+      const nextIndex = exercises.findIndex(
+        (ex, idx) => idx > activeIndex && !completedSet.has(ex.sessionExerciseId) && ex.sessionExerciseId !== sessionExerciseId,
+      )
+      if (nextIndex >= 0) setActiveIndex(nextIndex)
+      else if (activeIndex < exercises.length - 1) setActiveIndex(activeIndex + 1)
+    })
   }
 
   function handleReportPain() {
@@ -196,20 +158,17 @@ export function SessionRunner({
       })
       setPainDialogFor(null)
       setPainLocation("")
-      setPainSeverity(3)
+      setPainSeverity(5)
       setPainNotes("")
     })
   }
 
-  const active = exercises[activeIndex]
+  // ─── pre-start screen ────────────────────────────────────────────────────────
 
   if (!attendedAt) {
     return (
       <div className="flex flex-col items-center justify-center gap-6 px-4 py-16 text-center">
-        <Badge
-          className="border-0 text-primary-foreground"
-          style={{ backgroundColor: teamColor }}
-        >
+        <Badge className="border-0 text-primary-foreground" style={{ backgroundColor: teamColor }}>
           {teamName}
         </Badge>
         <h1 className="text-balance text-2xl font-semibold tracking-tight">{title}</h1>
@@ -218,16 +177,67 @@ export function SessionRunner({
           {safeDate(sessionDate, language === "ar" ? "ar" : "en-US", { weekday: "long", month: "long", day: "numeric" })}{" "}
           &middot; {safeTime(period, language === "ar" ? "ar" : "en-US")}
         </p>
-        <Button size="lg" className="mt-3 h-14 w-full gap-3 rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90" onClick={handleStart} disabled={isPending}>
+        <div className="w-full max-w-sm rounded-2xl border border-dashed p-4 text-left">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What to expect</p>
+          <ul className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
+            <li>· {exercises.length} exercises to complete</li>
+            <li>· Upload a selfie after each exercise</li>
+            <li>· Report any pain or discomfort as you go</li>
+          </ul>
+        </div>
+        {error ? (
+          <div className="flex w-full max-w-sm items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {error}
+          </div>
+        ) : null}
+        <Button
+          size="lg"
+          className="h-14 w-full max-w-sm gap-3 rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
+          onClick={handleStart}
+          disabled={isPending}
+        >
           <Play className="size-4" />
-          {dict.session.startSession}
+          {isPending ? "Starting…" : dict.session.startSession ?? "Start session"}
         </Button>
       </div>
     )
   }
 
+  // ─── done screen ─────────────────────────────────────────────────────────────
+
+  if (allDone) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 px-4 py-16 text-center">
+        <div className="grid size-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
+          <Check className="size-8" />
+        </div>
+        <h1 className="text-2xl font-semibold">All exercises done!</h1>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          Great work. Submit your session summary so your coach can review your feedback.
+        </p>
+        <Button size="lg" className="w-full max-w-sm gap-2" asChild>
+          <Link href={`/session/${sessionPostId}/summary?sessionAthleteId=${sessionAthleteId}`}>
+            <Check className="size-4" />
+            {dict.session.finishSession ?? "Finish session"}
+          </Link>
+        </Button>
+        <Link href="/dashboard" className="text-sm text-muted-foreground underline underline-offset-4">
+          Back to dashboard
+        </Link>
+      </div>
+    )
+  }
+
+  // ─── exercise runner ──────────────────────────────────────────────────────────
+
+  const selfieState = active ? (selfieStates[active.sessionExerciseId] ?? "idle") : "idle"
+  const selfieError = active ? selfieErrors[active.sessionExerciseId] : undefined
+  const isCompleted = active ? completedSet.has(active.sessionExerciseId) : false
+
   return (
     <div className="flex flex-col gap-5 px-4 py-6">
+      {/* Header */}
       <header className="flex flex-col gap-2">
         <Badge className="w-fit border-0 text-primary-foreground" style={{ backgroundColor: teamColor }}>
           {teamName}
@@ -235,96 +245,221 @@ export function SessionRunner({
         <h1 className="text-balance text-xl font-semibold tracking-tight">{title}</h1>
         <div className="flex items-center gap-3">
           <Progress value={progressPct} className="h-2 flex-1" />
-          <span className="text-xs font-medium tabular text-muted-foreground">
+          <span className="shrink-0 text-xs font-medium tabular text-muted-foreground">
             {completedCount}/{exercises.length}
           </span>
         </div>
       </header>
 
+      {/* Navigation pills */}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {exercises.map((ex, idx) => {
+          const done = completedSet.has(ex.sessionExerciseId)
+          const isActive = idx === activeIndex
+          return (
+            <button
+              key={ex.sessionExerciseId}
+              onClick={() => setActiveIndex(idx)}
+              className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                done
+                  ? "bg-emerald-500 text-white"
+                  : isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+              aria-label={`Exercise ${idx + 1}${done ? " (completed)" : ""}`}
+            >
+              {done ? <Check className="size-3" /> : idx + 1}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* General error */}
+      {error ? (
+        <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <AlertCircle className="size-4 shrink-0" />
+          {error}
+        </div>
+      ) : null}
+
+      {/* Active exercise card */}
       {active ? (
-        <Card className="flex flex-col gap-4 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium tabular text-muted-foreground">
-              {activeIndex + 1} / {exercises.length}
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                disabled={activeIndex === 0}
-                onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
-                aria-label={dict.common.previous}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-
-            </div>
-          </div>
-
+        <Card className="flex flex-col gap-4 overflow-hidden p-0">
+          {/* Exercise image */}
           {active.imageUrl ? (
-            <div className="relative aspect-video w-full overflow-hidden rounded-md bg-muted">
+            <div className="relative aspect-video w-full overflow-hidden bg-muted">
               <Image
-                src={active.imageUrl || "/placeholder.svg"}
+                src={active.imageUrl}
                 alt={active.name}
                 fill
                 className="object-cover"
                 crossOrigin="anonymous"
               />
             </div>
-          ) : null}
-
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold text-balance">{active.name}</h2>
-            {active.description ? (
-              <p className="text-sm leading-relaxed text-muted-foreground">{active.description}</p>
-            ) : null}
-            {active.sets || active.reps ? (
-              <p className="text-sm font-medium tabular text-foreground">
-                {active.sets ? `${active.sets} ${dict.session.sets}` : ""}
-                {active.sets && active.reps ? " · " : ""}
-                {active.reps ? `${active.reps} ${dict.session.reps}` : ""}
-              </p>
-            ) : null}
-          </div>
-
-          {active.videoUrl ? (
-            <div className="grid gap-2">
-              <Button type="button" variant="outline" className="w-full" onClick={() => setShowVideo((value) => !value)}>{showVideo ? "Hide video" : dict.session.watchDemo}</Button>
-              {showVideo ? <div className="aspect-video overflow-hidden rounded-md bg-muted"><iframe className="size-full" src={active.videoUrl.replace("watch?v=", "embed/")} title={`${active.name} video`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div> : null}
+          ) : (
+            <div className="flex aspect-video items-center justify-center bg-muted text-xs text-muted-foreground">
+              No photo
             </div>
-          ) : null}
+          )}
 
-          <div className="grid gap-3 border-t border-border pt-4"><Label>Exercise feedback (optional)</Label><Label>How hard was this exercise? (0–5)</Label><input type="range" min="0" max="5" value={difficulty} onChange={(event) => setDifficulty(Number(event.target.value))} /><span className="text-xs text-muted-foreground">{difficulty}/5</span><Label>Any unnatural pains?</Label><Textarea value={feedbackNotes} onChange={(event) => setFeedbackNotes(event.target.value)} placeholder="Describe pain or discomfort" /><Label>How did it feel overall? (0–5)</Label><input type="range" min="0" max="5" value={enjoyment} onChange={(event) => setEnjoyment(Number(event.target.value))} /><Button type="button" variant="outline" onClick={handleFeedback} disabled={!sessionAthleteId || isPending}>Save exercise feedback</Button></div>
+          <div className="flex flex-col gap-4 p-4">
+            {/* Exercise info */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground tabular">
+                  {activeIndex + 1} / {exercises.length}
+                </span>
+                {isCompleted && (
+                  <Badge className="gap-1 bg-emerald-500/15 text-emerald-600">
+                    <Check className="size-3" /> Done
+                  </Badge>
+                )}
+              </div>
+              <h2 className="text-lg font-semibold">{active.name}</h2>
+              {active.description ? (
+                <p className="text-sm leading-relaxed text-muted-foreground">{active.description}</p>
+              ) : null}
+              {active.sets || active.reps ? (
+                <p className="text-sm font-medium tabular">
+                  {active.sets ? `${active.sets} ${dict.session.sets}` : ""}
+                  {active.sets && active.reps ? " · " : ""}
+                  {active.reps ? `${active.reps} ${dict.session.reps}` : ""}
+                </p>
+              ) : null}
+            </div>
 
-          <div className="grid gap-2 border-t border-border pt-4">
-            <Button type="button" size="lg" disabled={!sessionAthleteId || isPending} onClick={() => { handleToggle(active.sessionExerciseId, true); setActiveIndex((index) => Math.min(exercises.length - 1, index + 1)) }}>
-              {activeIndex === exercises.length - 1 ? dict.session.finishSession : dict.common.next}
-              <ChevronRight className="size-4" />
+            {/* Video */}
+            {active.videoUrl ? (
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setShowVideo((v) => !v)}
+                >
+                  {showVideo ? "Hide video" : dict.session.watchDemo}
+                </Button>
+                {showVideo ? (
+                  <div className="aspect-video overflow-hidden rounded-xl bg-muted">
+                    <iframe
+                      className="size-full"
+                      src={active.videoUrl.replace("watch?v=", "embed/")}
+                      title={`${active.name} demo`}
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* ── Selfie upload ── */}
+            {!isCompleted ? (
+              <div className="flex flex-col gap-3 rounded-xl border border-dashed p-4">
+                <div className="flex items-center gap-2">
+                  <Camera className="size-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">
+                    {selfieState === "done"
+                      ? "Selfie uploaded ✓"
+                      : "Upload a selfie to complete this exercise"}
+                  </p>
+                </div>
+                {selfieState !== "done" ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Take a photo showing you completed the exercise. Coach Ahmed can review it from your athlete profile.
+                    </p>
+                    <label className="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/30 p-5 transition-colors hover:bg-muted/50">
+                      <Camera className="size-6 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {selfieState === "uploading" ? "Uploading…" : "Tap to choose or capture photo"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">Max 8 MB · JPG, PNG, WebP</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="user"
+                        className="absolute inset-0 cursor-pointer opacity-0"
+                        disabled={isPending || selfieState === "uploading"}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleSelfieUpload(active.sessionExerciseId, file)
+                        }}
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <p className="text-xs text-emerald-600">
+                    Selfie saved. You can now mark this exercise as complete.
+                  </p>
+                )}
+                {selfieError ? (
+                  <p className="flex items-center gap-1 text-xs text-destructive">
+                    <AlertCircle className="size-3 shrink-0" /> {selfieError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* ── Complete / pain buttons ── */}
+            {!isCompleted ? (
+              <Button
+                size="lg"
+                disabled={isPending || selfieState !== "done"}
+                onClick={() => handleCompleteExercise(active.sessionExerciseId)}
+                className="gap-2"
+              >
+                <Check className="size-4" />
+                {activeIndex === exercises.length - 1 ? "Complete final exercise" : "Complete exercise"}
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 p-3 text-sm text-emerald-700">
+                <Check className="size-4 shrink-0" />
+                Exercise completed
+              </div>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground"
+              onClick={() => setPainDialogFor(active.sessionExerciseId)}
+            >
+              <TriangleAlert className="size-4" />
+              {dict.session.reportPain}
             </Button>
-            <p className="text-center text-xs text-muted-foreground">Complete this exercise to continue to the next one.</p>
           </div>
-
-          <Button
-            variant="outline"
-            className="gap-2 text-destructive"
-            onClick={() => setPainDialogFor(active.sessionExerciseId)}
-          >
-            <TriangleAlert className="size-4" />
-            {dict.session.reportPain}
-          </Button>
         </Card>
       ) : null}
 
-      {allDone ? (
-        <Button size="lg" className="gap-2" asChild>
-          <Link href={`/session/${sessionPostId}/summary?sessionAthleteId=${sessionAthleteId}`}>
-            <Check className="size-4" />
-            {dict.session.finishSession}
-          </Link>
+      {/* Prev / Next nav */}
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          disabled={activeIndex === 0}
+          onClick={() => { setActiveIndex((i) => Math.max(0, i - 1)); setShowVideo(false) }}
+        >
+          <ChevronLeft className="size-4" />
+          {dict.common.previous}
         </Button>
-      ) : null}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          disabled={activeIndex === exercises.length - 1}
+          onClick={() => { setActiveIndex((i) => Math.min(exercises.length - 1, i + 1)); setShowVideo(false) }}
+        >
+          {dict.common.next}
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
 
+      {/* Pain dialog */}
       <Dialog open={!!painDialogFor} onOpenChange={(open) => !open && setPainDialogFor(null)}>
         <DialogContent>
           <DialogHeader>
@@ -341,9 +476,7 @@ export function SessionRunner({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label>
-                {dict.session.painSeverity}: {painSeverity}
-              </Label>
+              <Label>{dict.session.painSeverity}: {painSeverity}</Label>
               <Slider
                 value={[painSeverity]}
                 min={1}

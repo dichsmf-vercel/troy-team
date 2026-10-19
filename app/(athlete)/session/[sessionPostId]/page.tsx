@@ -75,8 +75,6 @@ export default async function SessionPage({
   if (exercisesError) console.error("[assigned-session-debug] Session exercise query failed", exercisesError)
   if (!exercises?.length) console.warn("[assigned-session-debug] No session_exercises rows resolved for this session post")
 
-  const { data: existingSelfie } = sessionAthlete?.id ? await supabase.from("session_selfies").select("id").eq("session_athlete_id", sessionAthlete.id).maybeSingle() : { data: null }
-
   let completions: { session_exercise_id: string; completed: boolean }[] = []
   if (sessionAthlete?.id) {
     const { data } = await supabase
@@ -114,7 +112,7 @@ export default async function SessionPage({
       initialSessionAthleteId={sessionAthlete?.id ?? null}
       initialAttendedAt={sessionAthlete?.attended_at ?? null}
       initialCompletions={completions}
-      initialSelfieUploaded={Boolean(existingSelfie)}
+      initialSelfieUploaded={false}
     />
   )
 }

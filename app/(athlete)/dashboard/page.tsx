@@ -57,7 +57,7 @@ export default async function DashboardPage() {
   const assignedToday = assignedSessions.filter((session) => session.sessionDate === todayStr)
   const assignedUpcoming = assignedSessions.filter((session) => session.sessionDate >= todayStr).slice(0, 5)
   const completedSessions = (attendanceRows ?? []).filter((row: any) => row.completed_at).length
-  const upcomingSessions = assignedUpcoming.length
+  const upcomingSessionsCount = assignedUpcoming.length
   const firstName = profile?.full_name?.split(" ")[0] ?? ""
   const programStatus = athleteProgram?.status === "approved" ? "Ready" : athleteProgram?.status === "active" ? "Active" : "Pending"
   const programSessions = Array.isArray((athleteProgram?.generation_reason as any)?.sessions) ? (athleteProgram?.generation_reason as any).sessions : []
@@ -86,7 +86,7 @@ export default async function DashboardPage() {
           <Card className="border-border/60 bg-card/80 shadow-sm">
             <CardContent className="p-3">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Upcoming</p>
-              <p className="mt-2 text-lg font-bold">{upcomingSessions.length}</p>
+              <p className="mt-2 text-lg font-bold">{upcomingSessionsCount}</p>
             </CardContent>
           </Card>
         </section>

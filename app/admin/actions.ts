@@ -63,3 +63,30 @@ export async function createManualProgramRule(formData: FormData) { const supaba
 export async function markNotificationRead(id: string) { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { error } = await supabase.from("notifications").update({ is_read: true, read_at: new Date().toISOString() }).eq("id", id).eq("recipient_id", user.id); revalidatePath("/admin"); return { error: error?.message ?? null } }
 export async function reviewAthleteProgram(id: string, status: "approved" | "rejected") { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (!profile || profile.role !== "admin") return { error: "Only admins can review programs." }; if (!id?.trim()) return { error: "Missing program id" }; const { error } = await supabase.from("athlete_programs").update({ status, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq("id", id); revalidatePath("/admin"); revalidatePath("/program"); return { error: error?.message ?? null } }
 export async function reviewSelfie(id: string) { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { error } = await supabase.from("session_selfies").update({ reviewed: true, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq("id", id); revalidatePath("/admin"); return { error: error?.message ?? null } }
+
+/**
+ * Review (and delete) a session exercise selfie uploaded during an assigned session.
+ * Files are stored in Supabase Storage under the "session-selfies" bucket.
+ */
+export async function reviewSessionSelfie(selfieId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized" }
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+  if (!profile || !["admin", "supporting_coach"].includes(profile.role)) return { error: "Forbidden" }
+  const service = createServiceClient()
+  const { data: selfie, error: loadError } = await service
+    .from("session_exercise_selfies")
+    .select("storage_path")
+    .eq("id", selfieId)
+    .single()
+  if (loadError || !selfie) return { error: loadError?.message || "Selfie not found." }
+  const { error: deleteFileError } = await service.storage
+    .from("session-selfies")
+    .remove([selfie.storage_path])
+  if (deleteFileError) return { error: deleteFileError.message }
+  const { error } = await service.from("session_exercise_selfies").delete().eq("id", selfieId)
+  if (error) return { error: error.message }
+  revalidatePath("/admin")
+  return { error: null }
+}

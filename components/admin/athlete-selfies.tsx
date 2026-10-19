@@ -1,34 +1,88 @@
 "use client"
 
 import { useState } from "react"
-import { Check } from "lucide-react"
+import { Check, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { reviewSelfie } from "@/app/admin/actions"
+import { Badge } from "@/components/ui/badge"
+import { markExerciseSelfieReviewed, reviewSessionSelfie } from "@/app/admin/actions"
 
-export function AthleteSelfies({ selfies }: { selfies: any[] }) {
-  const [items, setItems] = useState(Array.isArray(selfies) ? selfies : [])
+type Selfie = {
+  id: string
+  athlete_id: string
+  session_date?: string
+  exercise_index?: number
+  uploaded_at: string
+  image_url: string | null
+  // used for session selfies
+  session_exercise_id?: string
+  selfie_type: "program" | "session"
+}
+
+export function AthleteSelfies({ selfies, athleteName }: { selfies: Selfie[]; athleteName: string }) {
+  const [items, setItems] = useState<Selfie[]>(Array.isArray(selfies) ? selfies : [])
   const safeItems = Array.isArray(items) ? items : []
-  const groups = safeItems.reduce<Record<string, any[]>>((result, selfie) => {
-    const athleteId = selfie?.session_athletes?.athlete_id ?? "unassigned"
-    result[athleteId] = [...(result[athleteId] ?? []), selfie]
-    return result
-  }, {})
 
   if (!safeItems.length) return null
 
-  return <Card className="lg:col-span-2">
-    <CardHeader><CardTitle>Submitted athlete selfies</CardTitle></CardHeader>
-    <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Object.entries(groups).map(([athleteId, athleteSelfies]) => <div key={athleteId} className="rounded-lg border p-3">
-        <p className="mb-3 text-sm font-semibold">Athlete {athleteId === "unassigned" ? "unassigned" : athleteId.slice(0, 8)}</p>
-        <div className="grid gap-3">
-          {athleteSelfies.map((selfie) => <div key={selfie.id} className="overflow-hidden rounded-md border">
-            <img src={selfie.image_url} alt="Submitted athlete selfie" className="aspect-square w-full object-cover" />
-            <div className="flex items-center justify-between gap-2 p-2"><span className="text-xs text-muted-foreground">{selfie.uploaded_at ? new Date(selfie.uploaded_at).toLocaleDateString() : "Submitted"}</span><Button size="sm" variant="outline" onClick={async () => { await reviewSelfie(selfie.id); setItems((current) => current.filter((item) => item.id !== selfie.id)) }}><Check className="size-4" />Review</Button></div>
-          </div>)}
-        </div>
-      </div>)}
-    </CardContent>
-  </Card>
+  async function handleReview(selfie: Selfie) {
+    if (selfie.selfie_type === "program") {
+      await markExerciseSelfieReviewed(selfie.id)
+    } else {
+      await reviewSessionSelfie(selfie.id)
+    }
+    setItems((current) => current.filter((item) => item.id !== selfie.id))
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{athleteName}</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          {safeItems.length} selfie{safeItems.length === 1 ? "" : "s"} awaiting review
+        </p>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {safeItems.map((selfie) => (
+          <div key={selfie.id} className="grid gap-3 rounded-xl border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="font-medium text-sm">
+                  {selfie.selfie_type === "program"
+                    ? `Exercise ${(selfie.exercise_index ?? 0) + 1}`
+                    : "Session exercise"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {selfie.session_date ? `${selfie.session_date} · ` : ""}
+                  Uploaded {new Date(selfie.uploaded_at).toLocaleString()}
+                </p>
+              </div>
+              <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 text-xs">
+                Unread
+              </Badge>
+            </div>
+            {selfie.image_url ? (
+              <a href={selfie.image_url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg">
+                <img
+                  src={selfie.image_url}
+                  alt={`${athleteName} exercise selfie`}
+                  className="aspect-video w-full object-cover transition-transform hover:scale-[1.02]"
+                />
+              </a>
+            ) : (
+              <div className="grid aspect-video place-items-center rounded-lg bg-muted text-sm text-muted-foreground">
+                Image unavailable
+              </div>
+            )}
+            <form action={async () => handleReview(selfie)}>
+              <Button type="submit" variant="outline" size="sm" className="w-full gap-2">
+                <Check className="size-4" />
+                Mark reviewed and delete
+              </Button>
+            </form>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
 }

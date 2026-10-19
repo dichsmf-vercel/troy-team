@@ -12,20 +12,28 @@ export default async function AdminPage() {
   const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", user.id).single()
   if (!profile || !["admin", "supporting_coach"].includes(profile.role)) redirect("/dashboard")
   const service = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-  const [{ data: teams }, { data: sessions }, { data: athletes }, { data: exercises }, { data: selfies }, { data: notifications }, { data: rules }, { data: programs }] = await Promise.all([
+  const [{ data: teams }, { data: sessions }, { data: athletes }, { data: exercises }, { data: programSelfies }, { data: sessionSelfies }, { data: notifications }, { data: rules }, { data: programs }] = await Promise.all([
     supabase.from("teams").select("id, name_en, name_ar, color_hex, image_url, is_national_team").order("name_en"),
     supabase.from("session_posts").select("id, title_en, title_ar, notes, session_date, start_time, team_id, athlete_id, teams(name_en, name_ar)").order("session_date", { ascending: false }).limit(20),
     service.from("athletes").select("id, tier, account_status, assessment_status, medical_clearance_status, intake_completed_at, phone, height_cm, weight_kg, injury_notes, goals, created_at").order("created_at", { ascending: false }),
     service.from("exercises").select("id, name_en, name_ar, category, image_url, video_youtube_url, default_sets, default_reps, exercise_code, movement_pattern, difficulty").order("name_en"),
     service.from("program_exercise_selfies").select("id, athlete_id, athlete_program_id, session_date, exercise_index, storage_path, uploaded_at").is("reviewed_at", null).order("uploaded_at", { ascending: false }),
+    service.from("session_exercise_selfies").select("id, athlete_id, session_athlete_id, session_exercise_id, storage_path, uploaded_at").is("reviewed_at", null).order("uploaded_at", { ascending: false }),
     supabase.from("notifications").select("id, title, body, is_read, created_at").eq("recipient_id", user.id).order("created_at", { ascending: false }).limit(8),
     supabase.from("program_rules").select("id, name, rule_type, condition_json, action_json, is_active, created_at").order("created_at", { ascending: false }),
     supabase.from("athlete_programs").select("id, athlete_id, status, month_start, month_end, generation_reason, athletes(profiles(full_name))").order("created_at", { ascending: false }),
   ])
-  const selfiesWithLinks = await Promise.all((selfies ?? []).map(async (selfie: any) => {
+  // Generate signed URLs for program selfies (stored in exercise-selfies bucket)
+  const programSelfiesWithLinks = await Promise.all((programSelfies ?? []).map(async (selfie: any) => {
     const { data } = await service.storage.from("exercise-selfies").createSignedUrl(selfie.storage_path, 60 * 60)
-    return { ...selfie, image_url: data?.signedUrl ?? null }
+    return { ...selfie, image_url: data?.signedUrl ?? null, selfie_type: "program" as const }
   }))
+  // Generate signed URLs for session selfies (stored in session-selfies bucket)
+  const sessionSelfiesWithLinks = await Promise.all((sessionSelfies ?? []).map(async (selfie: any) => {
+    const { data } = await service.storage.from("session-selfies").createSignedUrl(selfie.storage_path, 60 * 60)
+    return { ...selfie, image_url: data?.signedUrl ?? null, selfie_type: "session" as const }
+  }))
+  const selfiesWithLinks = [...programSelfiesWithLinks, ...sessionSelfiesWithLinks]
   const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 })
   console.log("[athlete-debug] auth users loaded", { count: authUsers.data.users.length, error: authUsers.error?.message ?? null })
   const authEmailById = new Map(authUsers.data.users.map((authUser) => [authUser.id, authUser.email ?? ""]))
