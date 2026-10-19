@@ -16,13 +16,6 @@ export async function startSession(sessionPostId: string) {
   if (postError) return { error: `Unable to load session: ${postError.message}` }
   if (!post) return { error: "Session not found." }
 
-  const { count: exerciseCount, error: exerciseError } = await supabase
-    .from("session_exercises")
-    .select("id", { count: "exact", head: true })
-    .eq("session_post_id", sessionPostId)
-  if (exerciseError) return { error: `Unable to load session exercises: ${exerciseError.message}` }
-  if (!exerciseCount) return { error: "This session has no exercises assigned yet." }
-
   const { data: existing, error: existingError } = await supabase
     .from("session_athletes")
     .select("id, attended_at")
