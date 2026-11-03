@@ -33,7 +33,14 @@ async function callGemini(apiKey: string, prompt: string, systemInstruction?: st
 
   if (!res.ok) {
     const text = await res.text().catch(() => "")
-    throw new Error(`Gemini API error ${res.status}: ${text.slice(0, 200)}`)
+    try {
+      const errJson = JSON.parse(text)
+      const msg = errJson?.error?.message || text
+      throw new Error(`Gemini API error ${res.status}: ${msg}`)
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Gemini API error")) throw e
+      throw new Error(`Gemini API error ${res.status}: ${text}`)
+    }
   }
 
   const json = await res.json()
