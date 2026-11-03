@@ -8,7 +8,7 @@
  */
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const MODEL = "gemini-2.0-flash"
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash"
 
 type GeminiContent = { role: "user" | "model"; parts: { text: string }[] }
 
