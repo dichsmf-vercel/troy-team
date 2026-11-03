@@ -94,6 +94,11 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
 
     try {
       const result = await generateProgramWithAI({ athleteId, startDate, time, weekdays: days })
+      if ((result as any).rawText) {
+        console.groupCollapsed("%c[AI-Program-Generator] Raw Gemini Model Output (Click to inspect quality)", "color: #8b5cf6; font-weight: bold;")
+        console.log((result as any).rawText)
+        console.groupEnd()
+      }
       console.log("Server response:", result)
 
       if (result.error || !result.data) {

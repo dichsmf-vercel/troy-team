@@ -39,6 +39,7 @@ async function callGemini(apiKey: string, prompt: string, systemInstruction?: st
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 8192,
+        responseMimeType: "application/json",
       },
     }
     if (systemInstruction) {
@@ -108,12 +109,47 @@ async function callGemini(apiKey: string, prompt: string, systemInstruction?: st
   throw new Error(`No models could be contacted. Tried: ${uniqueModels.join(", ")}`)
 }
 
-/** Extract JSON from a Gemini response that may include markdown code fences. */
+/** Extract JSON reliably from a Gemini response that may include markdown code fences or raw JSON. */
 function extractJson(text: string): unknown {
-  // Try to find a ```json ... ``` block first
-  const fenceMatch = /```(?:json)?\s*([\s\S]+?)\s*```/i.exec(text)
-  const raw = fenceMatch ? fenceMatch[1] : text.trim()
-  return JSON.parse(raw)
+  if (!text || typeof text !== "string") {
+    throw new Error("Empty response from Gemini API.")
+  }
+
+  // 1. Try direct parsing first
+  try {
+    return JSON.parse(text)
+  } catch {}
+
+  // 2. Try standard markdown code fences ```json ... ```
+  const fenceMatch = /```(?:json)?\s*([\s\S]*?)\s*```/i.exec(text)
+  if (fenceMatch && fenceMatch[1]) {
+    try {
+      return JSON.parse(fenceMatch[1].trim())
+    } catch {}
+  }
+
+  // 3. Strip any unclosed or leading/trailing markdown fences
+  let cleaned = text.trim()
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
+  try {
+    return JSON.parse(cleaned)
+  } catch {}
+
+  // 4. Extract between the outermost { and }
+  const firstBrace = cleaned.indexOf("{")
+  const lastBrace = cleaned.lastIndexOf("}")
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const jsonSubstring = cleaned.substring(firstBrace, lastBrace + 1)
+    try {
+      return JSON.parse(jsonSubstring)
+    } catch {
+      // 5. Clean trailing commas before closing braces/brackets
+      const cleanedCommas = jsonSubstring.replace(/,\s*([\]}])/g, "$1")
+      return JSON.parse(cleanedCommas)
+    }
+  }
+
+  throw new Error(`Could not parse JSON from Gemini response. Preview: ${text.slice(0, 150)}...`)
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -163,9 +199,9 @@ export async function generateProgramWithGemini(input: {
   time: string
   weekdays: number[]
   coachSystemPrompt?: string | null
-}): Promise<{ data: GeminiProgramOutput | null; error: string | null }> {
+}): Promise<{ data: GeminiProgramOutput | null; rawText: string; error: string | null }> {
   const apiKey = process.env.GEMINI_API_KEY_1
-  if (!apiKey) return { data: null, error: "GEMINI_API_KEY_1 is not configured." }
+  if (!apiKey) return { data: null, rawText: "", error: "GEMINI_API_KEY_1 is not configured." }
 
   const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
   const trainingDays = input.weekdays.map((d) => weekdayNames[d]).join(", ")
@@ -252,13 +288,15 @@ ${exerciseList}
 
 Return ONLY the JSON block above. No explanatory text before or after.`
 
+  let raw = ""
   try {
-    const raw = await callGemini(apiKey, userPrompt, systemPrompt)
+    raw = await callGemini(apiKey, userPrompt, systemPrompt)
+    console.log(`[Gemini Raw Output Received]: length = ${raw.length}`)
     const parsed = extractJson(raw) as GeminiProgramOutput
 
     // Validate structure
     if (!parsed?.sessions?.length) {
-      return { data: null, error: "Gemini returned an invalid program structure — sessions array is empty." }
+      return { data: null, rawText: raw, error: "Gemini returned an invalid program structure — sessions array is empty." }
     }
 
     // Enrich exercise image_url from our exercise list where Gemini left it null
@@ -274,10 +312,10 @@ Return ONLY the JSON block above. No explanatory text before or after.`
       })),
     }
 
-    return { data: enriched, error: null }
+    return { data: enriched, rawText: raw, error: null }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return { data: null, error: msg }
+    return { data: null, rawText: raw, error: msg }
   }
 }
 

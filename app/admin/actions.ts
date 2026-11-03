@@ -1,4 +1,4 @@
-﻿"use server"
+"use server"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
@@ -306,10 +306,10 @@ export async function generateProgramWithAI(input: {
       message: result.error ?? "Unknown error",
       metadata: { athleteId: input.athleteId, startDate: input.startDate },
     }).then(() => null, () => null)
-    return { error: result.error ?? "Generation failed", data: null }
+    return { error: result.error ?? "Generation failed", data: null, rawText: result.rawText }
   }
 
-  return { error: null, data: result.data }
+  return { error: null, data: result.data, rawText: result.rawText }
 }
 
 export async function saveAIGeneratedProgram(input: {
