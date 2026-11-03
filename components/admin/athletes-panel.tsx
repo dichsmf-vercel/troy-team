@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useState } from "react"
 import { Search, UserRound } from "lucide-react"
@@ -85,9 +85,21 @@ export function AthletesPanel({
               event.preventDefault()
               setImporting(true)
               setImportMessage(null)
-              const result = await importAthletesCsv(new FormData(event.currentTarget))
-              setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`)
-              setImporting(false)
+              console.log("[Athletes-Panel] Starting CSV athlete import")
+              try {
+                const result = await importAthletesCsv(new FormData(event.currentTarget))
+                console.log("[Athletes-Panel] CSV import result:", result)
+                setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`)
+              } catch (err: any) {
+                console.error("[Athletes-Panel] CSV import error:", err)
+                if (err?.message?.includes("Server Action") || String(err).includes("UnrecognizedActionError")) {
+                  setImportMessage("App was recently updated. Please refresh the page (Ctrl + F5).")
+                } else {
+                  setImportMessage(err?.message ?? "An error occurred during CSV import.")
+                }
+              } finally {
+                setImporting(false)
+              }
             }}
             className="flex flex-wrap items-center gap-2"
           >

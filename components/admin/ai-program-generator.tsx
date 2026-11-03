@@ -83,16 +83,44 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
     setSaveMsg(null)
     setExpandedSession(0)
 
-    const result = await generateProgramWithAI({ athleteId, startDate, time, weekdays: days })
-    setGenerating(false)
+    console.group("[AI-Program-Generator] Generating 4-Week Program")
+    console.log("Input parameters:", {
+      athleteId,
+      athleteName: selectedAthlete?.profiles?.full_name ?? "Unknown",
+      startDate,
+      time,
+      weekdays: days,
+    })
 
-    if (result.error || !result.data) {
-      setGenError(result.error ?? "Generation failed.")
-      return
+    try {
+      const result = await generateProgramWithAI({ athleteId, startDate, time, weekdays: days })
+      console.log("Server response:", result)
+
+      if (result.error || !result.data) {
+        console.error("[AI-Program-Generator] Server returned error:", result.error)
+        setGenError(result.error ?? "Generation failed.")
+        return
+      }
+
+      console.log("[AI-Program-Generator] Successfully generated program:", result.data)
+      setProgram(result.data)
+      setOriginalProgram(result.data)
+    } catch (err: any) {
+      console.error("[AI-Program-Generator] Client execution error:", err)
+      const isActionMismatch =
+        err?.message?.includes("Server Action") ||
+        err?.name === "UnrecognizedActionError" ||
+        String(err).includes("Failed to find Server Action")
+
+      if (isActionMismatch) {
+        setGenError("The app was recently updated on the server. Please refresh the page (Ctrl + F5 or Cmd + Shift + R) to synchronize the latest build.")
+      } else {
+        setGenError(err?.message ?? "An unexpected error occurred while communicating with the server.")
+      }
+    } finally {
+      setGenerating(false)
+      console.groupEnd()
     }
-
-    setProgram(result.data)
-    setOriginalProgram(result.data)
   }
 
   async function handleSave() {
@@ -100,29 +128,67 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
     setSaving(true)
     setSaveMsg(null)
 
-    // If edits were made, run the learning flow
-    if (editMode && originalProgram && adminReason.trim()) {
-      const learnResult = await saveAdminEditsAndLearn({
-        programId: "", // will be filled after save
-        editedProgram: displayProgram,
-        originalProgram,
-        adminReason,
-        athleteName: selectedAthlete?.profiles?.full_name ?? "Athlete",
-      })
-      if (learnResult.error) {
-        setSaveMsg(`Warning: edits saved but learning failed: ${learnResult.error}`)
-      }
-    }
-
-    const result = await saveAIGeneratedProgram({
+    console.group("[AI-Program-Generator] Saving AI Program")
+    console.log("Saving payload:", {
       athleteId,
       startDate,
       time,
       weekdays: days,
-      program: displayProgram,
+      sessionsCount: displayProgram.sessions.length,
+      isEdited: editMode,
     })
-    setSaving(false)
-    setSaveMsg(result.error ?? "Program saved for admin review.")
+
+    try {
+      // If edits were made, run the learning flow
+      if (editMode && originalProgram && adminReason.trim()) {
+        console.log("[AI-Program-Generator] Saving admin edits with learning cue:", adminReason)
+        try {
+          const learnResult = await saveAdminEditsAndLearn({
+            programId: "", // will be filled after save
+            editedProgram: displayProgram,
+            originalProgram,
+            adminReason,
+            athleteName: selectedAthlete?.profiles?.full_name ?? "Athlete",
+          })
+          console.log("[AI-Program-Generator] Learning result:", learnResult)
+          if (learnResult.error) {
+            console.warn("[AI-Program-Generator] Learning step warning:", learnResult.error)
+            setSaveMsg(`Warning: edits saved but learning failed: ${learnResult.error}`)
+          }
+        } catch (learnErr) {
+          console.error("[AI-Program-Generator] Error in learning step:", learnErr)
+        }
+      }
+
+      const result = await saveAIGeneratedProgram({
+        athleteId,
+        startDate,
+        time,
+        weekdays: days,
+        program: displayProgram,
+      })
+      console.log("[AI-Program-Generator] Save result:", result)
+      setSaveMsg(result.error ?? "Program saved for admin review.")
+    } catch (err: any) {
+      console.error("[AI-Program-Generator] Error saving program:", err)
+      const isActionMismatch =
+        err?.message?.includes("Server Action") ||
+        err?.name === "UnrecognizedActionError" ||
+        String(err).includes("Failed to find Server Action")
+
+      if (isActionMismatch) {
+        setSaveMsg("Error: The app was recently updated. Please refresh the page to reload the newest version.")
+      } else {
+        setSaveMsg(resultErrorText(err))
+      }
+    } finally {
+      setSaving(false)
+      console.groupEnd()
+    }
+  }
+
+  function resultErrorText(err: any): string {
+    return `Error: ${err?.message ?? "Unable to save program."}`
   }
 
   function updateExercise(sIdx: number, eIdx: number, field: keyof GeminiExercise, value: unknown) {
@@ -223,9 +289,22 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
           </Button>
 
           {genError && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-              <span>{genError}</span>
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+              <div className="flex items-start gap-2">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                <span className="leading-relaxed">{genError}</span>
+              </div>
+              {genError.includes("refresh") && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 w-fit h-7 text-xs"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload Page Now
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
