@@ -13,9 +13,14 @@ type GeminiContent = { role: "user" | "model"; parts: { text: string }[] }
 
 async function callGemini(apiKey: string, prompt: string, systemInstruction?: string): Promise<string> {
   const models = [
-    process.env.GEMINI_MODEL || "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-  ]
+    process.env.GEMINI_MODEL,
+    "gemini-flash-latest",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-flash-lite-latest",
+  ].filter(Boolean) as string[]
   const uniqueModels = [...new Set(models)]
 
   let lastError: Error | null = null
@@ -51,9 +56,10 @@ async function callGemini(apiKey: string, prompt: string, systemInstruction?: st
           // ignore parse error
         }
 
-        const isTemporary = res.status === 503 || res.status === 429
-        if (isTemporary && i < uniqueModels.length - 1) {
-          console.warn(`[Gemini] Model ${model} returned ${res.status}. Falling back to ${uniqueModels[i + 1]}...`)
+        // Retry on 404 (model deprecated/unavailable for account), 503 (high demand), or 429 (rate limit)
+        const canFallback = (res.status === 404 || res.status === 503 || res.status === 429) && i < uniqueModels.length - 1
+        if (canFallback) {
+          console.warn(`[Gemini] Model ${model} returned HTTP ${res.status} ("${msg}"). Automatically trying fallback model ${uniqueModels[i + 1]}...`)
           continue
         }
 
@@ -67,8 +73,10 @@ async function callGemini(apiKey: string, prompt: string, systemInstruction?: st
     } catch (err: any) {
       lastError = err instanceof Error ? err : new Error(String(err))
       const isRetryable =
+        lastError.message.includes("404") ||
         lastError.message.includes("503") ||
         lastError.message.includes("429") ||
+        lastError.message.includes("no longer available") ||
         lastError.message.includes("high demand")
       if (isRetryable && i < uniqueModels.length - 1) {
         console.warn(`[Gemini] Retrying with fallback model ${uniqueModels[i + 1]} due to: ${lastError.message}`)
