@@ -1,4 +1,4 @@
-# Troy Team — Dev Handoff
+﻿# Troy Team — Dev Handoff
 
 Last updated: November 2026
 
@@ -351,20 +351,22 @@ New session structure:
 
 These are the things that MUST happen before showing this to athletes:
 
-- [ ] Run the SQL block above in Supabase (adds columns + new tables)
-- [ ] Fix the 9 missing i18n dictionary keys (blank labels in progress + profile pages)
-- [ ] Fix `AthleteStats` "Assessed" counter (`=== "complete"` → `=== "approved"`)
-- [ ] Strip or gate debug console logging (`[session-debug]`, `[athlete-debug]`, `AssignedTrainingDiagnostics`, etc.)
-- [ ] Block or remove `/auth/sign-up` (athletes should only be created via admin panel)
-- [ ] Fix `permanentlyDeleteAthlete` to also purge `session-selfies` storage bucket files
-- [ ] Add `error.tsx` under `app/` (and ideally under `app/(athlete)/`) for graceful error pages
-- [ ] Verify `display_id` column exists in `athletes` table or remove references
-- [ ] Fix `importAthletesCsv` N+1 (fetch auth users list once, not per row)
-- [ ] Fix `app/admin/athletes/[id]/page.tsx` save form (add hidden `full_name` field or redirect away)
+- [ ] Run the SQL block above in Supabase (adds columns + new tables: sport, position, birth_year, free_training_days, show_exercise_recap, goal on athlete_programs, coach_system_prompts, system_log, session_exercise_selfies, session-selfies storage bucket)
+- [x] Fix the 9 missing i18n dictionary keys (blank labels in progress + profile pages) — ✅ Completed in EN & AR
+- [x] Fix AthleteStats "Assessed" counter (=== "complete" -> === "approved") — ✅ Completed
+- [x] Strip or gate debug console logging ([session-debug], [athlete-debug], AssignedTrainingDiagnostics, etc.) — ✅ Completed
+- [x] Block or remove /auth/sign-up (athletes should only be created via admin panel) — ✅ Disabled via notFound()
+- [x] Fix permanentlyDeleteAthlete to also purge session-selfies storage bucket files — ✅ Completed
+- [x] Add error.tsx under app/ and app/(athlete)/ for graceful error pages — ✅ Added
+- [ ] Verify display_id column exists in athletes table or remove references
+- [x] Fix importAthletesCsv N+1 (fetch auth users list once, not per row) — ✅ Completed
+- [x] Fix app/admin/athletes/[id]/page.tsx save form (add hidden full_name field) — ✅ Completed
 - [ ] Enable pg_cron in Supabase and schedule the 7-day selfie cleanup
 
-Nice-to-have before prod (not blocking):
-- Batch signed URL generation in `admin/page.tsx` (`createSignedUrls` not one-by-one)
-- Add `loading.tsx` skeleton states for athlete-side pages
-- Remove dead `sendAthleteInvitation` action
-- Arabic translations for the 9 missing keys
+Nice-to-have before prod:
+- [x] Batch signed URL generation in admin/page.tsx (createSignedUrls batched) — ✅ Completed
+- [x] Add loading.tsx skeleton states for athlete-side and root pages — ✅ Added
+- [x] Arabic translations for all missing keys — ✅ Added
+- [x] Gemini AI program generation feature with prompt learning — ✅ Implemented
+- [x] TypeScript compiler zero-error check (npx tsc --noEmit) — ✅ Clean pass
+- [x] Production build passes (next build) — ✅ Clean build

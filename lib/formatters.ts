@@ -5,13 +5,13 @@ export function safeDate(value: unknown, locale = "en-US", options?: Intl.DateTi
     ? new Date(`${raw}T12:00:00`)
     : new Date(raw)
   if (Number.isNaN(date.getTime())) {
-    console.error("[v0] invalid date value", { value, locale })
+    if (process.env.NODE_ENV !== "production") console.error("[dev] invalid date value", { value, locale })
     return "—"
   }
   try {
     return date.toLocaleDateString(locale, options)
   } catch (error) {
-    console.error("[v0] date formatting failed", { value, locale, error })
+    if (process.env.NODE_ENV !== "production") console.error("[dev] date formatting failed", { value, locale, error })
     return "—"
   }
 }
@@ -28,11 +28,11 @@ export function safeTime(value: unknown, locale = "en-US") {
   try {
     return date.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" })
   } catch (error) {
-    console.error("[v0] time formatting failed", { value, locale, error })
+    if (process.env.NODE_ENV !== "production") console.error("[dev] time formatting failed", { value, locale, error })
     return "—"
   }
 }
 
 export function logPageHealth(page: string, details: Record<string, unknown>) {
-  if (process.env.NODE_ENV !== "production") console.log(`[v0] ${page} health`, details)
+  if (process.env.NODE_ENV !== "production") console.log(`[dev] ${page} health`, details)
 }

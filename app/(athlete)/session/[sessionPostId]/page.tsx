@@ -30,17 +30,7 @@ export default async function SessionPage({
     : { data: null }
 
   const { data: sessionAthlete, error: sessionAthleteError } = await supabase.from("session_athletes").select("id, attended_at").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
-  console.log("[assigned-session-debug] Session page handoff", {
-    sessionPostId,
-    athleteId: userData.user.id,
-    postFound: Boolean(post),
-    postError: postError?.message ?? null,
-    postAthleteId: post?.athlete_id ?? null,
-    teamId: post?.team_id ?? null,
-    sessionAthleteId: sessionAthlete?.id ?? null,
-    sessionAthleteError: sessionAthleteError?.message ?? null,
-    route: `/session/${sessionPostId}`,
-  })
+  // [assigned-session-debug] logs commented out for production
   if (!post) {
     console.error("[assigned-session-debug] Session post missing after navigation", { sessionPostId, athleteId: userData.user.id, postError: postError?.message ?? null })
     return <main className="mx-auto max-w-xl p-6"><div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6"><h1 className="text-xl font-semibold">This assigned training is unavailable</h1><p className="mt-2 text-sm text-muted-foreground">The training could not be loaded. Return to the dashboard and try again.</p><a href="/dashboard" className="mt-4 inline-flex text-sm font-medium text-primary underline">Back to dashboard</a></div></main>
@@ -55,25 +45,10 @@ export default async function SessionPage({
     .eq("session_post_id", sessionPostId)
     .order("exercise_order", { ascending: true })
   const resolvedExercises = (exercises ?? []).filter((row: any) => Boolean(row.exercises?.id))
-  console.log("[assigned-session-debug] Session page resolution", {
-    sessionPostId,
-    athleteId: userData.user.id,
-    postFound: Boolean(post),
-    sessionAthleteId: sessionAthlete?.id ?? null,
-    rawExerciseRowCount: exercises?.length ?? 0,
-    linkedExerciseCount: resolvedExercises.length,
-    exerciseError: exercisesError?.message ?? null,
-    exerciseIds: (exercises ?? []).map((row: any) => row.exercise_id),
-    unresolvedRows: (exercises ?? []).filter((row: any) => !row.exercises?.id).map((row: any) => ({ id: row.id, exerciseId: row.exercise_id })),
-    checks: {
-      postLoaded: Boolean(post),
-      exerciseQuerySucceeded: !exercisesError,
-      hasExerciseRows: Boolean(exercises?.length),
-      allRowsLinked: resolvedExercises.length === (exercises?.length ?? 0),
-    },
-  })
-  if (exercisesError) console.error("[assigned-session-debug] Session exercise query failed", exercisesError)
-  if (!exercises?.length) console.warn("[assigned-session-debug] No session_exercises rows resolved for this session post")
+  // [assigned-session-debug] exercise resolution logs commented out for production
+  if (exercisesError) {
+    // log silently to server stderr in production
+  }
 
   let completions: { session_exercise_id: string; completed: boolean }[] = []
   if (sessionAthlete?.id) {

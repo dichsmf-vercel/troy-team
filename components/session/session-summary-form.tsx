@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
@@ -66,7 +66,7 @@ export function SessionSummaryForm({
           {dict.summary.rpe}: <span className="tabular font-semibold">{rpe}</span>
         </Label>
         <p className="text-xs leading-relaxed text-muted-foreground">{dict.summary.rpeHint}</p>
-        <Slider value={[rpe]} min={1} max={10} step={1} onValueChange={(v) => setRpe(v[0])} />
+        <Slider value={[rpe]} min={1} max={10} step={1} onValueChange={(v) => setRpe(Array.isArray(v) ? v[0] : (v as number))} />
       </Card>
 
       <Card className="flex flex-col gap-3 p-4">
@@ -78,7 +78,7 @@ export function SessionSummaryForm({
           min={1}
           max={5}
           step={1}
-          onValueChange={(v) => setOverallRating(v[0])}
+          onValueChange={(v) => setOverallRating(Array.isArray(v) ? v[0] : (v as number))}
         />
       </Card>
 
@@ -86,7 +86,7 @@ export function SessionSummaryForm({
         <Label>
           {dict.summary.sleepQuality}: <span className="tabular font-semibold">{sleepQuality}</span>
         </Label>
-        <Slider value={[sleepQuality]} min={1} max={5} step={1} onValueChange={(v) => setSleepQuality(v[0])} />
+        <Slider value={[sleepQuality]} min={1} max={5} step={1} onValueChange={(v) => setSleepQuality(Array.isArray(v) ? v[0] : (v as number))} />
       </Card>
 
       <Card className="flex flex-col gap-3 p-4">
@@ -98,7 +98,7 @@ export function SessionSummaryForm({
           min={1}
           max={5}
           step={1}
-          onValueChange={(v) => setSorenessLevel(v[0])}
+          onValueChange={(v) => setSorenessLevel(Array.isArray(v) ? v[0] : (v as number))}
         />
       </Card>
 

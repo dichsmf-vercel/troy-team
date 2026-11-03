@@ -1,4 +1,4 @@
-export type Language = "en" | "ar"
+﻿export type Language = "en" | "ar"
 
 export const dictionaries = {
   en: {
@@ -10,6 +10,8 @@ export const dictionaries = {
       continue: "Continue",
       back: "Back",
       save: "Save",
+      saving: "Saving...",
+      saved: "Saved",
       cancel: "Cancel",
       submit: "Submit",
       loading: "Loading...",
@@ -32,6 +34,8 @@ export const dictionaries = {
       cm: "cm",
       previous: "Previous",
       next: "Next",
+      profile: "Profile",
+      progress: "Progress",
     },
     auth: {
       loginTitle: "Welcome back",
@@ -115,6 +119,7 @@ export const dictionaries = {
       selfieHint: "Snap a photo to confirm you completed this session",
       selfieUploaded: "Selfie uploaded",
       finishSession: "Finish session",
+      startSession: "Start session",
       allExercisesRequired: "Complete all exercises to finish the session",
     },
     summary: {
@@ -135,8 +140,11 @@ export const dictionaries = {
     progress: {
       title: "Progress",
       weightTrend: "Weight trend",
+      weight: "Weight",
       attendanceRate: "Attendance rate",
+      attendance: "Attendance",
       avgRpe: "Average RPE",
+      rpeTitle: "RPE history",
       totalSessions: "Sessions completed",
       insight: "Insight",
       last30Days: "Last 30 days",
@@ -147,6 +155,7 @@ export const dictionaries = {
     profile: {
       title: "Profile",
       personalInfo: "Personal information",
+      fullName: "Full name",
       changePhoto: "Change photo",
       cropPhoto: "Crop your photo",
       applyCrop: "Apply",
@@ -217,6 +226,8 @@ export const dictionaries = {
       continue: "استمرار",
       back: "رجوع",
       save: "حفظ",
+      saving: "جارٍ الحفظ...",
+      saved: "تم الحفظ",
       cancel: "إلغاء",
       submit: "إرسال",
       loading: "جارٍ التحميل...",
@@ -239,6 +250,8 @@ export const dictionaries = {
       cm: "سم",
       previous: "السابق",
       next: "التالي",
+      profile: "الملف الشخصي",
+      progress: "التقدم",
     },
     auth: {
       loginTitle: "مرحبًا بعودتك",
@@ -247,6 +260,7 @@ export const dictionaries = {
       signUpSubtitle: "انضم إلى الفرقة وابدأ التدريب",
       email: "البريد الإلكتروني",
       password: "كلمة المرور",
+      confirmPassword: "تأكيد كلمة المرور",
       fullName: "الاسم الكامل",
       language: "اللغة المفضلة",
       loginButton: "تسجيل الدخول",
@@ -321,6 +335,7 @@ export const dictionaries = {
       selfieHint: "التقط صورة لتأكيد إتمام هذه الجلسة",
       selfieUploaded: "تم رفع الصورة",
       finishSession: "إنهاء الجلسة",
+      startSession: "بدء الجلسة",
       allExercisesRequired: "أكمل جميع التمارين لإنهاء الجلسة",
     },
     summary: {
@@ -341,8 +356,11 @@ export const dictionaries = {
     progress: {
       title: "التقدم",
       weightTrend: "اتجاه الوزن",
+      weight: "الوزن",
       attendanceRate: "نسبة الحضور",
+      attendance: "الحضور",
       avgRpe: "متوسط معدل الجهد",
+      rpeTitle: "سجل معدل الجهد",
       totalSessions: "الجلسات المكتملة",
       insight: "ملاحظة",
       last30Days: "آخر ٣٠ يومًا",
@@ -353,6 +371,7 @@ export const dictionaries = {
     profile: {
       title: "الملف الشخصي",
       personalInfo: "المعلومات الشخصية",
+      fullName: "الاسم الكامل",
       changePhoto: "تغيير الصورة",
       cropPhoto: "قص الصورة",
       applyCrop: "تطبيق",
@@ -416,4 +435,8 @@ export const dictionaries = {
   },
 } as const
 
-export type Dictionary = typeof dictionaries.en
+type DeepString<T> = {
+  [K in keyof T]: T[K] extends string ? string : DeepString<T[K]>
+}
+
+export type Dictionary = DeepString<typeof dictionaries.en>

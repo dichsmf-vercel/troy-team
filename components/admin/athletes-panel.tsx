@@ -204,7 +204,7 @@ export function AthletesPanel({
 // ─── stats row ────────────────────────────────────────────────────────────────
 
 export function AthleteStats({ athletes }: { athletes: any[] }) {
-  const assessed = athletes.filter((a) => a.assessment_status === "complete").length
+  const assessed = athletes.filter((a) => a.assessment_status === "approved").length
   const paused = athletes.filter((a) => a.account_status === "paused").length
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

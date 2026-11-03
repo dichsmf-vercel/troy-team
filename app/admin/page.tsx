@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+﻿import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminBoard } from "@/components/admin/admin-board"
 import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
@@ -35,14 +35,35 @@ export default async function AdminPage() {
     supabase.from("athlete_programs").select("id, athlete_id, status, month_start, month_end, generation_reason, athletes(profiles(full_name))").order("created_at", { ascending: false }),
   ])
 
-  // Signed URLs for selfies
-  const programSelfiesWithLinks = await Promise.all((programSelfies ?? []).map(async (selfie: any) => {
-    const { data } = await service.storage.from("exercise-selfies").createSignedUrl(selfie.storage_path, 60 * 60)
-    return { ...selfie, image_url: data?.signedUrl ?? null, selfie_type: "program" as const }
+  // Signed URLs for selfies — batched to avoid N+1 per-selfie round trips
+  const programPaths = (programSelfies ?? []).map((s: any) => s.storage_path)
+  const sessionPaths = (sessionSelfies ?? []).map((s: any) => s.storage_path)
+
+  const [programSignedResults, sessionSignedResults] = await Promise.all([
+    programPaths.length
+      ? service.storage.from("exercise-selfies").createSignedUrls(programPaths, 60 * 60)
+      : Promise.resolve({ data: [] }),
+    sessionPaths.length
+      ? service.storage.from("session-selfies").createSignedUrls(sessionPaths, 60 * 60)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const programUrlByPath = new Map(
+    (programSignedResults.data ?? []).map((r: any) => [r.path, r.signedUrl ?? null])
+  )
+  const sessionUrlByPath = new Map(
+    (sessionSignedResults.data ?? []).map((r: any) => [r.path, r.signedUrl ?? null])
+  )
+
+  const programSelfiesWithLinks = (programSelfies ?? []).map((selfie: any) => ({
+    ...selfie,
+    image_url: programUrlByPath.get(selfie.storage_path) ?? null,
+    selfie_type: "program" as const,
   }))
-  const sessionSelfiesWithLinks = await Promise.all((sessionSelfies ?? []).map(async (selfie: any) => {
-    const { data } = await service.storage.from("session-selfies").createSignedUrl(selfie.storage_path, 60 * 60)
-    return { ...selfie, image_url: data?.signedUrl ?? null, selfie_type: "session" as const }
+  const sessionSelfiesWithLinks = (sessionSelfies ?? []).map((selfie: any) => ({
+    ...selfie,
+    image_url: sessionUrlByPath.get(selfie.storage_path) ?? null,
+    selfie_type: "session" as const,
   }))
   const selfiesWithLinks = [...programSelfiesWithLinks, ...sessionSelfiesWithLinks]
 

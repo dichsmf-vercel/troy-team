@@ -29,42 +29,22 @@ export default async function DashboardPage() {
     teamIds.length ? supabase.from("session_posts").select(assignedPostQuery).in("team_id", teamIds) : Promise.resolve({ data: [], error: null } as any),
   ])
   const assignedPosts = [...new Map([...(directPosts ?? []), ...(teamPosts ?? [])].map((post: any) => [post.id, post])).values()]
-  console.log("[assigned-session-debug] Dashboard assignment visibility", {
-    athleteId: userData.user.id,
-    teamIds,
-    directPosts: directPosts?.map((post: any) => ({ id: post.id, title: post.title_en })) ?? [],
-    teamPosts: teamPosts?.map((post: any) => ({ id: post.id, title: post.title_en })) ?? [],
-    directPostsError: directPostsError?.message ?? null,
-    teamPostsError: teamPostsError?.message ?? null,
-  })
+  // [assigned-session-debug] logs commented out for production
+  // console.log("[assigned-session-debug] Dashboard assignment visibility", { ... })
   const assignedPostIds = (assignedPosts ?? []).map((post: any) => post.id)
   const assignedDataClient = createAdminClient()
 
-  // Verify service role key is present — if not, exercise counts will be empty
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("[session-debug] ❌ SUPABASE_SERVICE_ROLE_KEY is not set — admin client will fail silently")
-  }
+  // [session-debug] service key check — commented out for production
+  // if (!process.env.SUPABASE_SERVICE_ROLE_KEY) { console.error(...) }
 
   const [{ data: assignedRows, error: assignedRowsError }, { data: attendanceRows, error: attendanceRowsError }] = assignedPostIds.length ? await Promise.all([
     assignedDataClient.from("session_exercises").select("id,session_post_id").in("session_post_id", assignedPostIds),
     supabase.from("session_athletes").select("id,session_post_id,attended_at,completed_at,session_summaries(id)").eq("athlete_id", userData.user.id).in("session_post_id", assignedPostIds),
   ]) : [{ data: [], error: null }, { data: [], error: null }]
 
-  console.log("[session-debug] exercise rows query", {
-    assignedPostIds,
-    rowsReturned: assignedRows?.length ?? 0,
-    error: assignedRowsError?.message ?? "none",
-    serviceKeyPresent: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-  })
   const exerciseCountByPost = new Map<string, number>()
   for (const row of assignedRows ?? []) exerciseCountByPost.set(row.session_post_id, (exerciseCountByPost.get(row.session_post_id) ?? 0) + 1)
-  console.log("[assigned-session-debug] Dashboard assigned exercise resolution", {
-    assignedPostIds,
-    assignedPostCount: assignedPosts?.length ?? 0,
-    sessionExerciseRowCount: assignedRows?.length ?? 0,
-    exerciseCountByPost: Object.fromEntries(exerciseCountByPost),
-    zeroExercisePosts: (assignedPosts ?? []).filter((post: any) => !exerciseCountByPost.has(post.id)).map((post: any) => post.id),
-  })
+  // [assigned-session-debug] exercise resolution log commented out for production
   const attendanceByPost = new Map((attendanceRows ?? []).map((row: any) => [row.session_post_id, row]))
   const assignedSessions: SessionCardData[] = (assignedPosts ?? []).map((post: any) => { const attendance = attendanceByPost.get(post.id); const team = post.teams ?? {}; return { sessionPostId: post.id, sessionAthleteId: attendance?.id ?? "", titleEn: post.title_en, titleAr: post.title_ar, sessionDate: post.session_date, period: post.start_time, exerciseCount: exerciseCountByPost.get(post.id) ?? 0, teamNameEn: team.name_en ?? "", teamNameAr: team.name_ar ?? "", teamImageUrl: team.image_url ?? null, colorHex: team.color_hex ?? "#888888", isNationalTeam: Boolean(team.is_national_team), hasSummary: Boolean(attendance?.session_summaries?.length), attendedAt: attendance?.attended_at ?? null } })
   const assignedToday = assignedSessions.filter((session) => session.sessionDate === todayStr)

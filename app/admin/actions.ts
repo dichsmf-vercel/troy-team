@@ -1,4 +1,4 @@
-"use server"
+﻿"use server"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
@@ -6,7 +6,10 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 export async function importCoachAhmedRulesFromCsv(formData: FormData) { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (profile?.role !== "admin") return { error: "Only admins can import rules." }; const service = createServiceClient(); let { data: program } = await service.from("programs").select("id").eq("name_en", "Coach Ahmed Rules Engine").maybeSingle(); if (!program) { const createdProgram = await service.from("programs").insert({ name_en: "Coach Ahmed Rules Engine", name_ar: "محرك قواعد كوتش أحمد", description_en: "Authoritative Coach Ahmed CSV rules.", status: "published" }).select("id").single(); if (createdProgram.error) return { error: createdProgram.error.message }; program = createdProgram.data } const uploaded = formData.get("file"); const csv = uploaded instanceof File && uploaded.size ? await uploaded.text() : await readFile(path.join(process.cwd(), "public/CoachAhmedRules.csv"), "utf8"); const rows = csv.trim().split(/\r?\n/).slice(1).filter(Boolean).map((line, index) => { const [ruleId, metric, operator, threshold, action, exerciseId] = line.split(",").map((value) => value.trim().replace(/^"|"$/g, "")); return { program_id: program.id, name: ruleId || `CSV-${index + 1}`, rule_text: `${ruleId}\t${metric}\t${operator}\t${threshold}\t${action}\t${exerciseId}`, rule_type: "coach_ahmed_csv", condition_json: { metric, operator, threshold }, action_json: { action, exercise_id: exerciseId }, priority: index + 1, is_active: true }; }); const { error: clearError } = await service.from("program_rules").delete().eq("rule_type", "coach_ahmed_csv"); if (clearError) return { error: clearError.message }; const { error } = await service.from("program_rules").insert(rows); if (error) return { error: error.message }; revalidatePath("/admin"); return { error: null, imported: rows.length } }
 
-export async function importAthletesCsv(formData: FormData) { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can import athletes." }; const file = formData.get("file"); if (!(file instanceof File) || !file.size) return { error: "Choose an athletes CSV file." }; const rows = parseCsv(await file.text()); if (!rows.length) return { error: "The CSV has no athlete rows." }; const service = createServiceClient(); let imported = 0; for (const row of rows) { const email = String(row.email || "").trim().toLowerCase(); const fullName = String(row.full_name || "").trim(); if (!email || !fullName) return { error: `Row ${imported + 2} requires full_name and email.` }; const existing = await service.auth.admin.listUsers({ page: 1, perPage: 1000 }); const existingUser = existing.data.users.find((candidate) => candidate.email?.toLowerCase() === email); let athleteId = existingUser?.id; if (!athleteId) { const created = await service.auth.admin.createUser({ email, email_confirm: false, user_metadata: { full_name: fullName, role: "athlete" } }); if (created.error || !created.user) return { error: created.error?.message || `Could not create ${email}.` }; athleteId = created.user.id } const { error: profileError } = await service.from("profiles").upsert({ id: athleteId, full_name: fullName, role: "athlete" }); if (profileError) return { error: profileError.message }; const number = (key: string) => { const value = Number(row[key]); return Number.isFinite(value) && value > 0 ? value : null }; const { error: athleteError } = await service.from("athletes").upsert({ id: athleteId, phone: row.phone || null, height_cm: number("height_cm"), weight_kg: number("weight_kg"), injury_notes: row.coach_notes || null, assessment_status: "draft" }); if (athleteError) return { error: athleteError.message }; imported++ } revalidatePath("/admin"); return { error: null, imported } }
+export async function importAthletesCsv(formData: FormData) { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can import athletes." }; const file = formData.get("file"); if (!(file instanceof File) || !file.size) return { error: "Choose an athletes CSV file." }; const rows = parseCsv(await file.text()); if (!rows.length) return { error: "The CSV has no athlete rows." }; const service = createServiceClient();
+  // Fetch all existing users once to avoid N+1 per row
+  const existingUsersResult = await service.auth.admin.listUsers({ page: 1, perPage: 1000 }); const existingEmailMap = new Map(existingUsersResult.data.users.map((u) => [u.email?.toLowerCase() ?? "", u.id]));
+  let imported = 0; for (const row of rows) { const email = String(row.email || "").trim().toLowerCase(); const fullName = String(row.full_name || "").trim(); if (!email || !fullName) return { error: `Row ${imported + 2} requires full_name and email.` }; let athleteId = existingEmailMap.get(email); if (!athleteId) { const created = await service.auth.admin.createUser({ email, email_confirm: false, user_metadata: { full_name: fullName, role: "athlete" } }); if (created.error || !created.data.user) return { error: created.error?.message || `Could not create ${email}.` }; athleteId = created.data.user.id } const { error: profileError } = await service.from("profiles").upsert({ id: athleteId, full_name: fullName, role: "athlete" }); if (profileError) return { error: profileError.message }; const number = (key: string) => { const value = Number(row[key]); return Number.isFinite(value) && value > 0 ? value : null }; const { error: athleteError } = await service.from("athletes").upsert({ id: athleteId, phone: row.phone || null, height_cm: number("height_cm"), weight_kg: number("weight_kg"), injury_notes: row.coach_notes || null, assessment_status: "draft" }); if (athleteError) return { error: athleteError.message }; imported++ } revalidatePath("/admin"); return { error: null, imported } }
 
 function parseCsv(csv: string) { const lines = csv.split(/\r?\n/).filter((line) => line.trim()); if (!lines.length) return []; const headers = lines[0].split(",").map((header) => header.trim()); return lines.slice(1).map((line) => { const values = line.split(","); return Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? "").trim().replace(/^"|"$/g, "")])) }) }
 
@@ -107,7 +110,19 @@ export async function createAthleteAccount(form: FormData) {
 
 function createServiceClient() { return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) }
 
-export async function permanentlyDeleteAthlete(athleteId: string) { const supabase = await createClient(); const { data: { user: admin } } = await supabase.auth.getUser(); if (!admin) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can permanently delete athletes." }; if (!athleteId || athleteId === admin.id) return { error: "Invalid athlete." }; const service = createServiceClient(); const { data: target } = await service.from("profiles").select("role").eq("id", athleteId).maybeSingle(); if (!target || target.role !== "athlete") return { error: "Only athlete accounts can be deleted here." }; const { data: assessments } = await service.from("athlete_assessments").select("id").eq("athlete_id", athleteId); const assessmentIds = (assessments ?? []).map((row) => row.id); if (assessmentIds.length) { const { error } = await service.from("athlete_assessment_answers").delete().in("assessment_id", assessmentIds); if (error) return { error: `Could not delete assessment answers: ${error.message}` } } const { data: sessionAthletes } = await service.from("session_athletes").select("id").eq("athlete_id", athleteId); const sessionAthleteIds = (sessionAthletes ?? []).map((row) => row.id); if (sessionAthleteIds.length) { const { error } = await service.from("session_selfies").delete().in("session_athlete_id", sessionAthleteIds); if (error) return { error: `Could not delete selfies: ${error.message}` } } for (const [table, column] of [["session_athletes", "athlete_id"], ["session_posts", "athlete_id"], ["athlete_programs", "athlete_id"], ["athlete_assessments", "athlete_id"], ["inbody_records", "athlete_id"], ["measurements", "athlete_id"], ["athlete_teams", "athlete_id"], ["athletes", "id"], ["profiles", "id"]] as const) { const { error } = await service.from(table).delete().eq(column, athleteId); if (error) return { error: `Could not delete ${table}: ${error.message}` } } const { error: authError } = await service.auth.admin.deleteUser(athleteId); if (authError) return { error: authError.message }; revalidatePath("/admin"); return { error: null } }
+export async function permanentlyDeleteAthlete(athleteId: string) { const supabase = await createClient(); const { data: { user: admin } } = await supabase.auth.getUser(); if (!admin) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can permanently delete athletes." }; if (!athleteId || athleteId === admin.id) return { error: "Invalid athlete." }; const service = createServiceClient(); const { data: target } = await service.from("profiles").select("role").eq("id", athleteId).maybeSingle(); if (!target || target.role !== "athlete") return { error: "Only athlete accounts can be deleted here." }; const { data: assessments } = await service.from("athlete_assessments").select("id").eq("athlete_id", athleteId); const assessmentIds = (assessments ?? []).map((row) => row.id); if (assessmentIds.length) { const { error } = await service.from("athlete_assessment_answers").delete().in("assessment_id", assessmentIds); if (error) return { error: `Could not delete assessment answers: ${error.message}` } }
+  // Delete session selfie storage files for assigned sessions
+  const { data: sessionAthletes } = await service.from("session_athletes").select("id").eq("athlete_id", athleteId); const sessionAthleteIds = (sessionAthletes ?? []).map((row) => row.id);
+  if (sessionAthleteIds.length) {
+    const { data: sessionSelfieRows } = await service.from("session_selfies").select("storage_path").in("session_athlete_id", sessionAthleteIds)
+    if (sessionSelfieRows?.length) await service.storage.from("session-selfies").remove(sessionSelfieRows.map((r) => r.storage_path))
+    const { error } = await service.from("session_selfies").delete().in("session_athlete_id", sessionAthleteIds); if (error) return { error: `Could not delete selfies: ${error.message}` }
+  }
+  // Delete session_exercise_selfies storage files (new bucket from per-exercise selfie system)
+  const { data: exerciseSelfieRows } = await service.from("session_exercise_selfies").select("storage_path").eq("athlete_id", athleteId)
+  if (exerciseSelfieRows?.length) await service.storage.from("session-selfies").remove(exerciseSelfieRows.map((r) => r.storage_path))
+  await service.from("session_exercise_selfies").delete().eq("athlete_id", athleteId)
+  for (const [table, column] of [["session_athletes", "athlete_id"], ["session_posts", "athlete_id"], ["athlete_programs", "athlete_id"], ["athlete_assessments", "athlete_id"], ["inbody_records", "athlete_id"], ["measurements", "athlete_id"], ["athlete_teams", "athlete_id"], ["athletes", "id"], ["profiles", "id"]] as const) { const { error } = await service.from(table).delete().eq(column, athleteId); if (error) return { error: `Could not delete ${table}: ${error.message}` } } const { error: authError } = await service.auth.admin.deleteUser(athleteId); if (authError) return { error: authError.message }; revalidatePath("/admin"); return { error: null } }
 
 export async function toggleAthleteAccountStatus(athleteId: string, status: "active" | "paused") { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { data: admin } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (admin?.role !== "admin") return { error: "Only admins can pause athlete accounts." }; const service = createServiceClient(); const { error } = await service.from("athletes").update({ account_status: status }).eq("id", athleteId); if (error) return { error: error.message }; const { error: authError } = await service.auth.admin.updateUserById(athleteId, { ban_duration: status === "paused" ? "876000h" : "none" }); if (authError) return { error: authError.message }; revalidatePath("/admin"); return { error: null } }
 
@@ -227,4 +242,164 @@ export async function reviewSessionSelfie(selfieId: string) {
   if (error) return { error: error.message }
   revalidatePath("/admin")
   return { error: null }
+}
+
+// ─── AI program generation ─────────────────────────────────────────────────────
+
+export async function generateProgramWithAI(input: {
+  athleteId: string
+  startDate: string
+  time: string
+  weekdays: number[]
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized", data: null }
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+  if (!profile || !["admin", "supporting_coach"].includes(profile.role)) return { error: "Forbidden", data: null }
+
+  const service = createServiceClient()
+
+  // Fetch athlete profile + assessment answers
+  const [{ data: athleteRow }, { data: profileRow }, { data: assessmentRows }, { data: exercises }, { data: promptRow }] = await Promise.all([
+    service.from("athletes").select("height_cm,weight_kg,injury_notes,tier,sport,position,birth_year").eq("id", input.athleteId).single(),
+    service.from("profiles").select("full_name").eq("id", input.athleteId).single(),
+    service.from("athlete_assessments")
+      .select("id,athlete_assessment_answers(question_key,answer_json)")
+      .eq("athlete_id", input.athleteId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    service.from("exercises").select("id,name_en,category,image_url").order("name_en"),
+    service.from("coach_system_prompts").select("prompt_text").order("version", { ascending: false }).limit(1).maybeSingle(),
+  ])
+
+  const answers: Record<string, number | null> = {}
+  for (const answer of (assessmentRows?.athlete_assessment_answers ?? []) as any[]) {
+    answers[answer.question_key] = answer.answer_json?.value ?? null
+  }
+
+  const { generateProgramWithGemini } = await import("@/lib/gemini")
+  const result = await generateProgramWithGemini({
+    athlete: {
+      name: profileRow?.full_name ?? "Athlete",
+      sport: athleteRow?.sport ?? null,
+      position: athleteRow?.position ?? null,
+      birth_year: athleteRow?.birth_year ?? null,
+      height_cm: athleteRow?.height_cm ?? null,
+      weight_kg: athleteRow?.weight_kg ?? null,
+      injury_notes: athleteRow?.injury_notes ?? null,
+      tier: athleteRow?.tier ?? null,
+    },
+    assessmentAnswers: answers,
+    exercises: (exercises ?? []) as { id: string; name_en: string; category: string | null; image_url: string | null }[],
+    startDate: input.startDate,
+    time: input.time,
+    weekdays: input.weekdays,
+    coachSystemPrompt: promptRow?.prompt_text ?? null,
+  })
+
+  if (result.error || !result.data) {
+    // Log failure to system_log
+    await service.from("system_log").insert({
+      event_type: "ai_generation_failure",
+      message: result.error ?? "Unknown error",
+      metadata: { athleteId: input.athleteId, startDate: input.startDate },
+    }).then(() => null, () => null)
+    return { error: result.error ?? "Generation failed", data: null }
+  }
+
+  return { error: null, data: result.data }
+}
+
+export async function saveAIGeneratedProgram(input: {
+  athleteId: string
+  startDate: string
+  time: string
+  weekdays: number[]
+  program: import("@/lib/gemini").GeminiProgramOutput
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized", id: null }
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+  if (!profile || !["admin", "supporting_coach"].includes(profile.role)) return { error: "Forbidden", id: null }
+
+  const start = new Date(`${input.startDate}T12:00:00`)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 27)
+
+  const service = createServiceClient()
+  const { data, error } = await service.from("athlete_programs").insert({
+    athlete_id: input.athleteId,
+    month_start: input.startDate,
+    month_end: end.toISOString().slice(0, 10),
+    goal: input.program.goal,
+    generation_reason: {
+      source: "gemini_ai",
+      schedule: { time: input.time, weekdays: input.weekdays },
+      sessions: input.program.sessions,
+      rationale: input.program.rationale,
+      warnings: input.program.warnings,
+    },
+    status: "pending_review",
+  }).select("id").single()
+
+  if (error || !data) return { error: error?.message ?? "Unable to save program.", id: null }
+
+  revalidatePath("/admin")
+  revalidatePath("/program")
+  return { error: null, id: data.id }
+}
+
+export async function saveAdminEditsAndLearn(input: {
+  programId: string
+  editedProgram: import("@/lib/gemini").GeminiProgramOutput
+  originalProgram: import("@/lib/gemini").GeminiProgramOutput
+  adminReason: string
+  athleteName: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized" }
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+  if (!profile || !["admin", "supporting_coach"].includes(profile.role)) return { error: "Forbidden" }
+
+  const service = createServiceClient()
+
+  // Update the program with edited sessions
+  const { error: updateError } = await service.from("athlete_programs").update({
+    generation_reason: {
+      ...((await service.from("athlete_programs").select("generation_reason").eq("id", input.programId).single()).data?.generation_reason as object ?? {}),
+      sessions: input.editedProgram.sessions,
+      goal: input.editedProgram.goal,
+    },
+    goal: input.editedProgram.goal,
+  }).eq("id", input.programId)
+
+  if (updateError) return { error: updateError.message }
+
+  // Run Gemini 2 summarization to update the coach system prompt
+  const { data: latestPrompt } = await service.from("coach_system_prompts").select("prompt_text,version").order("version", { ascending: false }).limit(1).maybeSingle()
+
+  const { summarizeAdminEdits } = await import("@/lib/gemini")
+  const learnResult = await summarizeAdminEdits({
+    originalProgram: input.originalProgram,
+    editedProgram: input.editedProgram,
+    adminReason: input.adminReason,
+    athleteName: input.athleteName,
+    currentPromptText: latestPrompt?.prompt_text ?? "",
+  })
+
+  if (!learnResult.error && learnResult.newPromptText) {
+    await service.from("coach_system_prompts").insert({
+      version: (latestPrompt?.version ?? 0) + 1,
+      prompt_text: learnResult.newPromptText,
+      change_summary: learnResult.summary ?? input.adminReason,
+      created_by: user.id,
+    })
+  }
+
+  revalidatePath("/admin")
+  return { error: null, summary: learnResult.summary }
 }

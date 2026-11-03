@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useTransition } from "react"
 import Image from "next/image"
@@ -70,36 +70,8 @@ export function SessionRunner({
   const { dict } = useLanguage()
 
   // ─── mount diagnostic ────────────────────────────────────────────────────────
-  // Open browser DevTools → Console and look for [session-debug] groups
-  // to trace the full lifecycle of an assigned session.
   useState(() => {
-    console.groupCollapsed("[session-debug] 🏋️ SessionRunner mounted")
-    console.table({
-      sessionPostId,
-      title,
-      teamName,
-      teamColor,
-      sessionDate,
-      period,
-      exerciseCount: exercises.length,
-      initialSessionAthleteId: initialSessionAthleteId ?? "none (attendance not yet created)",
-      initialAttendedAt: initialAttendedAt ?? "none (session not started)",
-      initialCompletions: initialCompletions.length,
-      alreadyCompleted: initialCompletions.filter((c) => c.completed).length,
-    })
-    console.log("[session-debug] exercises", exercises.map((ex, i) => ({
-      index: i + 1,
-      name: ex.name,
-      sessionExerciseId: ex.sessionExerciseId,
-      exerciseId: ex.exerciseId,
-      sets: ex.sets,
-      reps: ex.reps,
-      hasImage: Boolean(ex.imageUrl),
-      hasVideo: Boolean(ex.videoUrl),
-    })))
-    if (!exercises.length) console.error("[session-debug] ❌ No exercises received — athlete will see an empty runner")
-    if (!initialSessionAthleteId) console.warn("[session-debug] ⚠️ No session_athlete record yet — will be created on Start")
-    console.groupEnd()
+    // [session-debug] logs commented out for production
   })
 
   // Session state
@@ -139,25 +111,9 @@ export function SessionRunner({
   // ─── handlers ────────────────────────────────────────────────────────────────
 
   function handleStart() {
-    console.groupCollapsed("[session-debug] ▶️ Start session clicked")
-    console.table({
-      sessionPostId,
-      exerciseCount: exercises.length,
-      alreadyAttended: Boolean(attendedAt),
-      existingSessionAthleteId: sessionAthleteId ?? "none",
-    })
-    console.groupEnd()
+    // [session-debug] start logs commented out for production
     startTransition(async () => {
       const result = await startSession(sessionPostId)
-      console.groupCollapsed("[session-debug] startSession() response")
-      console.table({
-        success: !result?.error,
-        error: result?.error ?? "none",
-        returnedSessionAthleteId: result?.sessionAthleteId ?? "none",
-      })
-      if (result?.error) console.error("[session-debug] ❌ startSession failed:", result.error)
-      else console.log("[session-debug] ✅ Attendance created/confirmed, sessionAthleteId:", result?.sessionAthleteId)
-      console.groupEnd()
       if (result?.error) { setError(result.error); return }
       if (result?.sessionAthleteId) setSessionAthleteId(result.sessionAthleteId)
       if (!attendedAt) setAttendedAt(new Date().toISOString())
@@ -165,31 +121,11 @@ export function SessionRunner({
   }
 
   function handleSelfieUpload(sessionExerciseId: string, file: File) {
-    if (!sessionAthleteId) {
-      console.error("[session-debug] ❌ handleSelfieUpload called with no sessionAthleteId — Start session first")
-      return
-    }
-    console.groupCollapsed(`[session-debug] 📸 Selfie upload started — exercise ${sessionExerciseId.slice(0, 8)}`)
-    console.table({
-      sessionAthleteId,
-      sessionExerciseId,
-      fileName: file.name,
-      fileSizeKB: Math.round(file.size / 1024),
-      fileType: file.type,
-    })
-    console.groupEnd()
+    if (!sessionAthleteId) return
     setSelfieStates((prev) => ({ ...prev, [sessionExerciseId]: "uploading" }))
     setSelfieErrors((prev) => { const next = { ...prev }; delete next[sessionExerciseId]; return next })
     startTransition(async () => {
       const result = await uploadExerciseSelfie(sessionAthleteId, sessionExerciseId, file)
-      console.groupCollapsed(`[session-debug] uploadExerciseSelfie() response — exercise ${sessionExerciseId.slice(0, 8)}`)
-      console.table({
-        success: !result?.error,
-        error: result?.error ?? "none",
-      })
-      if (result?.error) console.error("[session-debug] ❌ Selfie upload failed:", result.error)
-      else console.log("[session-debug] ✅ Selfie uploaded successfully for exercise", sessionExerciseId)
-      console.groupEnd()
       if (result?.error) {
         setSelfieStates((prev) => ({ ...prev, [sessionExerciseId]: "error" }))
         setSelfieErrors((prev) => ({ ...prev, [sessionExerciseId]: result.error! }))
@@ -200,43 +136,22 @@ export function SessionRunner({
   }
 
   function handleCompleteExercise(sessionExerciseId: string) {
-    if (!sessionAthleteId) {
-      console.error("[session-debug] ❌ handleCompleteExercise called with no sessionAthleteId")
-      return
-    }
+    if (!sessionAthleteId) return
     if (selfieStates[sessionExerciseId] !== "done") {
-      console.warn("[session-debug] ⚠️ Complete blocked — selfie not uploaded yet for", sessionExerciseId, "| current state:", selfieStates[sessionExerciseId] ?? "idle")
       setSelfieErrors((prev) => ({ ...prev, [sessionExerciseId]: "Upload a selfie first to mark this exercise complete." }))
       return
     }
-    console.groupCollapsed(`[session-debug] ✅ Complete exercise — ${sessionExerciseId.slice(0, 8)}`)
-    console.table({
-      sessionAthleteId,
-      sessionExerciseId,
-      activeIndex,
-      selfieState: selfieStates[sessionExerciseId],
-    })
-    console.groupEnd()
     startTransition(async () => {
       const result = await toggleExerciseCompletion(sessionAthleteId, sessionExerciseId, true)
-      console.groupCollapsed(`[session-debug] toggleExerciseCompletion() response — exercise ${sessionExerciseId.slice(0, 8)}`)
-      console.table({ success: !result?.error, error: result?.error ?? "none" })
-      if (result?.error) console.error("[session-debug] ❌ toggleExerciseCompletion failed:", result.error)
-      else console.log("[session-debug] ✅ Exercise marked complete in DB")
-      console.groupEnd()
       if (result?.error) { setError(result.error); return }
       setCompletedSet((prev) => new Set([...prev, sessionExerciseId]))
-      // auto-advance to next incomplete
       const nextIndex = exercises.findIndex(
         (ex, idx) => idx > activeIndex && !completedSet.has(ex.sessionExerciseId) && ex.sessionExerciseId !== sessionExerciseId,
       )
       if (nextIndex >= 0) {
-        console.log("[session-debug] ➡️ Auto-advancing to exercise", nextIndex + 1)
         setActiveIndex(nextIndex)
       } else if (activeIndex < exercises.length - 1) {
         setActiveIndex(activeIndex + 1)
-      } else {
-        console.log("[session-debug] 🎉 All exercises complete — showing done screen")
       }
     })
   }
@@ -309,12 +224,13 @@ export function SessionRunner({
         <p className="max-w-xs text-sm text-muted-foreground">
           Great work. Submit your session summary so your coach can review your feedback.
         </p>
-        <Button size="lg" className="w-full max-w-sm gap-2" asChild>
-          <Link href={`/session/${sessionPostId}/summary?sessionAthleteId=${sessionAthleteId}`}>
-            <Check className="size-4" />
-            {dict.session.finishSession ?? "Finish session"}
-          </Link>
-        </Button>
+        <Link
+          href={`/session/${sessionPostId}/summary?sessionAthleteId=${sessionAthleteId}`}
+          className="inline-flex h-14 w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
+        >
+          <Check className="size-4" />
+          {dict.session.finishSession ?? "Finish session"}
+        </Link>
         <Link href="/dashboard" className="text-sm text-muted-foreground underline underline-offset-4">
           Back to dashboard
         </Link>
@@ -575,7 +491,7 @@ export function SessionRunner({
                 min={1}
                 max={10}
                 step={1}
-                onValueChange={(v) => setPainSeverity(v[0])}
+                onValueChange={(v) => setPainSeverity(Array.isArray(v) ? v[0] : (v as number))}
               />
             </div>
             <div className="flex flex-col gap-2">
