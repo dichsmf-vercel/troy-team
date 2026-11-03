@@ -26,7 +26,7 @@ export default async function AdminPage() {
   ] = await Promise.all([
     supabase.from("teams").select("id, name_en, name_ar, color_hex, image_url, is_national_team").order("name_en"),
     supabase.from("session_posts").select("id, title_en, title_ar, notes, session_date, start_time, team_id, athlete_id, teams(name_en, name_ar)").order("session_date", { ascending: false }).limit(20),
-    service.from("athletes").select("id, tier, account_status, assessment_status, medical_clearance_status, intake_completed_at, phone, height_cm, weight_kg, injury_notes, goals, created_at").order("created_at", { ascending: false }),
+    service.from("athletes").select("id, tier, account_status, assessment_status, medical_clearance_status, intake_completed_at, phone, height_cm, weight_kg, injury_notes, goals, created_at, sport, position, birth_year, free_training_days, show_exercise_recap").order("created_at", { ascending: false }),
     service.from("exercises").select("id, name_en, name_ar, category, image_url, video_youtube_url, default_sets, default_reps, exercise_code, movement_pattern, difficulty").order("name_en"),
     service.from("program_exercise_selfies").select("id, athlete_id, athlete_program_id, session_date, exercise_index, storage_path, uploaded_at").is("reviewed_at", null).order("uploaded_at", { ascending: false }),
     service.from("session_exercise_selfies").select("id, athlete_id, session_athlete_id, session_exercise_id, storage_path, uploaded_at").is("reviewed_at", null).order("uploaded_at", { ascending: false }),
@@ -53,7 +53,7 @@ export default async function AdminPage() {
   // Athlete enrichment
   const athleteIds = (athletes ?? []).map((a) => a.id)
   const { data: athleteProfiles } = athleteIds.length
-    ? await service.from("profiles").select("id,full_name,full_name_ar,role,subscription_tier,renewal_date,coach_private_notes").in("id", athleteIds)
+    ? await service.from("profiles").select("id,full_name,full_name_ar,role,subscription_tier,renewal_date,coach_private_notes,troy_id,password_change_required").in("id", athleteIds)
     : { data: [] }
   const athleteProfileById = new Map((athleteProfiles ?? []).map((p) => [p.id, p]))
   const { data: athleteTeams } = athleteIds.length

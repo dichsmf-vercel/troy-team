@@ -10,7 +10,100 @@ export async function importAthletesCsv(formData: FormData) { const supabase = a
 
 function parseCsv(csv: string) { const lines = csv.split(/\r?\n/).filter((line) => line.trim()); if (!lines.length) return []; const headers = lines[0].split(",").map((header) => header.trim()); return lines.slice(1).map((line) => { const values = line.split(","); return Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? "").trim().replace(/^"|"$/g, "")])) }) }
 
-export async function createAthleteAccount(form: FormData) { const supabase = await createClient(); const { data: { user: admin } } = await supabase.auth.getUser(); if (!admin) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can create athletes." }; const email = String(form.get("email") || "").trim().toLowerCase(); const fullName = String(form.get("full_name") || "").trim(); if (!email || !fullName) return { error: "Full name and email are required." }; const service = createServiceClient(); const temporaryPassword = `Athlete-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}!`; const { data: created, error: authError } = await service.auth.admin.createUser({ email, password: temporaryPassword, email_confirm: true, user_metadata: { full_name: fullName, role: "athlete" } }); if (authError || !created.user) return { error: authError?.message || "Unable to create account." }; const id = created.user.id; const number = (key: string) => { const value = Number(form.get(key)); return Number.isFinite(value) && value > 0 ? value : null }; const { error: profileError } = await service.from("profiles").upsert({ id, full_name: fullName, full_name_ar: String(form.get("full_name_ar") || "").trim() || null, role: "athlete" }); if (profileError) return { error: profileError.message }; const { error: athleteError } = await service.from("athletes").upsert({ id, phone: String(form.get("phone") || "").trim() || null, height_cm: number("height_cm"), weight_kg: number("weight_kg"), injury_notes: String(form.get("coach_notes") || "").trim() || null, assessment_status: "draft" }); if (athleteError) return { error: athleteError.message }; const teamId = String(form.get("team_id") || ""); if (teamId) await service.from("athlete_teams").insert({ athlete_id: id, team_id: teamId }); const height = number("height_cm"); const weight = number("weight_kg"); const bmi = height && weight ? Number((weight / ((height / 100) ** 2)).toFixed(2)) : null; const assessment = await service.from("athlete_assessments").insert({ athlete_id: id, status: "draft", version: 1, coach_notes: String(form.get("coach_notes") || "").trim() || null, injury_flags: [], goals: [] }).select("id").single(); if (assessment.data) { const fields = ["body_fat_pct", "bmi", "deep_squat", "hurdle_step", "inline_lunge", "shoulder_mobility", "active_straight_leg_raise", "trunk_stability", "rotary_stability", "fms_total", "v_jump_cm", "sprint_30m_seconds", "t_test_seconds", "beep_test_level", "beep_test_speed", "beep_test_vo2_max", "star_balance", "agility_rshaqah_seconds", "squat_1rm_kg", "bench_press_1rm_kg", "deadlift_1rm_kg", "power_clean_1rm_kg", "shoulder_press_1rm_kg"]; const fmsTotal = ["deep_squat", "hurdle_step", "inline_lunge", "shoulder_mobility", "active_straight_leg_raise", "trunk_stability", "rotary_stability"].reduce((total, key) => total + (number(key) ?? 0), 0); const answers = fields.map((key) => ({ assessment_id: assessment.data.id, question_key: key, answer_json: { value: key === "bmi" ? bmi : key === "fms_total" ? fmsTotal : form.get(key) ? Number(form.get(key)) : null } })); await service.from("athlete_assessment_answers").insert(answers); if (height || weight) { const measurement = await service.from("measurements").insert({ athlete_id: id, recorded_at: new Date().toISOString(), height_cm: height, weight_kg: weight, body_fat_pct: number("body_fat_pct"), notes: "Admin assessment creation" }); if (measurement.error) return { error: `Measurement save failed: ${measurement.error.message}` }; } if (height || weight || bmi) { const inbody = await service.from("inbody_records").insert({ athlete_id: id, assessment_id: assessment.data.id, height_cm: height, weight_kg: weight, bmi, body_fat_pct: number("body_fat_pct"), recorded_at: new Date().toISOString() }); if (inbody.error) return { error: `InBody save failed: ${inbody.error.message}` }; } } revalidatePath("/admin"); return { error: null, athleteId: id } }
+export async function createAthleteAccount(form: FormData) {
+  const supabase = await createClient()
+  const { data: { user: admin } } = await supabase.auth.getUser()
+  if (!admin) return { error: "Unauthorized" }
+  const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle()
+  if (adminProfile?.role !== "admin") return { error: "Only admins can create athletes." }
+
+  const fullName = String(form.get("full_name") || "").trim()
+  if (!fullName) return { error: "Full name is required." }
+
+  // Generate Troy ID and derive internal email
+  const { generateTroyId, troyIdToEmail } = await import("@/lib/troy-id")
+  const service = createServiceClient()
+
+  // Keep regenerating until unique (collision is astronomically unlikely but safe)
+  let troyId = generateTroyId()
+  let attempts = 0
+  while (attempts < 5) {
+    const { data: existing } = await service.from("profiles").select("id").eq("troy_id", troyId).maybeSingle()
+    if (!existing) break
+    troyId = generateTroyId()
+    attempts++
+  }
+
+  const internalEmail = troyIdToEmail(troyId)
+  const temporaryPassword = `Troy-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}!`
+
+  const { data: created, error: authError } = await service.auth.admin.createUser({
+    email: internalEmail,
+    password: temporaryPassword,
+    email_confirm: true,
+    user_metadata: { full_name: fullName, role: "athlete", troy_id: troyId },
+  })
+  if (authError || !created.user) return { error: authError?.message || "Unable to create account." }
+
+  const id = created.user.id
+  const number = (key: string) => { const v = Number(form.get(key)); return Number.isFinite(v) && v > 0 ? v : null }
+
+  const { error: profileError } = await service.from("profiles").upsert({
+    id,
+    full_name: fullName,
+    full_name_ar: String(form.get("full_name_ar") || "").trim() || null,
+    role: "athlete",
+    troy_id: troyId,
+    password_change_required: true,
+  })
+  if (profileError) return { error: profileError.message }
+
+  const { error: athleteError } = await service.from("athletes").upsert({
+    id,
+    phone: String(form.get("phone") || "").trim() || null,
+    height_cm: number("height_cm"),
+    weight_kg: number("weight_kg"),
+    injury_notes: String(form.get("coach_notes") || "").trim() || null,
+    assessment_status: "draft",
+    sport: String(form.get("sport") || "").trim() || null,
+    position: String(form.get("position") || "").trim() || null,
+    birth_year: number("birth_year"),
+    free_training_days: [],
+    show_exercise_recap: true,
+  })
+  if (athleteError) return { error: athleteError.message }
+
+  const teamId = String(form.get("team_id") || "")
+  if (teamId) await service.from("athlete_teams").insert({ athlete_id: id, team_id: teamId })
+
+  const height = number("height_cm")
+  const weight = number("weight_kg")
+  const bmi = height && weight ? Number((weight / ((height / 100) ** 2)).toFixed(2)) : null
+
+  const assessment = await service.from("athlete_assessments").insert({
+    athlete_id: id, status: "draft", version: 1,
+    coach_notes: String(form.get("coach_notes") || "").trim() || null,
+    injury_flags: [], goals: [],
+  }).select("id").single()
+
+  if (assessment.data) {
+    const fields = ["body_fat_pct", "bmi", "deep_squat", "hurdle_step", "inline_lunge", "shoulder_mobility", "active_straight_leg_raise", "trunk_stability", "rotary_stability", "fms_total", "v_jump_cm", "sprint_30m_seconds", "t_test_seconds", "beep_test_level", "beep_test_speed", "beep_test_vo2_max", "star_balance", "agility_rshaqah_seconds", "squat_1rm_kg", "bench_press_1rm_kg", "deadlift_1rm_kg", "power_clean_1rm_kg", "shoulder_press_1rm_kg"]
+    const fmsTotal = ["deep_squat", "hurdle_step", "inline_lunge", "shoulder_mobility", "active_straight_leg_raise", "trunk_stability", "rotary_stability"].reduce((total, key) => total + (number(key) ?? 0), 0)
+    const answers = fields.map((key) => ({ assessment_id: assessment.data.id, question_key: key, answer_json: { value: key === "bmi" ? bmi : key === "fms_total" ? fmsTotal : form.get(key) ? Number(form.get(key)) : null } }))
+    await service.from("athlete_assessment_answers").insert(answers)
+    if (height || weight) {
+      const measurement = await service.from("measurements").insert({ athlete_id: id, recorded_at: new Date().toISOString(), height_cm: height, weight_kg: weight, body_fat_pct: number("body_fat_pct"), notes: "Admin assessment creation" })
+      if (measurement.error) return { error: `Measurement save failed: ${measurement.error.message}` }
+    }
+    if (height || weight || bmi) {
+      const inbody = await service.from("inbody_records").insert({ athlete_id: id, assessment_id: assessment.data.id, height_cm: height, weight_kg: weight, bmi, body_fat_pct: number("body_fat_pct"), recorded_at: new Date().toISOString() })
+      if (inbody.error) return { error: `InBody save failed: ${inbody.error.message}` }
+    }
+  }
+
+  revalidatePath("/admin")
+  return { error: null, athleteId: id, troyId, temporaryPassword }
+}
 
 function createServiceClient() { return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) }
 
@@ -18,7 +111,20 @@ export async function permanentlyDeleteAthlete(athleteId: string) { const supaba
 
 export async function toggleAthleteAccountStatus(athleteId: string, status: "active" | "paused") { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { data: admin } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (admin?.role !== "admin") return { error: "Only admins can pause athlete accounts." }; const service = createServiceClient(); const { error } = await service.from("athletes").update({ account_status: status }).eq("id", athleteId); if (error) return { error: error.message }; const { error: authError } = await service.auth.admin.updateUserById(athleteId, { ban_duration: status === "paused" ? "876000h" : "none" }); if (authError) return { error: authError.message }; revalidatePath("/admin"); return { error: null } }
 
-export async function generateTemporaryAthletePassword(athleteId: string) { const supabase = await createClient(); const { data: { user: admin } } = await supabase.auth.getUser(); if (!admin) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can reset athlete passwords." }; const temporaryPassword = `Athlete-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}!`; const service = createServiceClient(); const { error } = await service.auth.admin.updateUserById(athleteId, { password: temporaryPassword, email_confirm: true }); if (error) return { error: error.message }; return { error: null, temporaryPassword } }
+export async function generateTemporaryAthletePassword(athleteId: string) {
+  const supabase = await createClient()
+  const { data: { user: admin } } = await supabase.auth.getUser()
+  if (!admin) return { error: "Unauthorized" }
+  const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle()
+  if (adminProfile?.role !== "admin") return { error: "Only admins can reset athlete passwords." }
+  const temporaryPassword = `Troy-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}!`
+  const service = createServiceClient()
+  const { error } = await service.auth.admin.updateUserById(athleteId, { password: temporaryPassword, email_confirm: true })
+  if (error) return { error: error.message }
+  // Force the athlete to set a new password on next login
+  await service.from("profiles").update({ password_change_required: true }).eq("id", athleteId)
+  return { error: null, temporaryPassword }
+}
 
 export async function sendAthleteInvitation(athleteId: string) { const supabase = await createClient(); const { data: { user: admin } } = await supabase.auth.getUser(); if (!admin) return { error: "Unauthorized" }; const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle(); if (adminProfile?.role !== "admin") return { error: "Only admins can send invitations." }; const service = createServiceClient(); const { data: athleteUser } = await service.auth.admin.getUserById(athleteId); const email = athleteUser.user?.email; if (!email) return { error: "Athlete email not found." }; const { error } = await service.auth.admin.inviteUserByEmail(email, { data: { role: "athlete" }, redirectTo: `${process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || "http://localhost:3000"}/auth/callback?next=/auth/set-password` }); if (error) return { error: error.message }; revalidatePath("/admin"); return { error: null } }
 
@@ -34,6 +140,38 @@ export async function markExerciseSelfieReviewed(selfieId: string) {
   const { error: deleteFileError } = await service.storage.from("exercise-selfies").remove([selfie.storage_path])
   if (deleteFileError) return { error: deleteFileError.message }
   const { error } = await service.from("program_exercise_selfies").delete().eq("id", selfieId)
+  if (error) return { error: error.message }
+  revalidatePath("/admin")
+  return { error: null }
+}
+
+export async function updateAthleteSettings(form: FormData) {
+  const supabase = await createClient()
+  const { data: { user: admin } } = await supabase.auth.getUser()
+  if (!admin) return { error: "Unauthorized" }
+  const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", admin.id).maybeSingle()
+  if (!adminProfile || !["admin", "supporting_coach"].includes(adminProfile.role)) return { error: "Forbidden" }
+
+  const athleteId = String(form.get("athlete_id") || "").trim()
+  if (!athleteId) return { error: "Missing athlete ID." }
+
+  // free_training_days: multiple checkbox values (0=Sun … 6=Sat)
+  const freeDays = form
+    .getAll("free_training_days")
+    .map((d) => Number(d))
+    .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+
+  const showRecap = form.get("show_exercise_recap") === "true"
+  const sport = String(form.get("sport") || "").trim() || null
+  const position = String(form.get("position") || "").trim() || null
+  const birthYearRaw = Number(form.get("birth_year"))
+  const birthYear = Number.isInteger(birthYearRaw) && birthYearRaw > 1900 ? birthYearRaw : null
+
+  const service = createServiceClient()
+  const { error } = await service
+    .from("athletes")
+    .update({ free_training_days: freeDays, show_exercise_recap: showRecap, sport, position, birth_year: birthYear })
+    .eq("id", athleteId)
   if (error) return { error: error.message }
   revalidatePath("/admin")
   return { error: null }

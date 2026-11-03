@@ -62,7 +62,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
           <SessionPanel teams={safeTeams} athletes={safeAthletes} sessions={safeSessions} exercises={safeExercises} />
         </TabsContent>
         <TabsContent value="athletes" className="mt-6">
-          <AthletesWorkspace teams={safeTeams} athletes={safeAthletes} selfies={Array.isArray(selfies) ? selfies : []} />
+          <AthletesWorkspace teams={safeTeams} athletes={safeAthletes} selfies={Array.isArray(selfies) ? selfies : []} feedbackSummaries={feedbackSummaries} feedbackPainReports={feedbackPainReports} />
         </TabsContent>
         <TabsContent value="feedback" className="mt-6">
           <AthleteFeedbackPanel athletes={safeAthletes} summaries={feedbackSummaries} painReports={feedbackPainReports} />
@@ -81,9 +81,9 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
   )
 }
 
-function AthletesWorkspace({ teams, athletes, selfies }: { teams: any[]; athletes: any[]; selfies: any[] }) {
+function AthletesWorkspace({ teams, athletes, selfies, feedbackSummaries, feedbackPainReports }: { teams: any[]; athletes: any[]; selfies: any[]; feedbackSummaries: any[]; feedbackPainReports: any[] }) {
   const [showCreate, setShowCreate] = useState(false)
-  return <div className="grid gap-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold tracking-tight">Athletes</h2><p className="text-sm text-muted-foreground">{athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster</p></div><Button type="button" onClick={() => setShowCreate((value) => !value)}><Plus className="mr-2 size-4" />{showCreate ? "Close form" : "Create athlete"}</Button></div>{showCreate ? <AthleteCreateForm teams={teams} /> : null}<TeamManagementForm /><AthletesPanel athletes={athletes} selfies={selfies} /></div>
+  return <div className="grid gap-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold tracking-tight">Athletes</h2><p className="text-sm text-muted-foreground">{athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster</p></div><Button type="button" onClick={() => setShowCreate((value) => !value)}><Plus className="mr-2 size-4" />{showCreate ? "Close form" : "Create athlete"}</Button></div>{showCreate ? <AthleteCreateForm teams={teams} /> : null}<TeamManagementForm /><AthletesPanel athletes={athletes} selfies={selfies} feedbackSummaries={feedbackSummaries} feedbackPainReports={feedbackPainReports} /></div>
 }
 
 function TeamManagementForm() {
