@@ -8,45 +8,77 @@
  */
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash"
 
 type GeminiContent = { role: "user" | "model"; parts: { text: string }[] }
 
 async function callGemini(apiKey: string, prompt: string, systemInstruction?: string): Promise<string> {
-  const body: Record<string, unknown> = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }] as GeminiContent[],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 8192,
-    },
-  }
-  if (systemInstruction) {
-    body.systemInstruction = { parts: [{ text: systemInstruction }] }
-  }
+  const models = [
+    process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+  ]
+  const uniqueModels = [...new Set(models)]
 
-  const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
-  })
+  let lastError: Error | null = null
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
+  for (let i = 0; i < uniqueModels.length; i++) {
+    const model = uniqueModels[i]
+    const body: Record<string, unknown> = {
+      contents: [{ role: "user", parts: [{ text: prompt }] }] as GeminiContent[],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 8192,
+      },
+    }
+    if (systemInstruction) {
+      body.systemInstruction = { parts: [{ text: systemInstruction }] }
+    }
+
     try {
-      const errJson = JSON.parse(text)
-      const msg = errJson?.error?.message || text
-      throw new Error(`Gemini API error ${res.status}: ${msg}`)
-    } catch (e) {
-      if (e instanceof Error && e.message.startsWith("Gemini API error")) throw e
-      throw new Error(`Gemini API error ${res.status}: ${text}`)
+      const res = await fetch(`${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60_000),
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "")
+        let msg = text
+        try {
+          const errJson = JSON.parse(text)
+          msg = errJson?.error?.message || text
+        } catch {
+          // ignore parse error
+        }
+
+        const isTemporary = res.status === 503 || res.status === 429
+        if (isTemporary && i < uniqueModels.length - 1) {
+          console.warn(`[Gemini] Model ${model} returned ${res.status}. Falling back to ${uniqueModels[i + 1]}...`)
+          continue
+        }
+
+        throw new Error(`Gemini API error ${res.status}: ${msg}`)
+      }
+
+      const json = await res.json()
+      const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+      if (!text) throw new Error("Gemini returned an empty response.")
+      return text
+    } catch (err: any) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      const isRetryable =
+        lastError.message.includes("503") ||
+        lastError.message.includes("429") ||
+        lastError.message.includes("high demand")
+      if (isRetryable && i < uniqueModels.length - 1) {
+        console.warn(`[Gemini] Retrying with fallback model ${uniqueModels[i + 1]} due to: ${lastError.message}`)
+        continue
+      }
+      throw lastError
     }
   }
 
-  const json = await res.json()
-  const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-  if (!text) throw new Error("Gemini returned an empty response.")
-  return text
+  throw lastError || new Error("Failed to call Gemini API.")
 }
 
 /** Extract JSON from a Gemini response that may include markdown code fences. */
