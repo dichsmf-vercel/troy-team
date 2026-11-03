@@ -12,18 +12,25 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 type GeminiContent = { role: "user" | "model"; parts: { text: string }[] }
 
 async function callGemini(apiKey: string, prompt: string, systemInstruction?: string): Promise<string> {
-  const models = [
+  const candidateModels = [
     process.env.GEMINI_MODEL,
-    "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
     "gemini-3.8-flash",
+    "gemini-flash-latest",
     "gemini-flash-lite-latest",
+    "gemini-pro-latest",
   ].filter(Boolean) as string[]
-  const uniqueModels = [...new Set(models)]
 
-  let lastError: Error | null = null
+  // Deduplicate and filter out deprecated/discontinued models for new users
+  const uniqueModels = [...new Set(candidateModels)].filter(
+    (m) => m !== "gemini-2.5-flash" && m !== "gemini-2.0-flash"
+  )
+
+  const failureLog: string[] = []
 
   for (let i = 0; i < uniqueModels.length; i++) {
     const model = uniqueModels[i]
@@ -39,6 +46,7 @@ async function callGemini(apiKey: string, prompt: string, systemInstruction?: st
     }
 
     try {
+      console.log(`[Gemini] Attempting generation with model (${i + 1}/${uniqueModels.length}): ${model}`)
       const res = await fetch(`${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -56,37 +64,48 @@ async function callGemini(apiKey: string, prompt: string, systemInstruction?: st
           // ignore parse error
         }
 
-        // Retry on 404 (model deprecated/unavailable for account), 503 (high demand), or 429 (rate limit)
-        const canFallback = (res.status === 404 || res.status === 503 || res.status === 429) && i < uniqueModels.length - 1
-        if (canFallback) {
-          console.warn(`[Gemini] Model ${model} returned HTTP ${res.status} ("${msg}"). Automatically trying fallback model ${uniqueModels[i + 1]}...`)
+        const isAuthError = res.status === 401 || res.status === 403
+        if (isAuthError) {
+          // Key itself is unauthorized or suspended
+          throw new Error(`Gemini API error ${res.status}: ${msg}`)
+        }
+
+        failureLog.push(`${model} (HTTP ${res.status})`)
+
+        if (i < uniqueModels.length - 1) {
+          console.warn(`[Gemini] Model ${model} returned HTTP ${res.status} ("${msg.slice(0, 100)}"). Iterating to next candidate: ${uniqueModels[i + 1]}...`)
           continue
         }
 
-        throw new Error(`Gemini API error ${res.status}: ${msg}`)
+        throw new Error(`All candidate models failed: ${failureLog.join(", ")} | Last error: ${msg}`)
       }
 
       const json = await res.json()
       const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-      if (!text) throw new Error("Gemini returned an empty response.")
+      if (!text) {
+        failureLog.push(`${model} (empty response)`)
+        if (i < uniqueModels.length - 1) continue
+        throw new Error("Gemini returned an empty response.")
+      }
+
+      console.log(`[Gemini] Successfully generated output using model: ${model}`)
       return text
     } catch (err: any) {
-      lastError = err instanceof Error ? err : new Error(String(err))
-      const isRetryable =
-        lastError.message.includes("404") ||
-        lastError.message.includes("503") ||
-        lastError.message.includes("429") ||
-        lastError.message.includes("no longer available") ||
-        lastError.message.includes("high demand")
-      if (isRetryable && i < uniqueModels.length - 1) {
-        console.warn(`[Gemini] Retrying with fallback model ${uniqueModels[i + 1]} due to: ${lastError.message}`)
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes("401") || msg.includes("403") || msg.includes("suspended")) {
+        throw err
+      }
+
+      failureLog.push(`${model} (error)`)
+      if (i < uniqueModels.length - 1) {
+        console.warn(`[Gemini] Error with model ${model} (${msg.slice(0, 100)}). Trying ${uniqueModels[i + 1]}...`)
         continue
       }
-      throw lastError
+      throw new Error(`All candidate models failed: ${failureLog.join(", ")} | ${msg}`)
     }
   }
 
-  throw lastError || new Error("Failed to call Gemini API.")
+  throw new Error(`No models could be contacted. Tried: ${uniqueModels.join(", ")}`)
 }
 
 /** Extract JSON from a Gemini response that may include markdown code fences. */
