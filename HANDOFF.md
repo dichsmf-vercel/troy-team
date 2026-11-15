@@ -131,6 +131,10 @@ on conflict (id) do nothing;
 - **Athlete Roster (`athletes-panel.tsx`)**:
   - Filter by Active, Paused, Pain Reports, or Unread Selfies.
   - Mobile-optimized cards with clear tags and Troy ID display.
+- **Excel Roster Import (`excel-import.ts`)**:
+  - Parses the Troy template and Coach Ahmed measurement-sheet layout in the browser, with an import preview and downloadable `.xlsx` template.
+  - Matches athlete clubs to existing teams or creates missing teams, then creates Troy ID accounts and saves FMS/performance assessment values, including the Row Machine result when its column is labeled.
+  - Shows generated temporary credentials once after import; incomplete FMS batteries do not receive a misleading total score.
 
 ### 2. Legacy / Fallback Program Engine (`lib/program-engine.ts`)
 - **Proper Session Hierarchy**:
@@ -177,26 +181,10 @@ on conflict (id) do nothing;
 - **Prompt Manager**: View active Gemini prompts, historical versions from `coach_system_prompts`, and manually adjust or rollback prompting instructions.
 - **Theme Customizer**: Global theme toggle and branding options (light mode, dark mode, club color accent palettes) applied across all athlete and admin portals.
 
-### 2. Bulk Athlete Import via Excel (.xlsx)
-- **File Reference**: Analyzed uploaded file `قياسات_اللعيبه_الغابه.xlsx` (27 columns).
-- **Structure**:
-  - Player name (اسم اللاعب)
-  - Club name (النادي: e.g. الطيران, الجيش, الغابة)
-  - Sport (اللعبة: يد / Handball)
-  - Position (المركز: GK, etc.)
-  - Age / Birth Year (السن او مواليد)
-  - FMS 7-test battery (Deep Squat, Hurdle Step, Inline Lunge, Shoulder Mobility, Active Straight-Leg Raise, Trunk Push-Up, Rotary Stability)
-  - Performance battery (Horizontal Jump, Vertical Jump, Anaerobic 20m, 505 Agility Test, T-Test, Row Machine, Push-ups, Pull-ups, Plank)
-- **Feasibility & Implementation Plan**:
-  - Use a client-side Excel reader (`xlsx` or lightweight OpenXML parser) to parse uploaded spreadsheets without server overhead.
-  - Automatically match club names to existing teams or create new teams on the fly.
-  - Missing fields will be gracefully defaulted to `"Not Set"` rather than blocking import.
-  - Provide Coach Ahmed with a downloadable template (`.xlsx`) matching the column headers for future club rosters.
-
-### 3. External Weight Sheet Integration
+### 2. External Weight Sheet Integration
 - Athletes maintain separate weight record sheets.
 - Build an integration module that imports these historical lifting weights and pairs them with the session percentages (e.g. `70% of 120kg = 84kg`) for athletes who want exact kg guidance alongside percentage prescriptions.
 
-### 4. Supabase Edge Functions for Alerting
+### 3. Supabase Edge Functions for Alerting
 - Implement a lightweight Supabase Edge Function triggered by `system_log` inserts for errors.
 - Dispatches instant email notifications to Coach Ahmed or the tech lead when Gemini API quotas or demand spikes occur.

@@ -83,14 +83,22 @@ const FMS_TESTS = [
   { key: "rotary_stability", label: "Rotary Stability" },
 ]
 
-const PERF_METRICS = [
+const PERF_METRICS: { key: string; label: string; unit: string; ragEnabled?: boolean }[] = [
   { key: "v_jump_cm", label: "Vertical Jump", unit: "cm" },
+  { key: "horizontal_jump_cm", label: "Horizontal Jump", unit: "cm", ragEnabled: false },
   { key: "sprint_30m_seconds", label: "30m Sprint", unit: "sec" },
+  { key: "sprint_20m_seconds", label: "20m Sprint", unit: "sec", ragEnabled: false },
+  { key: "agility_505_r_seconds", label: "505 Agility (R)", unit: "sec", ragEnabled: false },
+  { key: "agility_505_l_seconds", label: "505 Agility (L)", unit: "sec", ragEnabled: false },
   { key: "t_test_seconds", label: "T-Test", unit: "sec" },
   { key: "beep_test_level", label: "Beep Test Level", unit: "" },
   { key: "beep_test_vo2_max", label: "Beep Test VO₂", unit: "" },
   { key: "star_balance", label: "Star Balance", unit: "" },
   { key: "agility_rshaqah_seconds", label: "Agility (Rshaqah)", unit: "sec" },
+  { key: "push_ups", label: "Push-ups", unit: "reps", ragEnabled: false },
+  { key: "pull_ups", label: "Pull-ups", unit: "reps", ragEnabled: false },
+  { key: "plank_seconds", label: "Plank Hold", unit: "sec", ragEnabled: false },
+  { key: "row_machine_result", label: "Row Machine", unit: "", ragEnabled: false },
 ]
 
 const STRENGTH_METRICS = [
@@ -398,9 +406,9 @@ export function AthleteDrawer({
                     Performance Tests (RAG Indicator)
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {PERF_METRICS.map(({ key, label, unit }) => {
+                    {PERF_METRICS.map(({ key, label, unit, ragEnabled = true }) => {
                       const val = answersMap[key] ?? null
-                      const rag = val != null ? getPerformanceRag(key, val) : null
+                      const rag = ragEnabled && val != null ? getPerformanceRag(key, val) : null
                       return (
                         <div key={key} className="rounded-lg border bg-card p-2.5">
                           <p className="text-[11px] text-muted-foreground truncate">{label}</p>
@@ -412,7 +420,9 @@ export function AthleteDrawer({
                               {rag.label}
                             </span>
                           ) : (
-                            <span className="mt-1.5 inline-block text-[9px] text-muted-foreground">Not recorded</span>
+                            <span className="mt-1.5 inline-block text-[9px] text-muted-foreground">
+                              {val != null ? "Recorded" : "Not recorded"}
+                            </span>
                           )}
                         </div>
                       )

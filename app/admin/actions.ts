@@ -3,6 +3,7 @@ import type { GeminiProgramOutput } from "@/lib/gemini"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import type { ParsedAthleteRow } from "@/lib/excel-import"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 export async function importCoachAhmedRulesFromCsv(formData: FormData) { const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Unauthorized" }; const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(); if (profile?.role !== "admin") return { error: "Only admins can import rules." }; const service = createServiceClient(); let { data: program } = await service.from("programs").select("id").eq("name_en", "Coach Ahmed Rules Engine").maybeSingle(); if (!program) { const createdProgram = await service.from("programs").insert({ name_en: "Coach Ahmed Rules Engine", name_ar: "محرك قواعد كوتش أحمد", description_en: "Authoritative Coach Ahmed CSV rules.", status: "published" }).select("id").single(); if (createdProgram.error) return { error: createdProgram.error.message }; program = createdProgram.data } const uploaded = formData.get("file"); const csv = uploaded instanceof File && uploaded.size ? await uploaded.text() : await readFile(path.join(process.cwd(), "public/CoachAhmedRules.csv"), "utf8"); const rows = csv.trim().split(/\r?\n/).slice(1).filter(Boolean).map((line, index) => { const [ruleId, metric, operator, threshold, action, exerciseId] = line.split(",").map((value) => value.trim().replace(/^"|"$/g, "")); return { program_id: program.id, name: ruleId || `CSV-${index + 1}`, rule_text: `${ruleId}\t${metric}\t${operator}\t${threshold}\t${action}\t${exerciseId}`, rule_type: "coach_ahmed_csv", condition_json: { metric, operator, threshold }, action_json: { action, exercise_id: exerciseId }, priority: index + 1, is_active: true }; }); const { error: clearError } = await service.from("program_rules").delete().eq("rule_type", "coach_ahmed_csv"); if (clearError) return { error: clearError.message }; const { error } = await service.from("program_rules").insert(rows); if (error) return { error: error.message }; revalidatePath("/admin"); return { error: null, imported: rows.length } }
@@ -13,6 +14,273 @@ export async function importAthletesCsv(formData: FormData) { const supabase = a
   let imported = 0; for (const row of rows) { const email = String(row.email || "").trim().toLowerCase(); const fullName = String(row.full_name || "").trim(); if (!email || !fullName) return { error: `Row ${imported + 2} requires full_name and email.` }; let athleteId = existingEmailMap.get(email); if (!athleteId) { const created = await service.auth.admin.createUser({ email, email_confirm: false, user_metadata: { full_name: fullName, role: "athlete" } }); if (created.error || !created.data.user) return { error: created.error?.message || `Could not create ${email}.` }; athleteId = created.data.user.id } const { error: profileError } = await service.from("profiles").upsert({ id: athleteId, full_name: fullName, role: "athlete" }); if (profileError) return { error: profileError.message }; const number = (key: string) => { const value = Number(row[key]); return Number.isFinite(value) && value > 0 ? value : null }; const { error: athleteError } = await service.from("athletes").upsert({ id: athleteId, phone: row.phone || null, height_cm: number("height_cm"), weight_kg: number("weight_kg"), injury_notes: row.coach_notes || null, assessment_status: "draft" }); if (athleteError) return { error: athleteError.message }; imported++ } revalidatePath("/admin"); return { error: null, imported } }
 
 function parseCsv(csv: string) { const lines = csv.split(/\r?\n/).filter((line) => line.trim()); if (!lines.length) return []; const headers = lines[0].split(",").map((header) => header.trim()); return lines.slice(1).map((line) => { const values = line.split(","); return Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? "").trim().replace(/^"|"$/g, "")])) }) }
+
+export async function importAthletesFromExcel(rows: ParsedAthleteRow[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Unauthorized", imported: 0, credentials: [] }
+  const { data: adminProfile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+  if (adminProfile?.role !== "admin") {
+    return { error: "Only admins can import athletes.", imported: 0, credentials: [] }
+  }
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return { error: "The spreadsheet has no athlete rows.", imported: 0, credentials: [] }
+  }
+
+  const invalidRowIndex = rows.findIndex((row) => !row || typeof row.fullName !== "string" || !row.fullName.trim())
+  if (invalidRowIndex >= 0) {
+    const invalidRow = rows[invalidRowIndex]
+    return {
+      error: `Row ${invalidRow?.rowNumber ?? invalidRowIndex + 1} is missing the athlete name.`,
+      imported: 0,
+      credentials: [],
+    }
+  }
+
+  const rowsToImport: ParsedAthleteRow[] = []
+  for (const [index, row] of rows.entries()) {
+    const metricValues = [
+      row.birthYear,
+      row.deepSquat,
+      row.hurdleStep,
+      row.inlineLunge,
+      row.shoulderMobility,
+      row.activeStraightLegRaise,
+      row.trunkStability,
+      row.rotaryStability,
+      row.verticalJumpCm,
+      row.horizontalJumpCm,
+      row.sprint20mSec,
+      row.tTestSec,
+      row.agility505RSec,
+      row.agility505LSec,
+      row.pushUps,
+      row.pullUps,
+      row.plankSec,
+      row.beepTestLevel,
+      row.rowMachineResult,
+    ]
+    if (metricValues.some((value) => value != null && (typeof value !== "number" || !Number.isFinite(value)))) {
+      return {
+        error: `Row ${row.rowNumber ?? index + 1} has an invalid numeric value.`,
+        imported: 0,
+        credentials: [],
+      }
+    }
+    const fmsScores = [
+      row.deepSquat,
+      row.hurdleStep,
+      row.inlineLunge,
+      row.shoulderMobility,
+      row.activeStraightLegRaise,
+      row.trunkStability,
+      row.rotaryStability,
+    ]
+    if (fmsScores.some((score) => score != null && (!Number.isInteger(score) || score < 0 || score > 3))) {
+      return {
+        error: `Row ${row.rowNumber ?? index + 1} has an FMS score outside the 0–3 range.`,
+        imported: 0,
+        credentials: [],
+      }
+    }
+    rowsToImport.push({
+      ...row,
+      fullName: row.fullName.trim(),
+      clubName: typeof row.clubName === "string" ? row.clubName.trim() : null,
+      sport: typeof row.sport === "string" ? row.sport.trim() : "Not Set",
+      position: typeof row.position === "string" ? row.position.trim() : "Not Set",
+      assessmentDate: typeof row.assessmentDate === "string" ? row.assessmentDate.trim() : null,
+      rawNotes: typeof row.rawNotes === "string" ? row.rawNotes.trim() : null,
+    })
+  }
+
+  const service = createServiceClient()
+  const { data: existingTeams, error: teamsError } = await service.from("teams").select("id,name_en,name_ar")
+  if (teamsError) return { error: `Could not load teams: ${teamsError.message}`, imported: 0, credentials: [] }
+  const teamIdByName = new Map<string, string>()
+  for (const team of existingTeams ?? []) {
+    for (const name of [team.name_en, team.name_ar]) {
+      if (name?.trim()) teamIdByName.set(name.trim().toLocaleLowerCase(), team.id)
+    }
+  }
+
+  const credentials: { name: string; troyId: string; temporaryPassword: string }[] = []
+  let imported = 0
+  const fail = (rowNumber: number, message: string) => ({
+    error: `Row ${rowNumber}: ${message}`,
+    imported,
+    credentials,
+  })
+
+  for (const row of rowsToImport) {
+    const fullName = row.fullName.trim()
+    const clubName = row.clubName?.trim()
+    let teamId: string | null = null
+
+    if (clubName && clubName.toLocaleLowerCase() !== "not set") {
+      teamId = teamIdByName.get(clubName.toLocaleLowerCase()) ?? null
+      if (!teamId) {
+        const { data: team, error } = await service
+          .from("teams")
+          .insert({
+            name_en: clubName,
+            name_ar: clubName,
+            color_hex: "#2563eb",
+            created_by: user.id,
+          })
+          .select("id")
+          .single()
+        if (error || !team) {
+          return fail(row.rowNumber, `Could not create team "${clubName}": ${error?.message ?? "No team returned."}`)
+        }
+        teamId = team.id
+        teamIdByName.set(clubName.toLocaleLowerCase(), team.id)
+      }
+    }
+
+    const { generateTroyId, troyIdToEmail } = await import("@/lib/troy-id")
+    let troyId = generateTroyId()
+    let athleteId: string | null = null
+    let authError: string | null = null
+    let temporaryPassword = ""
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: existing, error: lookupError } = await service
+        .from("profiles")
+        .select("id")
+        .eq("troy_id", troyId)
+        .maybeSingle()
+      if (lookupError) return fail(row.rowNumber, `Could not verify Troy ID: ${lookupError.message}`)
+      if (existing) {
+        troyId = generateTroyId()
+        continue
+      }
+
+      temporaryPassword = `Troy-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}!`
+      const created = await service.auth.admin.createUser({
+        email: troyIdToEmail(troyId),
+        password: temporaryPassword,
+        email_confirm: true,
+        user_metadata: { full_name: fullName, role: "athlete", troy_id: troyId },
+      })
+      if (created.error || !created.data.user) {
+        authError = created.error?.message ?? "Could not create athlete account."
+        if (created.error?.message.toLowerCase().includes("already")) {
+          troyId = generateTroyId()
+          continue
+        }
+        return fail(row.rowNumber, authError)
+      }
+
+      athleteId = created.data.user.id
+      credentials.push({ name: fullName, troyId, temporaryPassword })
+      break
+    }
+    if (!athleteId) return fail(row.rowNumber, authError ?? "Could not generate a unique Troy ID.")
+
+    const isArabicName = /[\u0600-\u06ff]/.test(fullName)
+    const { error: profileError } = await service.from("profiles").upsert({
+      id: athleteId,
+      full_name: fullName,
+      full_name_ar: isArabicName ? fullName : null,
+      role: "athlete",
+      troy_id: troyId,
+      password_change_required: true,
+    })
+    if (profileError) return fail(row.rowNumber, `Profile save failed: ${profileError.message}`)
+
+    const { error: athleteError } = await service.from("athletes").upsert({
+      id: athleteId,
+      sport: row.sport || "Not Set",
+      position: row.position || "Not Set",
+      birth_year: row.birthYear ?? null,
+      free_training_days: [0, 1, 2, 3, 4, 5, 6],
+      show_exercise_recap: true,
+      goals: "Standard Program",
+      assessment_status: "draft",
+    })
+    if (athleteError) return fail(row.rowNumber, `Athlete profile save failed: ${athleteError.message}`)
+
+    if (teamId) {
+      const { error } = await service.from("athlete_teams").insert({ athlete_id: athleteId, team_id: teamId })
+      if (error) return fail(row.rowNumber, `Team assignment failed: ${error.message}`)
+    }
+
+    const fmsScores = [
+      row.deepSquat,
+      row.hurdleStep,
+      row.inlineLunge,
+      row.shoulderMobility,
+      row.activeStraightLegRaise,
+      row.trunkStability,
+      row.rotaryStability,
+    ]
+    const fmsTotal = fmsScores.every((score) => typeof score === "number" && Number.isFinite(score))
+      ? fmsScores.reduce<number>((total, score) => total + (score ?? 0), 0)
+      : null
+    const assessmentNotes = [
+      "Imported from Excel roster",
+      row.assessmentDate ? `Assessment date: ${row.assessmentDate}` : null,
+      row.rawNotes,
+    ].filter(Boolean).join("\n")
+    const submittedAt = row.assessmentDate && /^\d{4}-\d{2}-\d{2}$/.test(row.assessmentDate)
+      ? `${row.assessmentDate}T12:00:00.000Z`
+      : new Date().toISOString()
+    const { data: assessment, error: assessmentError } = await service
+      .from("athlete_assessments")
+      .insert({
+        athlete_id: athleteId,
+        status: "draft",
+        version: 1,
+        coach_notes: assessmentNotes,
+        injury_flags: [],
+        goals: [],
+        submitted_at: submittedAt,
+      })
+      .select("id")
+      .single()
+    if (assessmentError || !assessment) {
+      return fail(row.rowNumber, `Assessment save failed: ${assessmentError?.message ?? "No assessment returned."}`)
+    }
+
+    const answers: { assessment_id: string; question_key: string; answer_json: { value: number } }[] = []
+    const values: [string, number | null | undefined][] = [
+      ["deep_squat", row.deepSquat],
+      ["hurdle_step", row.hurdleStep],
+      ["inline_lunge", row.inlineLunge],
+      ["shoulder_mobility", row.shoulderMobility],
+      ["active_straight_leg_raise", row.activeStraightLegRaise],
+      ["trunk_stability", row.trunkStability],
+      ["rotary_stability", row.rotaryStability],
+      ["fms_total", fmsTotal],
+      ["v_jump_cm", row.verticalJumpCm],
+      ["horizontal_jump_cm", row.horizontalJumpCm],
+      ["sprint_20m_seconds", row.sprint20mSec],
+      ["t_test_seconds", row.tTestSec],
+      ["agility_505_r_seconds", row.agility505RSec],
+      ["agility_505_l_seconds", row.agility505LSec],
+      ["push_ups", row.pushUps],
+      ["pull_ups", row.pullUps],
+      ["plank_seconds", row.plankSec],
+      ["beep_test_level", row.beepTestLevel],
+      ["row_machine_result", row.rowMachineResult],
+    ]
+    for (const [questionKey, value] of values) {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        answers.push({ assessment_id: assessment.id, question_key: questionKey, answer_json: { value } })
+      }
+    }
+    if (answers.length) {
+      const { error } = await service.from("athlete_assessment_answers").insert(answers)
+      if (error) return fail(row.rowNumber, `Assessment measurements save failed: ${error.message}`)
+    }
+
+    imported++
+  }
+
+  revalidatePath("/admin")
+  return { error: null, imported, credentials }
+}
 
 export async function createAthleteAccount(form: FormData) {
   const supabase = await createClient()

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { ExcelAthleteImport } from "@/components/admin/excel-athlete-import"
 import { AthleteDrawer } from "@/components/admin/athlete-drawer"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 
@@ -200,6 +201,8 @@ export function AthletesPanel({
           </div>
         </CardHeader>
       </Card>
+
+      <ExcelAthleteImport />
 
       {/* Roster list */}
       <section aria-label="Athlete roster">
