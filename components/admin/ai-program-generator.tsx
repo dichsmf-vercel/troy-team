@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { generateProgramWithAI, saveAIGeneratedProgram, saveAdminEditsAndLearn } from "@/app/admin/actions"
+import { generateProgramWithAI, saveAIGeneratedProgram, saveAdminEditsAndLearn, generateLegacyFallbackProgram } from "@/app/admin/actions"
 import type { GeminiProgramOutput, GeminiSession, GeminiExercise } from "@/lib/gemini"
 import { weekdayLabel, monthLabel } from "@/lib/program-engine"
 
@@ -54,6 +54,34 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
 
   // Save state
   const [saving, setSaving] = useState(false)
+  const [fallbackGenerating, setFallbackGenerating] = useState(false)
+
+  async function handleFallbackGenerate() {
+    setFallbackGenerating(true)
+    setSaveMsg(null)
+    console.log("[AI-Program-Generator] Triggered Option B: Fallback to Rules Engine")
+    try {
+      const result = await generateLegacyFallbackProgram({
+        athleteId,
+        startDate,
+        time,
+        weekdays: days,
+      })
+      if (result.error || !result.data) {
+        setGenError(result.error ?? "Fallback generation failed.")
+        return
+      }
+      setProgram(result.data)
+      setOriginalProgram(result.data)
+      setGenError(null)
+      console.log("[AI-Program-Generator] Fallback program generated successfully:", result.data)
+    } catch (err: any) {
+      console.error("[AI-Program-Generator] Fallback execution error:", err)
+      setGenError(err?.message ?? "Fallback generation failed.")
+    } finally {
+      setFallbackGenerating(false)
+    }
+  }
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
 
   const selectedAthlete = athletes.find((a) => a.id === athleteId)
@@ -310,6 +338,26 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
                   Reload Page Now
                 </Button>
               )}
+              <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5 text-foreground">
+                <p className="font-semibold text-xs">Automatic Fallback Available (Option B)</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Generate this 4-week program immediately using Coach Ahmed's structured rules engine.
+                </p>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className="mt-2 w-full gap-1.5 h-8 text-xs font-semibold"
+                  onClick={handleFallbackGenerate}
+                  disabled={fallbackGenerating}
+                >
+                  {fallbackGenerating ? (
+                    <><Loader2 className="size-3.5 animate-spin" /> Generating with Rules Engine…</>
+                  ) : (
+                    <><Sparkles className="size-3.5" /> Generate with Rules Engine Instead</>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

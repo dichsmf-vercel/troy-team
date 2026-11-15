@@ -100,137 +100,103 @@ create policy "admins delete session exercise selfies"
   on public.session_exercise_selfies for delete to authenticated
   using (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin','supporting_coach')));
 
--- session-selfies storage bucket
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('session-selfies', 'session-selfies', false, 8388608, array['image/jpeg','image/png','image/webp','image/heic'])
+-- Storage bucket
+insert into storage.buckets (id, name, public)
+values ('session-selfies', 'session-selfies', false)
 on conflict (id) do nothing;
-
-create policy "athletes upload session selfies"
-  on storage.objects for insert to authenticated
-  with check (bucket_id = 'session-selfies' and (storage.foldername(name))[1] = auth.uid()::text);
-create policy "athletes view own session selfies"
-  on storage.objects for select to authenticated
-  using (bucket_id = 'session-selfies' and (storage.foldername(name))[1] = auth.uid()::text);
-create policy "admins view all session selfies"
-  on storage.objects for select to authenticated
-  using (bucket_id = 'session-selfies' and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin','supporting_coach')));
-create policy "admins delete session selfies"
-  on storage.objects for delete to authenticated
-  using (bucket_id = 'session-selfies' and exists (select 1 from public.profiles where id = auth.uid() and role in ('admin','supporting_coach')));
 ```
+
 </details>
 
 ---
 
-## 🔑 Environment Variables (Vercel)
+## ⚡ Current System Capabilities (Implemented & Verified)
 
-| Variable | Purpose | Status |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | ✅ Set |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | ✅ Set |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role (admin operations) | ✅ Set |
-| `GEMINI_API_KEY_1` | AI Program generation (Flash models) | ✅ Set |
-| `GEMINI_API_KEY_2` | Summarization / prompt learning | ✅ Set |
-| `GEMINI_MODEL` | Optional model override (defaults to 3.1-flash-lite with fallback) | ⚙️ Optional |
-| `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` | Email invite redirect (dev only) | ⚠️ Unused in prod |
+### 1. Athletes Tab & Creation Engine
+- **Athlete Creation Form (`athlete-create-form.tsx`)**:
+  - Full preferences section: available training days selector (Sun–Sat), program assignment toggle (`has_program`: Monthly Program vs Assigned Exercises Only), and session exercise recap toggle (`show_exercise_recap`).
+  - **Live RAG Color Indicators**: Real-time badge highlighting as numbers are typed for Vertical Jump, 30m Sprint, T-Test, Beep Test, Agility, Star Balance, and FMS Total (< 14 High Risk, 14–17 Moderate, ≥ 18 Optimal).
+  - **FMS Arabic Scoring**: 0 (ضعيف جدا), 1 (ضعيف), 2 (جيد/متوسط), 3 (ممتاز).
+  - **Epley 1RM Formula**: Automatically calculates 1RM from entered weight (kg) and reps performed (`1RM = Weight × (1 + Reps/30)`).
+  - **Custom Field Editor**: Add custom key/value fields in any section (Account, Measurements, FMS, Performance, Strength, Preferences).
+- **Athlete Drawer (`athlete-drawer.tsx`)**:
+  - Mobile-responsive sliding sheet with clean collapsible panels.
+  - Vitals & quick metrics grid with BMI and session stats.
+  - Performance tests display with RAG color pills.
+  - FMS score breakdown with Arabic ratings.
+  - Settings manager: free days, program mode, exercise recap, sport, position.
+  - Account security: 1-click temporary password generation with copy confirmation, pause/resume account, and permanent deletion.
+  - Unread selfie review and deletion.
+  - Session feedback & pain reports with severity levels.
+- **Athlete Roster (`athletes-panel.tsx`)**:
+  - Filter by Active, Paused, Pain Reports, or Unread Selfies.
+  - Mobile-optimized cards with clear tags and Troy ID display.
 
----
+### 2. Legacy / Fallback Program Engine (`lib/program-engine.ts`)
+- **Proper Session Hierarchy**:
+  1. Warm-up (2 exercises)
+  2. Mobility (2 exercises, allowed to repeat across sessions for consistency)
+  3. Rubber Bands (1–2 exercises for activation)
+  4. FMS Problem Exercises (included in Weeks 1 & 2 ONLY, dropped in Weeks 3 & 4)
+  5. Strength / Power / Main Work (adapted to age, split, and season)
+  6. Cooldown (1 exercise)
+- **3-Day Split Logic**: Upper Body Focus (Day 1), Lower Body Focus (Day 2), Full Body & Power (Day 3). Automatically falls back to balanced rotation if training days differ.
+- **Age < 12 Youth Safety**: Automatically excludes heavy barbell lifts, deadlifts, and 1RM efforts; substitutes motor control, bodyweight, and agility drills.
+- **Egyptian Sport Season Awareness**:
+  - *Off-season* (May–July): Adds foundational endurance/conditioning blocks.
+  - *Pre-season* (August): Power and high-intensity capacity preparation.
+  - *In-season* (September–April): Match season; manages fatigue by reducing heavy strain to keep athletes fresh.
+- **Percentages Only**: Session runner displays loads exclusively as percentages (e.g. `60%`, `70%`, `80%`), avoiding confusing raw kg values.
 
-## ✅ What's Working & Shipped to `main`
+### 3. AI Program Generation & Fallback (Option B)
+- **Gemini Engine (`lib/gemini.ts`)**: Resilient multi-model chain (3.1-flash-lite → 3.5-flash → 3.6 → 3.7 → 3.8 → flash-latest) with 5-stage JSON extraction.
+- **Option B Fallback**: When Gemini API encounters high demand or errors, a prompt card appears: **"Generate with Rules Engine Instead"**. Clicking it immediately runs the rules engine and loads the structured 4-week program in the review panel without losing the coach's workflow.
 
-### 1. AI Program Generation Flow (Gemini)
-- **Multi-Model Fallback Chain**: Starts with `gemini-3.1-flash-lite`, automatically cascading to `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gemini-3.7-flash`, `gemini-3.8-flash`, and `gemini-flash-latest`.
-- **Automatic Error Resilience**: Automatically catches 404 (model deprecated for account), 503 (high demand spikes), and 429 (rate limits) and seamlessly retries the next candidate model without crashing.
-- **Strict JSON Parsing**: Employs `responseMimeType: "application/json"` with a 5-step fallback extractor that strips Markdown code fences and cleans trailing commas.
-- **Prompt Learning Engine**: When coaches edit an AI program and provide a coaching rationale, Gemini 2 analyzes the diff and persists updated coach preferences to `coach_system_prompts`.
-- **Admin Review UI**: Clean workspace toggle in the Programs tab between Rules-based and ✨ AI Generator, complete with inline editing and approval workflows.
-- **Client & Console Diagnostics**: Detailed `console.group` logs in browser DevTools showing raw output quality and full request payloads.
-
-### 2. Auth & Identity
-- **Troy ID System**: Athletes sign in via `TROY-XXXXXXX` or email; derives internal `@troy.internal` accounts.
-- **Forced Password Reset**: Secure middleware forces first-time athletes to set a permanent password.
-- **Sign-Up Locked**: Public `/auth/sign-up` returns `notFound()`, ensuring accounts are exclusively admin-issued.
-
-### 3. Assigned Trainings & Runner
-- **Sequential Exercise Runner**: Step-by-step runner with numbered nav pills, exercise demo videos, and auto-advance.
-- **Per-Exercise Selfies**: Required upload before marking an exercise complete, stored in Supabase `session-selfies`.
-- **In-Session Pain Reporting**: Modal pain dialog recording location, severity (1-10 slider), and coach notes.
-- **Post-Session Summaries**: Captures RPE, muscle soreness, sleep quality, and qualitative feedback.
-
-### 4. Admin Operations & Roster
-- **Athletes Drawer**: Slide-out Sheet displaying stats, Troy ID credentials, selfie queues, feedback history, and controls.
-- **Batched URL Generation**: Optimized with `createSignedUrls` to avoid N+1 bottlenecks when loading selfie galleries.
-- **Session Assignment**: Assign sessions to whole teams or individual athletes with exercise load percentages.
-- **Feedback Tab**: Unified dashboard for athlete session summaries and red-badged pain reports.
-
----
-
-## 🛠️ Bugs Fixed & Prod Hardening Completed
-
-- [x] **Missing i18n Keys**: Added `profile`, `progress`, `saving`, `saved`, `weight`, `rpeTitle`, `attendance`, `startSession`, `confirmPassword` in EN & AR.
-- [x] **TypeScript Strict Typing**: Fixed dictionary typing with recursive `DeepString`, slider array types, and server action promise types. Zero errors on `npx tsc --noEmit`.
-- [x] **Production Bundle**: Clean `next build` pass across all 22 static and dynamic routes.
-- [x] **Admin Athlete Detail Preservation**: Fixed `/admin/athletes/[id]` form to preserve `full_name`.
-- [x] **N+1 CSV Importer Query**: Batched auth user list retrieval before loop execution.
-- [x] **Storage Purge on Deletion**: `permanentlyDeleteAthlete` sweeps files from `session-selfies` bucket.
-- [x] **UI Error & Loading Boundaries**: Added `error.tsx` and `loading.tsx` across root and `(athlete)` routes.
-- [x] **Action Hash Mismatch Handling**: Wrapped all client server action calls with recovery states and reload prompts.
-- [x] **Gated Console Logs**: Cleaned up dev-only console output for production readiness.
+### 4. Athlete-Side Adaptation
+- **Empty State on `/program`**: Friendly illustrated empty state when no monthly program is assigned, directing athletes to their daily dashboard.
+- **Exercise Recap Screen (`program-session-runner.tsx`)**:
+  - When enabled (`show_exercise_recap = true`), finishing all exercises displays the full overview: *"This is all the exercises you did today"*, listing sets, reps, load percentages, and completion checks.
+  - Athletes proceed from recap directly to the post-session feedback form.
+  - Completed sessions provide a *"View Today's Exercise Recap"* button to review anytime.
 
 ---
 
-## 📌 Prod-Readiness Checklist
+## 🛠️ Verification & Build Status
 
-- [x] Run SQL block in Supabase (tables, columns, policies, bucket) — **Done**
-- [x] Fix missing i18n dictionary keys in EN & AR — **Done**
-- [x] Fix `AthleteStats` "Assessed" counter (`=== "approved"`) — **Done**
-- [x] Strip/gate debug console logging — **Done**
-- [x] Block public `/auth/sign-up` — **Done**
-- [x] Purge storage bucket files on athlete deletion — **Done**
-- [x] Add graceful `error.tsx` and `loading.tsx` skeleton states — **Done**
-- [x] Fix CSV import N+1 user listing query — **Done**
-- [x] Fix athlete detail edit name erasure — **Done**
-- [x] Batch signed URL generation in admin page — **Done**
-- [x] Build and type verification passing (`tsc` & `next build`) — **Done**
-- [ ] Enable `pg_cron` in Supabase extensions and schedule the 7-day selfie cleanup function (optional housekeeping).
+- [x] `npx tsc --noEmit` = **0 errors (Clean pass)**
+- [x] `npx next build --webpack` = **Successful production build across all 22 static and dynamic routes**
+- [x] Database migrations fully executed
+- [x] Git repository synced with `main`
 
 ---
 
-## 🚀 Next Features & Roadmap
+## 🔮 Future Work & Backlog
 
-The remaining features from the product roadmap can be built in the following recommended order:
+### 1. Admin System & Settings Tab
+- **System Management Workspace**: Add a dedicated "Settings" tab in `/admin` so Coach Ahmed never needs to touch the codebase.
+- **Prompt Manager**: View active Gemini prompts, historical versions from `coach_system_prompts`, and manually adjust or rollback prompting instructions.
+- **Theme Customizer**: Global theme toggle and branding options (light mode, dark mode, club color accent palettes) applied across all athlete and admin portals.
 
-### 1. Performance Test RAG Coloring (Item 5)
-Color test results red/amber/green based on generic athletic population thresholds:
-- **FMS Total**: `< 14` (Red), `14–17` (Amber), `≥ 18` (Green)
-- **30m Sprint**: `> 5.0s` (Red), `4.5–5.0s` (Amber), `< 4.5s` (Green)
-- **Vertical Jump**: `< 30cm` (Red), `30–45cm` (Amber), `> 45cm` (Green)
-- **T-Test**: `> 11.5s` (Red), `10.5–11.5s` (Amber), `< 10.5s` (Green)
-- **Beep Test VO₂**: `< 40` (Red), `40–50` (Amber), `> 50` (Green)
-- *Locations*: Show color-coded pill tags in the Admin Athlete Drawer and the Athlete Progress dashboard.
+### 2. Bulk Athlete Import via Excel (.xlsx)
+- **File Reference**: Analyzed uploaded file `قياسات_اللعيبه_الغابه.xlsx` (27 columns).
+- **Structure**:
+  - Player name (اسم اللاعب)
+  - Club name (النادي: e.g. الطيران, الجيش, الغابة)
+  - Sport (اللعبة: يد / Handball)
+  - Position (المركز: GK, etc.)
+  - Age / Birth Year (السن او مواليد)
+  - FMS 7-test battery (Deep Squat, Hurdle Step, Inline Lunge, Shoulder Mobility, Active Straight-Leg Raise, Trunk Push-Up, Rotary Stability)
+  - Performance battery (Horizontal Jump, Vertical Jump, Anaerobic 20m, 505 Agility Test, T-Test, Row Machine, Push-ups, Pull-ups, Plank)
+- **Feasibility & Implementation Plan**:
+  - Use a client-side Excel reader (`xlsx` or lightweight OpenXML parser) to parse uploaded spreadsheets without server overhead.
+  - Automatically match club names to existing teams or create new teams on the fly.
+  - Missing fields will be gracefully defaulted to `"Not Set"` rather than blocking import.
+  - Provide Coach Ahmed with a downloadable template (`.xlsx`) matching the column headers for future club rosters.
 
-### 2. Program Page "No Program" Illustrated Empty State (Item 6)
-- Replace the minimal empty container on `/program` with an athlete-friendly illustrated state:
-  *"Your coach hasn't assigned a program yet — check back soon or message Coach Ahmed."*
-- Display athlete sport, position, and team banner.
+### 3. External Weight Sheet Integration
+- Athletes maintain separate weight record sheets.
+- Build an integration module that imports these historical lifting weights and pairs them with the session percentages (e.g. `70% of 120kg = 84kg`) for athletes who want exact kg guidance alongside percentage prescriptions.
 
-### 3. Excel Athlete Import with Club Matching (Item 7)
-- Support `.xlsx` athlete roster imports with column mapping (AR/EN names, club, sport, position, age/birth year, FMS scores 1-7, 1RM strength lifts).
-- Interactive club resolution step: match spreadsheet club names to existing teams, create new teams, or assign as unattached clients.
-- Automatic Epley 1RM conversion from entered weight + reps.
-
-### 4. Admin System Operations Tab (Item 10)
-- Add a 7th tab to `/admin`: **"System"**.
-- View current active system prompt and version history from `coach_system_prompts`.
-- Manual prompt editor with rollback capabilities.
-- Live event & error log viewer backed by `system_log`.
-
-### 5. Dynamic Assessment Schema Builder (Item 11)
-- Admin UI to customize athlete intake questions backed by `assessment_form_schema`.
-- Supports toggles, 0–3 FMS selectors, numeric ranges, and free text.
-- Versioned schema saves to prevent invalidating previous athlete records.
-
-### 6. Exercise Recap Screen (Item 12)
-- Post-session review screen showing exercises completed with prescribed sets, reps, and loads before the feedback form.
-- Accessible on-demand from the dashboard ("View recap").
-- Toggleable per athlete via `show_exercise_recap`.
+### 4. Supabase Edge Functions for Alerting
+- Implement a lightweight Supabase Edge Function triggered by `system_log` inserts for errors.
+- Dispatches instant email notifications to Coach Ahmed or the tech lead when Gemini API quotas or demand spikes occur.

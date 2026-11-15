@@ -7,6 +7,7 @@
  */
 
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no I, O, 0, 1 — avoids confusion
+const TROY_ID_PATTERN = /^TROY-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}$/i
 
 export function generateTroyId(): string {
   let id = "TROY-"
@@ -26,12 +27,12 @@ export function generateTroyId(): string {
  * e.g. "TROY-A3X9K2M" → "troy-a3x9k2m@troy.internal"
  */
 export function troyIdToEmail(troyId: string): string {
-  return `${troyId.toLowerCase()}@troy.internal`
+  return `${troyId.trim().toLowerCase()}@troy.internal`
 }
 
 /**
  * Returns true if the given string looks like a Troy ID (TROY-XXXXXXX)
  */
 export function isTroyId(value: string): boolean {
-  return /^TROY-[A-Z0-9]{7}$/i.test(value.trim())
+  return typeof value === "string" && TROY_ID_PATTERN.test(value.trim())
 }

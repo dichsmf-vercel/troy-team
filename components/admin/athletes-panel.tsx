@@ -1,7 +1,7 @@
-﻿"use client"
+"use client"
 
 import { useMemo, useState } from "react"
-import { Search, UserRound } from "lucide-react"
+import { Search, UserRound, Filter, SlidersHorizontal, AlertTriangle, Camera } from "lucide-react"
 import { importAthletesCsv } from "@/app/admin/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,8 @@ type AthletePanelProps = {
   feedbackPainReports?: AthleteExercisePain[]
 }
 
+type FilterStatus = "all" | "active" | "paused" | "pain" | "selfies"
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 export function AthletesPanel({
@@ -28,6 +30,7 @@ export function AthletesPanel({
   feedbackPainReports = [],
 }: AthletePanelProps) {
   const [query, setQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>("all")
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null)
@@ -55,86 +58,160 @@ export function AthletesPanel({
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
-    if (!term) return athletes
     return athletes.filter((athlete) => {
       const name = athlete.profiles?.full_name ?? athlete.full_name ?? ""
       const troyId = athlete.profiles?.troy_id ?? ""
       const email = athlete.auth_email ?? ""
-      return `${name} ${troyId} ${email}`.toLowerCase().includes(term)
+      const sport = athlete.sport ?? ""
+      const matchesSearch = !term || `${name} ${troyId} ${email} ${sport}`.toLowerCase().includes(term)
+      if (!matchesSearch) return false
+
+      if (statusFilter === "active") return athlete.account_status !== "paused"
+      if (statusFilter === "paused") return athlete.account_status === "paused"
+      if (statusFilter === "pain") return (painCountById[athlete.id] ?? 0) > 0
+      if (statusFilter === "selfies") return (selfieCountById[athlete.id] ?? 0) > 0
+
+      return true
     })
-  }, [athletes, query])
+  }, [athletes, query, statusFilter, painCountById, selfieCountById])
 
   function openAthlete(athlete: any) {
     setSelectedAthlete(athlete)
     setDrawerOpen(true)
   }
 
+  const pausedCount = athletes.filter((a) => a.account_status === "paused").length
+  const totalPainAthletes = athletes.filter((a) => (painCountById[a.id] ?? 0) > 0).length
+  const totalSelfieAthletes = athletes.filter((a) => (selfieCountById[a.id] ?? 0) > 0).length
+
   return (
-    <div className="grid gap-6">
-      {/* Search + import */}
+    <div className="grid gap-5">
+      {/* Search + import bar */}
       <Card>
-        <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Athletes</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster. Click any row to open their full profile.
-            </p>
-          </div>
-          <form
-            onSubmit={async (event) => {
-              event.preventDefault()
-              setImporting(true)
-              setImportMessage(null)
-              console.log("[Athletes-Panel] Starting CSV athlete import")
-              try {
-                const result = await importAthletesCsv(new FormData(event.currentTarget))
-                console.log("[Athletes-Panel] CSV import result:", result)
-                setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`)
-              } catch (err: any) {
-                console.error("[Athletes-Panel] CSV import error:", err)
-                if (err?.message?.includes("Server Action") || String(err).includes("UnrecognizedActionError")) {
-                  setImportMessage("App was recently updated. Please refresh the page (Ctrl + F5).")
-                } else {
-                  setImportMessage(err?.message ?? "An error occurred during CSV import.")
+        <CardHeader className="gap-4 p-4 sm:p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-xl">Athlete Roster</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Manage profiles, assessments, training schedules, and direct credentials.
+              </p>
+            </div>
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault()
+                setImporting(true)
+                setImportMessage(null)
+                console.log("[Athletes-Panel] Starting CSV athlete import")
+                try {
+                  const result = await importAthletesCsv(new FormData(event.currentTarget))
+                  setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`)
+                } catch (err: any) {
+                  if (err?.message?.includes("Server Action") || String(err).includes("UnrecognizedActionError")) {
+                    setImportMessage("App was recently updated. Please refresh the page (Ctrl + F5).")
+                  } else {
+                    setImportMessage(err?.message ?? "An error occurred during CSV import.")
+                  }
+                } finally {
+                  setImporting(false)
                 }
-              } finally {
-                setImporting(false)
-              }
-            }}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <Input type="file" name="file" accept=".csv,text/csv" className="max-w-xs" />
-            <Button type="submit" variant="outline" disabled={importing}>
-              {importing ? "Importing…" : "Import CSV"}
-            </Button>
-          </form>
+              }}
+              className="flex flex-wrap items-center gap-2"
+            >
+              <Input type="file" name="file" accept=".csv,text/csv" className="h-8 text-xs max-w-xs" />
+              <Button type="submit" variant="outline" size="sm" disabled={importing} className="h-8 text-xs">
+                {importing ? "Importing…" : "Import CSV"}
+              </Button>
+            </form>
+          </div>
+
           {importMessage && (
-            <p role="status" className="text-xs text-muted-foreground">
+            <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
               {importMessage}
             </p>
           )}
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
-            <Input
-              aria-label="Search athletes"
-              placeholder="Search name, Troy ID…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="pl-9"
-            />
+
+          {/* Search and filters */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
+              <Input
+                aria-label="Search athletes"
+                placeholder="Search name, Troy ID, sport…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("all")}
+                className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                  statusFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                All ({athletes.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("active")}
+                className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                  statusFilter === "active" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                Active ({athletes.length - pausedCount})
+              </button>
+              {pausedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("paused")}
+                  className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                    statusFilter === "paused" ? "bg-amber-600 text-white" : "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20"
+                  }`}
+                >
+                  Paused ({pausedCount})
+                </button>
+              )}
+              {totalPainAthletes > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("pain")}
+                  className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                    statusFilter === "pain" ? "bg-red-600 text-white" : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
+                  }`}
+                >
+                  Pain reports ({totalPainAthletes})
+                </button>
+              )}
+              {totalSelfieAthletes > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("selfies")}
+                  className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                    statusFilter === "selfies" ? "bg-violet-600 text-white" : "bg-violet-500/10 text-violet-700 hover:bg-violet-500/20"
+                  }`}
+                >
+                  Selfies ({totalSelfieAthletes})
+                </button>
+              )}
+            </div>
           </div>
         </CardHeader>
       </Card>
 
       {/* Roster list */}
       <section aria-label="Athlete roster">
-        <div className="divide-y rounded-xl border overflow-hidden">
+        <div className="divide-y rounded-xl border bg-card overflow-hidden">
           {filtered.map((athlete) => {
             const profile = athlete.profiles ?? {}
             const name = profile.full_name ?? athlete.full_name ?? "Unnamed athlete"
+            const nameAr = profile.full_name_ar ?? null
             const troyId = profile.troy_id ?? null
             const team = athlete.athlete_teams?.[0]?.teams
             const isPaused = athlete.account_status === "paused"
+            const isAssignedOnly = athlete.goals?.includes("Assigned exercises only")
             const selfieCount = selfieCountById[athlete.id] ?? 0
             const painCount = painCountById[athlete.id] ?? 0
 
@@ -143,47 +220,57 @@ export function AthletesPanel({
                 key={athlete.id}
                 type="button"
                 onClick={() => openAthlete(athlete)}
-                className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                className="flex w-full flex-col gap-2 p-4 text-left transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={`Open profile for ${name}`}
               >
-                {/* Avatar */}
-                <div className="grid size-9 shrink-0 place-items-center rounded-full bg-accent/15 text-accent">
-                  {team?.image_url ? (
-                    <img src={team.image_url} alt="" className="size-9 rounded-full object-cover" />
-                  ) : (
-                    <UserRound className="size-4.5" />
-                  )}
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Avatar */}
+                  <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary font-bold">
+                    {team?.image_url ? (
+                      <img src={team.image_url} alt="" className="size-10 rounded-full object-cover" />
+                    ) : (
+                      <UserRound className="size-5" />
+                    )}
+                  </div>
+
+                  {/* Name + id */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {name} {nameAr ? <span className="text-xs text-muted-foreground font-normal">({nameAr})</span> : null}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      <span className="font-mono text-primary font-medium">{troyId ?? athlete.auth_email ?? "—"}</span>
+                      {team?.name_en ? ` · ${team.name_en}` : ""}
+                      {athlete.sport ? ` · ${String(athlete.sport).toUpperCase()}` : ""}
+                      {athlete.position ? ` (${athlete.position})` : ""}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Name + id */}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {troyId ?? athlete.auth_email ?? "—"}
-                    {team?.name_en ? ` · ${team.name_en}` : ""}
-                    {athlete.sport ? ` · ${athlete.sport}` : ""}
-                  </p>
-                </div>
-
-                {/* Badges */}
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                {/* Badges row */}
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-13 sm:pl-0 sm:justify-end">
                   {isPaused && (
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 text-xs">
+                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 text-[10px]">
                       Paused
                     </Badge>
                   )}
+                  {isAssignedOnly && (
+                    <Badge variant="secondary" className="text-[10px] text-muted-foreground">
+                      Assigned Only
+                    </Badge>
+                  )}
                   {selfieCount > 0 && (
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 text-xs">
-                      {selfieCount} selfie{selfieCount === 1 ? "" : "s"}
+                    <Badge variant="secondary" className="bg-violet-500/10 text-violet-700 text-[10px]">
+                      <Camera className="mr-1 size-3" /> {selfieCount}
                     </Badge>
                   )}
                   {painCount > 0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      {painCount} pain
+                    <Badge variant="destructive" className="text-[10px]">
+                      <AlertTriangle className="mr-1 size-3" /> {painCount} pain
                     </Badge>
                   )}
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {athlete.assessment_status?.replaceAll("_", " ") ?? "not started"}
+                  <Badge variant="outline" className="text-[10px] capitalize">
+                    {athlete.assessment_status?.replaceAll("_", " ") ?? "Draft"}
                   </Badge>
                 </div>
               </button>
@@ -191,8 +278,8 @@ export function AthletesPanel({
           })}
 
           {!filtered.length && (
-            <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No athletes match this search.
+            <div className="rounded-xl p-8 text-center text-sm text-muted-foreground">
+              No athletes match this search or filter.
             </div>
           )}
         </div>
@@ -213,7 +300,6 @@ export function AthletesPanel({
   )
 }
 
-// ─── stats row ────────────────────────────────────────────────────────────────
 
 export function AthleteStats({ athletes }: { athletes: any[] }) {
   const assessed = athletes.filter((a) => a.assessment_status === "approved").length

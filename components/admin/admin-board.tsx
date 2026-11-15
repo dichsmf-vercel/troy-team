@@ -11,7 +11,7 @@ import { SessionPanel } from "@/components/admin/session-panel"
 import { RulesPanel } from "@/components/admin/rules-panel"
 import { createExercise, createTeam, updateExerciseVideo } from "@/app/admin/actions"
 import { ProgramGenerator } from "@/components/admin/program-generator"
-import { AthletesPanel } from "@/components/admin/athletes-panel"
+import { AthletesPanel, AthleteStats } from "@/components/admin/athletes-panel"
 import { AthleteCreateForm } from "@/components/admin/athlete-create-form"
 import { ProgramReviewPanel } from "@/components/admin/program-review-panel"
 import { AIProgramGenerator } from "@/components/admin/ai-program-generator"
@@ -81,7 +81,23 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
 
 function AthletesWorkspace({ teams, athletes, selfies, feedbackSummaries, feedbackPainReports }: { teams: any[]; athletes: any[]; selfies: any[]; feedbackSummaries: any[]; feedbackPainReports: any[] }) {
   const [showCreate, setShowCreate] = useState(false)
-  return <div className="grid gap-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold tracking-tight">Athletes</h2><p className="text-sm text-muted-foreground">{athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster</p></div><Button type="button" onClick={() => setShowCreate((value) => !value)}><Plus className="mr-2 size-4" />{showCreate ? "Close form" : "Create athlete"}</Button></div>{showCreate ? <AthleteCreateForm teams={teams} /> : null}<TeamManagementForm /><AthletesPanel athletes={athletes} selfies={selfies} feedbackSummaries={feedbackSummaries} feedbackPainReports={feedbackPainReports} /></div>
+  return (
+    <div className="grid gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Athletes</h2>
+          <p className="text-sm text-muted-foreground">{athletes.length} athlete{athletes.length === 1 ? "" : "s"} in your roster</p>
+        </div>
+        <Button type="button" onClick={() => setShowCreate((value) => !value)}>
+          <Plus className="mr-2 size-4" />{showCreate ? "Close form" : "Create athlete"}
+        </Button>
+      </div>
+      <AthleteStats athletes={athletes} />
+      {showCreate ? <AthleteCreateForm teams={teams} /> : null}
+      <TeamManagementForm />
+      <AthletesPanel athletes={athletes} selfies={selfies} feedbackSummaries={feedbackSummaries} feedbackPainReports={feedbackPainReports} />
+    </div>
+  )
 }
 
 function TeamManagementForm() {

@@ -1,3 +1,4 @@
+import type { GeminiProgramOutput } from "@/lib/gemini"
 "use server"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
@@ -61,6 +62,14 @@ export async function createAthleteAccount(form: FormData) {
   })
   if (profileError) return { error: profileError.message }
 
+  const freeDays = form
+    .getAll("free_training_days")
+    .map((d) => Number(d))
+    .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+  const showRecap = form.get("show_exercise_recap") !== "false"
+  const hasProgram = form.get("has_program") !== "false"
+  const athleteGoals = hasProgram ? (String(form.get("goals") || "").trim() || "Standard Program") : "Assigned exercises only (No monthly program assigned)"
+
   const { error: athleteError } = await service.from("athletes").upsert({
     id,
     phone: String(form.get("phone") || "").trim() || null,
@@ -71,8 +80,9 @@ export async function createAthleteAccount(form: FormData) {
     sport: String(form.get("sport") || "").trim() || null,
     position: String(form.get("position") || "").trim() || null,
     birth_year: number("birth_year"),
-    free_training_days: [],
-    show_exercise_recap: true,
+    free_training_days: freeDays,
+    show_exercise_recap: showRecap,
+    goals: athleteGoals,
   })
   if (athleteError) return { error: athleteError.message }
 
@@ -177,6 +187,8 @@ export async function updateAthleteSettings(form: FormData) {
     .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
 
   const showRecap = form.get("show_exercise_recap") === "true"
+  const hasProgram = form.get("has_program") === "true"
+  const athleteGoals = hasProgram ? "Standard Program" : "Assigned exercises only (No monthly program assigned)"
   const sport = String(form.get("sport") || "").trim() || null
   const position = String(form.get("position") || "").trim() || null
   const birthYearRaw = Number(form.get("birth_year"))
@@ -185,7 +197,7 @@ export async function updateAthleteSettings(form: FormData) {
   const service = createServiceClient()
   const { error } = await service
     .from("athletes")
-    .update({ free_training_days: freeDays, show_exercise_recap: showRecap, sport, position, birth_year: birthYear })
+    .update({ free_training_days: freeDays, show_exercise_recap: showRecap, sport, position, birth_year: birthYear, goals: athleteGoals })
     .eq("id", athleteId)
   if (error) return { error: error.message }
   revalidatePath("/admin")
@@ -402,4 +414,57 @@ export async function saveAdminEditsAndLearn(input: {
 
   revalidatePath("/admin")
   return { error: null, summary: learnResult.summary }
+}
+
+
+export async function generateLegacyFallbackProgram(input: {
+  athleteId: string
+  startDate: string
+  time: string
+  weekdays: number[]
+}) {
+  const supabase = await createClient()
+  const { data: { user: admin } } = await supabase.auth.getUser()
+  if (!admin) return { error: "Unauthorized" }
+
+  const service = createServiceClient()
+  const [{ data: exercises }, { data: athlete }] = await Promise.all([
+    service.from("exercises").select("*"),
+    service.from("athletes").select("*, profiles(*)").eq("id", input.athleteId).maybeSingle(),
+  ])
+
+  if (!exercises?.length) return { error: "No exercises available in catalog." }
+
+  const { generateFourWeekProgram } = await import("@/lib/program-engine")
+  const sessions = generateFourWeekProgram({
+    startDate: input.startDate,
+    time: input.time,
+    weekdays: input.weekdays,
+    exercises: exercises ?? [],
+    birthYear: athlete?.birth_year,
+    sport: athlete?.sport,
+  })
+
+  const converted: GeminiProgramOutput = {
+    goal: "Rules-based periodized training plan",
+    rationale: `Rules-based program generated using Coach Ahmed's structured progression (${sessions[0]?.seasonPeriod ?? "Standard Periodization"}).`,
+    warnings: athlete?.injury_notes ? [athlete.injury_notes] : [],
+    sessions: sessions.map((s) => ({
+      week: s.week,
+      date: s.date,
+      time: s.time,
+      exercises: s.exercises.map((e) => ({
+        id: e.id,
+        name_en: e.name_en,
+        section: e.section,
+        sets: e.sets,
+        reps: e.reps,
+        load_percentage: e.loadPercentage,
+        tempo: "2-0-2-0",
+        notes: "Controlled tempo, steady breathing",
+      })),
+    })),
+  }
+
+  return { data: converted, error: null }
 }
