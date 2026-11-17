@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { firstRelation } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getLanguage } from "@/lib/i18n/get-language"
@@ -44,7 +45,7 @@ export default async function SessionPage({
     .select("id, exercise_id, exercise_order, sets, reps, exercises(id, name_en, name_ar, description_en, description_ar, image_url, video_youtube_url)")
     .eq("session_post_id", sessionPostId)
     .order("exercise_order", { ascending: true })
-  const resolvedExercises = (exercises ?? []).filter((row: any) => Boolean(row.exercises?.id))
+  const resolvedExercises = (exercises ?? []).filter((row) => Boolean(firstRelation(row.exercises)?.id))
   // [assigned-session-debug] exercise resolution logs commented out for production
   if (exercisesError) {
     // log silently to server stderr in production
@@ -70,7 +71,7 @@ export default async function SessionPage({
       isNationalTeam={team?.is_national_team ?? false}
       sessionDate={post.session_date}
       period={post.start_time ? String(post.start_time).slice(0, 5) : "00:00"}
-      exercises={(exercises ?? []).flatMap((se: any) => {
+      exercises={(exercises ?? []).flatMap((se) => {
         const related = Array.isArray(se.exercises) ? se.exercises[0] : se.exercises
         if (!related?.id) return []
         return [{

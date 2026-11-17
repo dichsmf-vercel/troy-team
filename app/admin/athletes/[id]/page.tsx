@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { updateAthleteAccount } from "@/app/admin/actions"
+import { updateAthleteAccount } from "@/app/admin/actions/athletes"
 
 export default async function AdminAthleteDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

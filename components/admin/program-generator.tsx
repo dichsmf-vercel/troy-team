@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { generateFourWeekProgram, monthLabel, weekdayLabel } from "@/lib/program-engine"
-import { saveGeneratedProgram } from "@/app/admin/actions"
+import { saveGeneratedProgram } from "@/app/admin/actions/programs"
+import type { AdminAthlete, AdminExercise, AdminRule } from "@/lib/admin/types"
+import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
 
@@ -17,9 +19,9 @@ export function ProgramGenerator({
   exercises,
   rules,
 }: {
-  athletes: any[]
-  exercises: any[]
-  rules: any[]
+  athletes: AdminAthlete[]
+  exercises: AdminExercise[]
+  rules: AdminRule[]
 }) {
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
@@ -33,14 +35,14 @@ export function ProgramGenerator({
 
   const ruleFilteredExercises = useMemo(() => {
     const values = Object.fromEntries(
-      (selectedAthlete?.assessment_answers ?? []).map((answer: any) => [
+      (selectedAthlete?.assessment_answers ?? []).map((answer) => [
         answer.question_key,
         answer.answer_json?.value,
       ])
     )
-    const matches = (rule: any) => {
+    const matches = (rule: AdminRule) => {
       const condition = rule.condition_json ?? {}
-      const raw = values[condition.metric]
+      const raw = condition.metric ? values[condition.metric] : undefined
       const actual = Number(raw)
       const threshold = Number(condition.threshold)
       if (!Number.isFinite(actual) || !Number.isFinite(threshold)) return true
@@ -59,11 +61,11 @@ export function ProgramGenerator({
       .filter((rule) => String(rule.action_json?.action).toUpperCase() === "ADD")
       .map((rule) => String(rule.action_json?.exercise_id ?? ""))
     const allowed = exercises.filter(
-      (exercise) => !removals.includes(exercise.id) && !removals.includes(exercise.exercise_code)
+      (exercise) => !removals.includes(exercise.id) && !removals.includes(exercise.exercise_code ?? "")
     )
     const added = exercises.filter(
       (exercise) =>
-        additions.includes(exercise.id) || additions.includes(exercise.exercise_code)
+        additions.includes(exercise.id) || additions.includes(exercise.exercise_code ?? "")
     )
     return [...new Map([...added, ...allowed].map((exercise) => [exercise.id, exercise])).values()]
   }, [exercises, rules, selectedAthlete])
@@ -154,14 +156,6 @@ export function ProgramGenerator({
               type="button"
               disabled={!athleteId || !days.length}
               onClick={() => {
-                console.log("[Rules-Program-Generator] Preview requested", {
-                  athleteId,
-                  startDate,
-                  time,
-                  weekdays: days,
-                  birthYear: selectedAthlete?.birth_year,
-                  sport: selectedAthlete?.sport,
-                })
                 const nextGenerated = generateFourWeekProgram({
                   startDate,
                   time,
@@ -170,7 +164,6 @@ export function ProgramGenerator({
                   birthYear: selectedAthlete?.birth_year,
                   sport: selectedAthlete?.sport,
                 })
-                console.log("[Rules-Program-Generator] Engine output sessions:", nextGenerated.length)
                 setSaveState(null)
                 setGenerated(nextGenerated)
               }}
@@ -182,7 +175,6 @@ export function ProgramGenerator({
                 type="button"
                 variant="secondary"
                 onClick={async () => {
-                  console.log("[Rules-Program-Generator] Save requested", { athleteId, startDate })
                   setSaveState("Saving...")
                   try {
                     const result = await saveGeneratedProgram({
@@ -192,17 +184,16 @@ export function ProgramGenerator({
                       weekdays: days,
                       sessions: generated,
                     })
-                    console.log("[Rules-Program-Generator] Save response:", result)
                     setSaveState(result.error ?? "Saved for admin review")
-                  } catch (err: any) {
+                  } catch (err) {
                     console.error("[Rules-Program-Generator] Save error:", err)
                     if (
-                      err?.message?.includes("Server Action") ||
+                      isStaleActionError(err) ||
                       String(err).includes("UnrecognizedActionError")
                     ) {
                       setSaveState("App was recently updated. Please refresh the page (Ctrl+F5).")
                     } else {
-                      setSaveState(err?.message ?? "Failed to save program.")
+                      setSaveState(actionErrorMessage(err, "Failed to save program."))
                     }
                   }
                 }}

@@ -343,150 +343,100 @@ function findRowMachineColumn(row: unknown[]): number | null {
   return index < 0 ? null : index
 }
 
+// ─── Import template ──────────────────────────────────────────────────────────
+
+export type ImportColumn = {
+  /** Arabic label shown first in the header. */
+  ar: string
+  /** English label (also what the parser looks for when detecting the template). */
+  en: string
+  required?: boolean
+  /** Short explanation for Coach Ahmed. */
+  hint: string
+  hintAr: string
+  example1: string | number
+  example2: string | number
+  width: number
+}
+
 /**
- * Generates a clean Excel workbook template matching the import columns
- * with bilingual headers and sample rows for Coach Ahmed to distribute.
+ * Single source of truth for the template: the download, the preview table in the import
+ * dialog, and the parser's column order (parseAthletesFromExcel, standard format) all follow it.
+ * Do not reorder without updating the parser.
+ */
+export const IMPORT_COLUMNS: ImportColumn[] = [
+  { ar: "اسم اللاعب", en: "Full Name", required: true, hint: "Player's full name (Arabic or English). The only required column.", hintAr: "الاسم الكامل للاعب. العمود الوحيد المطلوب.", example1: "محمد احمد", example2: "يوسف مصطفى", width: 28 },
+  { ar: "النادي", en: "Club", hint: "Club / team name. A team is created automatically if it does not exist.", hintAr: "اسم النادي. يتم إنشاء الفريق تلقائياً إذا لم يكن موجوداً.", example1: "الطيران", example2: "الجيش", width: 16 },
+  { ar: "اللعبة", en: "Sport (e.g. يد, قدم, سلة, فولي, هوكي)", hint: "Handball, football, basketball, volleyball, hockey…", hintAr: "يد، قدم، سلة، فولي، هوكي…", example1: "يد", example2: "يد", width: 16 },
+  { ar: "المركز", en: "Position (e.g. GK, RB, Pivot)", hint: "Playing position.", hintAr: "مركز اللعب.", example1: "GK", example2: "RB", width: 16 },
+  { ar: "السن او مواليد", en: "Birth Year (e.g. 2010)", hint: "Birth year (2012) or age (14). Used to avoid duplicate athletes.", hintAr: "سنة الميلاد (2012) أو السن (14).", example1: 2012, example2: 2011, width: 14 },
+  { ar: "Deep Squat", en: "Deep Squat (0–3)", hint: "FMS score, whole number 0–3.", hintAr: "درجة FMS من 0 إلى 3.", example1: 2, example2: 3, width: 18 },
+  { ar: "Hurdle Step", en: "Hurdle Step (0–3)", hint: "FMS score 0–3.", hintAr: "درجة FMS من 0 إلى 3.", example1: 2, example2: 2, width: 18 },
+  { ar: "Inline Lunge", en: "Inline Lunge (0–3)", hint: "FMS score 0–3.", hintAr: "درجة FMS من 0 إلى 3.", example1: 2, example2: 2, width: 18 },
+  { ar: "Shoulder Mobility", en: "Shoulder Mobility (0–3)", hint: "FMS score 0–3.", hintAr: "درجة FMS من 0 إلى 3.", example1: 2, example2: 3, width: 22 },
+  { ar: "Active Straight-Leg Raise", en: "Active Straight-Leg Raise (0–3)", hint: "FMS score 0–3.", hintAr: "درجة FMS من 0 إلى 3.", example1: 2, example2: 2, width: 26 },
+  { ar: "Trunk Stability Push-Up", en: "Trunk Stability Push-Up (0–3)", hint: "FMS score 0–3.", hintAr: "درجة FMS من 0 إلى 3.", example1: 2, example2: 2, width: 26 },
+  { ar: "Rotary Stability", en: "Rotary Stability (0–3)", hint: "FMS score 0–3.", hintAr: "درجة FMS من 0 إلى 3.", example1: 2, example2: 2, width: 22 },
+  { ar: "الوثب العمودي", en: "Vertical Jump cm (e.g. 35 or 229-35)", hint: "Centimetres. “229-35” (reach-jump) is read as 35.", hintAr: "بالسنتيمتر. الصيغة 229-35 تُقرأ 35.", example1: 30, example2: 27, width: 24 },
+  { ar: "العدو", en: "Sprint 30m / 20m sec (e.g. 4.12)", hint: "Seconds.", hintAr: "بالثواني.", example1: 4.1, example2: 4.4, width: 22 },
+  { ar: "T-Test", en: "T-Test sec (e.g. 11.20)", hint: "Seconds.", hintAr: "بالثواني.", example1: 11.37, example2: 13.15, width: 18 },
+  { ar: "Beep Test", en: "Beep Test Level (e.g. 8.5)", hint: "Level reached.", hintAr: "المستوى الذي وصل إليه اللاعب.", example1: 8, example2: 7, width: 18 },
+  { ar: "الضغط", en: "Push Ups count", hint: "Repetitions.", hintAr: "عدد التكرارات.", example1: 15, example2: 10, width: 16 },
+  { ar: "العقلة", en: "Pull Ups count", hint: "Repetitions.", hintAr: "عدد التكرارات.", example1: 5, example2: 3, width: 16 },
+  { ar: "البلانك", en: "Plank Hold sec", hint: "Seconds.", hintAr: "بالثواني.", example1: 60, example2: 45, width: 16 },
+  { ar: "505 يمين", en: "505 Agility R sec", hint: "Seconds, right leg.", hintAr: "بالثواني، الرجل اليمنى.", example1: 3.47, example2: 3.9, width: 18 },
+  { ar: "505 شمال", en: "505 Agility L sec", hint: "Seconds, left leg.", hintAr: "بالثواني، الرجل اليسرى.", example1: 3.5, example2: 3.5, width: 18 },
+  { ar: "تاريخ القياس", en: "Assessment Date (YYYY-MM-DD)", hint: "Date of the measurements, e.g. 2026-01-15 (or a normal Excel date).", hintAr: "تاريخ القياسات مثل 2026-01-15.", example1: "2026-01-15", example2: "2026-01-15", width: 22 },
+  { ar: "الوثب الأفقي", en: "Horizontal Jump cm", hint: "Centimetres.", hintAr: "بالسنتيمتر.", example1: 180, example2: 175, width: 20 },
+  { ar: "التجديف", en: "Row Machine Result", hint: "Result on the rowing machine.", hintAr: "نتيجة جهاز التجديف.", example1: "", example2: "", width: 20 },
+]
+
+export function importTemplateHeaders(): string[] {
+  return IMPORT_COLUMNS.map((column) => `${column.ar} / ${column.en}${column.required ? " *" : ""}`)
+}
+
+/** Rows of the first sheet. `withExamples` is only used for the "Example" sheet and tests. */
+export function buildTemplateSheetRows(withExamples: boolean): (string | number)[][] {
+  const rows: (string | number)[][] = [importTemplateHeaders()]
+  if (withExamples) {
+    rows.push(IMPORT_COLUMNS.map((column) => column.example1), IMPORT_COLUMNS.map((column) => column.example2))
+    // A row with only a name shows that every other column is optional.
+    rows.push(IMPORT_COLUMNS.map((column, index) => (index === 0 ? "احمد هاني" : index === 1 ? "الشمس" : index === 4 ? 2013 : "")))
+  }
+  return rows
+}
+
+/**
+ * Builds the workbook Coach Ahmed downloads:
+ *   1. "Athletes"     — header row only. FILL THIS SHEET (it is the one that gets imported)
+ *   2. "Example"      — the same columns with three example players
+ *   3. "Instructions" — bilingual explanation of every column
  */
 export function generateAthleteImportTemplate(): ArrayBuffer {
-  const headers = [
-    "اسم اللاعب / Full Name *",
-    "النادي / Club",
-    "اللعبة / Sport (e.g. يد, قدم, سلة, فولي, هوكي)",
-    "المركز / Position (e.g. GK, RB, Pivot)",
-    "السن او مواليد / Birth Year (e.g. 2010)",
-    "Deep Squat (0–3)",
-    "Hurdle Step (0–3)",
-    "Inline Lunge (0–3)",
-    "Shoulder Mobility (0–3)",
-    "Active Straight-Leg Raise (0–3)",
-    "Trunk Stability Push-Up (0–3)",
-    "Rotary Stability (0–3)",
-    "Vertical Jump cm (e.g. 35 or 229-35)",
-    "Sprint 30m / 20m sec (e.g. 4.12)",
-    "T-Test sec (e.g. 11.20)",
-    "Beep Test Level (e.g. 8.5)",
-    "Push Ups count",
-    "Pull Ups count",
-    "Plank Hold sec",
-    "505 Agility R sec",
-    "505 Agility L sec",
-    "Assessment Date (YYYY-MM-DD)",
-    "Horizontal Jump cm",
-    "Row Machine Result",
-  ]
-
-  const sampleRow1 = [
-    "محمد احمد",
-    "الطيران",
-    "يد",
-    "GK",
-    2012,
-    2,
-    2,
-    2,
-    2,
-    2,
-    2,
-    2,
-    30,
-    4.10,
-    11.37,
-    8,
-    15,
-    5,
-    60,
-    3.47,
-    3.50,
-    "2026-01-15",
-    180,
-    "",
-  ]
-
-  const sampleRow2 = [
-    "يوسف مصطفى",
-    "الجيش",
-    "يد",
-    "RB",
-    2011,
-    3,
-    2,
-    2,
-    3,
-    2,
-    2,
-    2,
-    27,
-    4.40,
-    13.15,
-    7,
-    10,
-    3,
-    45,
-    3.90,
-    3.50,
-    "2026-01-15",
-    175,
-    "",
-  ]
-
-  const sampleRow3 = [
-    "احمد هاني (Missing fields default to Not Set)",
-    "الشمس",
-    "يد",
-    "",
-    2013,
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]
-
-  const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow1, sampleRow2, sampleRow3])
-
-  // Set column widths
-  ws["!cols"] = [
-    { wch: 28 }, // Name
-    { wch: 16 }, // Club
-    { wch: 16 }, // Sport
-    { wch: 16 }, // Position
-    { wch: 14 }, // Birth Year
-    { wch: 18 }, // Deep Squat
-    { wch: 18 }, // Hurdle Step
-    { wch: 18 }, // Inline Lunge
-    { wch: 22 }, // Shoulder Mobility
-    { wch: 26 }, // Leg Raise
-    { wch: 26 }, // Trunk Stability
-    { wch: 22 }, // Rotary Stability
-    { wch: 24 }, // V Jump
-    { wch: 22 }, // Sprint
-    { wch: 18 }, // T-Test
-    { wch: 18 }, // Beep Level
-    { wch: 16 }, // Push Ups
-    { wch: 16 }, // Pull Ups
-    { wch: 16 }, // Plank
-    { wch: 18 }, // Agility R
-    { wch: 18 }, // Agility L
-    { wch: 22 }, // Assessment date
-    { wch: 20 }, // Horizontal jump
-    { wch: 20 }, // Row machine
-  ]
-
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, "Athletes Roster Template")
+
+  const athletes = XLSX.utils.aoa_to_sheet(buildTemplateSheetRows(false))
+  athletes["!cols"] = IMPORT_COLUMNS.map((column) => ({ wch: column.width }))
+  XLSX.utils.book_append_sheet(wb, athletes, "Athletes")
+
+  const example = XLSX.utils.aoa_to_sheet(buildTemplateSheetRows(true))
+  example["!cols"] = IMPORT_COLUMNS.map((column) => ({ wch: column.width }))
+  XLSX.utils.book_append_sheet(wb, example, "Example")
+
+  const instructions = XLSX.utils.aoa_to_sheet([
+    ["Troy Team — athlete roster import / استيراد قائمة اللاعبين"],
+    [],
+    ["1. Fill the first sheet (“Athletes”), one player per row, starting under the header. / املأ الورقة الأولى (Athletes)، لاعب في كل صف."],
+    ["2. Only the name is required. Empty cells become “Not Set”. / الاسم فقط مطلوب، والخلايا الفارغة تُترك غير محددة."],
+    ["3. Do not rename, move or delete the header row. / لا تغيّر صف العناوين."],
+    ["4. Players who already exist (same name and birth year) are skipped. / اللاعبون الموجودون مسبقاً يتم تخطيهم."],
+    ["5. After the import you get a Troy ID and a temporary password for each player. Save them! / ستحصل على رقم Troy وكلمة مرور مؤقتة لكل لاعب، احفظها."],
+    [],
+    ["Column / العمود", "Required / مطلوب", "What to enter", "ماذا تكتب"],
+    ...IMPORT_COLUMNS.map((column) => [`${column.ar} / ${column.en}`, column.required ? "Yes / نعم" : "No / لا", column.hint, column.hintAr]),
+  ])
+  instructions["!cols"] = [{ wch: 52 }, { wch: 16 }, { wch: 70 }, { wch: 46 }]
+  XLSX.utils.book_append_sheet(wb, instructions, "Instructions")
 
   return XLSX.write(wb, { type: "array", bookType: "xlsx" })
 }

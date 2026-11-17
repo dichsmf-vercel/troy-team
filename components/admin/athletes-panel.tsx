@@ -1,21 +1,24 @@
 "use client"
 
+import { firstRelation } from "@/lib/utils"
 import { useMemo, useState } from "react"
 import { Search, UserRound, Filter, SlidersHorizontal, AlertTriangle, Camera } from "lucide-react"
-import { importAthletesCsv } from "@/app/admin/actions"
+import { importAthletesCsv } from "@/app/admin/actions/imports"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ExcelAthleteImport } from "@/components/admin/excel-athlete-import"
 import { AthleteDrawer } from "@/components/admin/athlete-drawer"
+import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
+import type { AdminAthlete, AdminAthleteProfile, AdminSelfie } from "@/lib/admin/types"
 
 // ─── props ────────────────────────────────────────────────────────────────────
 
 type AthletePanelProps = {
-  athletes: any[]
-  selfies?: any[]
+  athletes: AdminAthlete[]
+  selfies?: AdminSelfie[]
   feedbackSummaries?: AthleteSessionSummary[]
   feedbackPainReports?: AthleteExercisePain[]
 }
@@ -76,7 +79,7 @@ export function AthletesPanel({
     })
   }, [athletes, query, statusFilter, painCountById, selfieCountById])
 
-  function openAthlete(athlete: any) {
+  function openAthlete(athlete: AdminAthlete) {
     setSelectedAthlete(athlete)
     setDrawerOpen(true)
   }
@@ -102,15 +105,14 @@ export function AthletesPanel({
                 event.preventDefault()
                 setImporting(true)
                 setImportMessage(null)
-                console.log("[Athletes-Panel] Starting CSV athlete import")
                 try {
                   const result = await importAthletesCsv(new FormData(event.currentTarget))
                   setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`)
-                } catch (err: any) {
-                  if (err?.message?.includes("Server Action") || String(err).includes("UnrecognizedActionError")) {
+                } catch (err) {
+                  if (isStaleActionError(err)) {
                     setImportMessage("App was recently updated. Please refresh the page (Ctrl + F5).")
                   } else {
-                    setImportMessage(err?.message ?? "An error occurred during CSV import.")
+                    setImportMessage(actionErrorMessage(err, "An error occurred during CSV import."))
                   }
                 } finally {
                   setImporting(false)
@@ -208,11 +210,11 @@ export function AthletesPanel({
       <section aria-label="Athlete roster">
         <div className="divide-y rounded-xl border bg-card overflow-hidden">
           {filtered.map((athlete) => {
-            const profile = athlete.profiles ?? {}
+            const profile: Partial<AdminAthleteProfile> = athlete.profiles ?? {}
             const name = profile.full_name ?? athlete.full_name ?? "Unnamed athlete"
             const nameAr = profile.full_name_ar ?? null
             const troyId = profile.troy_id ?? null
-            const team = athlete.athlete_teams?.[0]?.teams
+            const team = firstRelation(athlete.athlete_teams?.[0]?.teams)
             const isPaused = athlete.account_status === "paused"
             const isAssignedOnly = athlete.goals?.includes("Assigned exercises only")
             const selfieCount = selfieCountById[athlete.id] ?? 0
@@ -304,7 +306,7 @@ export function AthletesPanel({
 }
 
 
-export function AthleteStats({ athletes }: { athletes: any[] }) {
+export function AthleteStats({ athletes }: { athletes: AdminAthlete[] }) {
   const assessed = athletes.filter((a) => a.assessment_status === "approved").length
   const paused = athletes.filter((a) => a.account_status === "paused").length
   return (

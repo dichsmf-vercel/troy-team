@@ -1,9 +1,20 @@
 ﻿import { redirect } from "next/navigation"
+import type { AdminAthlete } from "@/lib/admin/types"
 import { createClient } from "@/lib/supabase/server"
 import { AdminBoard } from "@/components/admin/admin-board"
 import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
 import { AdminErrorBoundary } from "@/components/admin/admin-error-boundary"
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createAdminClient } from "@/lib/supabase/admin"
+
+// AI program generation runs as a server action hosted by this page; allow it the full minute.
+export const maxDuration = 60
+
+type SessionAthleteRow = { id: string; athlete_id: string; session_post_id: string | null }
+type SummaryRow = { id: string; session_athlete_id: string; rpe: number | null; overall_rating: number | null; sleep_quality: number | null; soreness_level: number | null; symptoms: string[] | null; feedback_text: string | null; submitted_at: string }
+type PainRow = { id: string; session_athlete_id: string; session_exercise_id: string | null; pain_location: string | null; pain_severity: number | null; pain_notes: string | null; created_at: string }
+type SessionPostRow = { id: string; title_en: string | null; session_date: string | null }
+type ExerciseName = { name_en?: string | null }
+type SessionExerciseRow = { id: string; exercises: ExerciseName | ExerciseName[] | null }
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -11,7 +22,7 @@ export default async function AdminPage() {
   if (!user) redirect("/auth/login")
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
   if (!profile || !["admin", "supporting_coach"].includes(profile.role)) redirect("/dashboard")
-  const service = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const service = createAdminClient()
 
   const [
     { data: teams },
@@ -36,8 +47,8 @@ export default async function AdminPage() {
   ])
 
   // Signed URLs for selfies — batched to avoid N+1 per-selfie round trips
-  const programPaths = (programSelfies ?? []).map((s: any) => s.storage_path)
-  const sessionPaths = (sessionSelfies ?? []).map((s: any) => s.storage_path)
+  const programPaths = (programSelfies ?? []).map((s: { storage_path: string }) => s.storage_path)
+  const sessionPaths = (sessionSelfies ?? []).map((s: { storage_path: string }) => s.storage_path)
 
   const [programSignedResults, sessionSignedResults] = await Promise.all([
     programPaths.length
@@ -49,18 +60,18 @@ export default async function AdminPage() {
   ])
 
   const programUrlByPath = new Map(
-    (programSignedResults.data ?? []).map((r: any) => [r.path, r.signedUrl ?? null])
+    (programSignedResults.data ?? []).map((r: { path: string | null; signedUrl: string | null }) => [r.path, r.signedUrl ?? null])
   )
   const sessionUrlByPath = new Map(
-    (sessionSignedResults.data ?? []).map((r: any) => [r.path, r.signedUrl ?? null])
+    (sessionSignedResults.data ?? []).map((r: { path: string | null; signedUrl: string | null }) => [r.path, r.signedUrl ?? null])
   )
 
-  const programSelfiesWithLinks = (programSelfies ?? []).map((selfie: any) => ({
+  const programSelfiesWithLinks = (programSelfies ?? []).map((selfie: { id: string; athlete_id: string; storage_path: string; uploaded_at: string }) => ({
     ...selfie,
     image_url: programUrlByPath.get(selfie.storage_path) ?? null,
     selfie_type: "program" as const,
   }))
-  const sessionSelfiesWithLinks = (sessionSelfies ?? []).map((selfie: any) => ({
+  const sessionSelfiesWithLinks = (sessionSelfies ?? []).map((selfie: { id: string; athlete_id: string; storage_path: string; uploaded_at: string }) => ({
     ...selfie,
     image_url: sessionUrlByPath.get(selfie.storage_path) ?? null,
     selfie_type: "session" as const,
@@ -78,9 +89,9 @@ export default async function AdminPage() {
     : { data: [] }
   const athleteProfileById = new Map((athleteProfiles ?? []).map((p) => [p.id, p]))
   const { data: athleteTeams } = athleteIds.length
-    ? await service.from("athlete_teams").select("athlete_id,team_id,teams(name_en,name_ar,image_url,color_hex)").in("athlete_id", athleteIds)
+    ? await service.from("athlete_teams").select("athlete_id,team_id,teams(id,name_en,name_ar,image_url,color_hex)").in("athlete_id", athleteIds)
     : { data: [] }
-  const teamsByAthlete = new Map<string, any[]>()
+  const teamsByAthlete = new Map<string, NonNullable<AdminAthlete["athlete_teams"]>>()
   for (const m of athleteTeams ?? []) teamsByAthlete.set(m.athlete_id, [...(teamsByAthlete.get(m.athlete_id) ?? []), m])
   const [{ data: measurements }, { data: inbodyRecords }, { data: assessments }] = athleteIds.length
     ? await Promise.all([
@@ -108,10 +119,10 @@ export default async function AdminPage() {
   })
 
   // ── Feedback: session summaries + pain reports ────────────────────────────────
-  const sessionAthleteRows = athleteIds.length
-    ? (await service.from("session_athletes").select("id,athlete_id,session_post_id").in("athlete_id", athleteIds)).data ?? []
+  const sessionAthleteRows: SessionAthleteRow[] = athleteIds.length
+    ? ((await service.from("session_athletes").select("id,athlete_id,session_post_id").in("athlete_id", athleteIds)).data ?? [])
     : []
-  const saIdList = sessionAthleteRows.map((row: any) => row.id)
+  const saIdList = sessionAthleteRows.map((row) => row.id)
   const [{ data: rawSummaries }, { data: rawPainRows }] = saIdList.length
     ? await Promise.all([
         service.from("session_summaries").select("id,session_athlete_id,rpe,overall_rating,sleep_quality,soreness_level,symptoms,feedback_text,submitted_at").in("session_athlete_id", saIdList).order("submitted_at", { ascending: false }).limit(200),
@@ -119,31 +130,31 @@ export default async function AdminPage() {
       ])
     : [{ data: [] }, { data: [] }]
 
-  const saMap = new Map(sessionAthleteRows.map((row: any) => [row.id, row]))
-  const spIds = [...new Set(sessionAthleteRows.map((row: any) => row.session_post_id).filter(Boolean))]
+  const saMap = new Map<string, SessionAthleteRow>(sessionAthleteRows.map((row) => [row.id, row]))
+  const spIds = [...new Set(sessionAthleteRows.map((row) => row.session_post_id).filter((id): id is string => !!id))]
   const { data: spRows } = spIds.length
     ? await service.from("session_posts").select("id,title_en,session_date").in("id", spIds)
     : { data: [] }
-  const spMap = new Map((spRows ?? []).map((sp: any) => [sp.id, sp]))
-  const seIds = [...new Set((rawPainRows ?? []).map((row: any) => row.session_exercise_id).filter(Boolean))]
+  const spMap = new Map(((spRows ?? []) as SessionPostRow[]).map((sp) => [sp.id, sp]))
+  const seIds = [...new Set(((rawPainRows ?? []) as PainRow[]).map((row) => row.session_exercise_id).filter((id): id is string => !!id))]
   const { data: seRows } = seIds.length
     ? await service.from("session_exercises").select("id,exercises(name_en)").in("id", seIds)
     : { data: [] }
-  const seMap = new Map((seRows ?? []).map((se: any) => [se.id, se]))
+  const seMap = new Map(((seRows ?? []) as SessionExerciseRow[]).map((se) => [se.id, se]))
 
-  const feedbackSummaries = (rawSummaries ?? []).map((row: any) => {
-    const sa = saMap.get(row.session_athlete_id) as any
-    const sp = sa ? spMap.get(sa.session_post_id) as any : null
+  const feedbackSummaries = ((rawSummaries ?? []) as SummaryRow[]).map((row) => {
+    const sa = saMap.get(row.session_athlete_id)
+    const sp = sa?.session_post_id ? spMap.get(sa.session_post_id) : undefined
     return { id: row.id, athlete_id: sa?.athlete_id ?? "", session_post_id: sa?.session_post_id ?? "", session_title: sp?.title_en ?? "Training session", session_date: sp?.session_date ?? "", submitted_at: row.submitted_at, rpe: row.rpe, overall_rating: row.overall_rating, sleep_quality: row.sleep_quality, soreness_level: row.soreness_level, symptoms: row.symptoms, feedback_text: row.feedback_text }
-  }).filter((row: any) => row.athlete_id)
+  }).filter((row) => row.athlete_id)
 
-  const feedbackPainReports = (rawPainRows ?? []).map((row: any) => {
-    const sa = saMap.get(row.session_athlete_id) as any
-    const sp = sa ? spMap.get(sa.session_post_id) as any : null
-    const se = seMap.get(row.session_exercise_id) as any
+  const feedbackPainReports = ((rawPainRows ?? []) as PainRow[]).map((row) => {
+    const sa = saMap.get(row.session_athlete_id)
+    const sp = sa?.session_post_id ? spMap.get(sa.session_post_id) : undefined
+    const se = row.session_exercise_id ? seMap.get(row.session_exercise_id) : undefined
     const exName = Array.isArray(se?.exercises) ? se.exercises[0]?.name_en : se?.exercises?.name_en
     return { id: row.id, athlete_id: sa?.athlete_id ?? "", session_post_id: sa?.session_post_id ?? "", session_title: sp?.title_en ?? "Training session", session_date: sp?.session_date ?? "", exercise_name: exName ?? "Exercise", pain_location: row.pain_location, pain_severity: row.pain_severity, pain_notes: row.pain_notes, reported_at: row.created_at }
-  }).filter((row: any) => row.athlete_id)
+  }).filter((row) => row.athlete_id)
 
   return (
     <>

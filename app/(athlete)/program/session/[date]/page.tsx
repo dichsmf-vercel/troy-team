@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AthleteHeader } from "@/components/athlete/athlete-header"
 import { ProgramSessionRunner } from "@/components/session/program-session-runner"
+import { readProgramSessions } from "@/lib/program-data"
 
 export default async function ProgramSessionPage({ params }: { params: Promise<{ date: string }> }) {
   const { date } = await params
@@ -26,10 +27,8 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
   ])
 
   if (!assignment) notFound()
-  const sessions = Array.isArray((assignment.generation_reason as any)?.sessions)
-    ? (assignment.generation_reason as any).sessions
-    : []
-  const session = sessions.find((item: any) => item.date === date)
+  const sessions = readProgramSessions(assignment.generation_reason)
+  const session = sessions.find((item) => item.date === date)
   if (!session) notFound()
 
   const { data: feedback } = await supabase
@@ -54,7 +53,7 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
         <ProgramSessionRunner
           programId={assignment.id}
           date={date}
-          time={session.time}
+          time={session.time ?? ""}
           exercises={session.exercises ?? []}
           initialFeedback={feedback ?? []}
           initialCompleted={completion?.status === "completed"}

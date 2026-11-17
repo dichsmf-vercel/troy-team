@@ -1,5 +1,6 @@
 "use client"
 
+import { firstRelation } from "@/lib/utils"
 import { useMemo, useState, useTransition } from "react"
 import {
   AlertTriangle,
@@ -36,11 +37,12 @@ import {
   toggleAthleteAccountStatus,
   permanentlyDeleteAthlete,
   updateAthleteSettings,
-  markExerciseSelfieReviewed,
-  reviewSessionSelfie,
-} from "@/app/admin/actions"
+} from "@/app/admin/actions/athletes"
+import { markExerciseSelfieReviewed, reviewSessionSelfie } from "@/app/admin/actions/selfies"
 import { getPerformanceRag } from "@/lib/rag-thresholds"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
+import type { AdminAthlete, AdminAthleteProfile } from "@/lib/admin/types"
+import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -56,7 +58,7 @@ type Selfie = {
 }
 
 type AthleteDrawerProps = {
-  athlete: any
+  athlete: AdminAthlete
   selfies: Selfie[]
   summaries: AthleteSessionSummary[]
   painReports: AthleteExercisePain[]
@@ -145,11 +147,11 @@ export function AthleteDrawer({
 
   const athleteSelfies = selfieItems.filter((s) => s.athlete_id === athlete.id)
 
-  const profile = athlete.profiles ?? {}
+  const profile: Partial<AdminAthleteProfile> = athlete.profiles ?? {}
   const name = profile.full_name ?? athlete.full_name ?? "Unnamed athlete"
   const nameAr = profile.full_name_ar ?? null
   const troyId = profile.troy_id ?? null
-  const team = athlete.athlete_teams?.[0]?.teams
+  const team = firstRelation(athlete.athlete_teams?.[0]?.teams)
   const height = athlete.height_cm ?? athlete.latest_measurement?.height_cm
   const weight = athlete.weight_kg ?? athlete.latest_measurement?.weight_kg
   const bmi = height && weight ? (weight / ((height / 100) ** 2)).toFixed(1) : null
@@ -185,7 +187,6 @@ export function AthleteDrawer({
       setMsg(null)
       setTmpPassword(null)
       try {
-        console.log("[Athlete-Drawer] Generating temporary password for athlete:", athlete.id)
         const result = await generateTemporaryAthletePassword(athlete.id)
         if (result.error) {
           console.error("[Athlete-Drawer] Password reset error:", result.error)
@@ -194,9 +195,9 @@ export function AthleteDrawer({
         }
         setTmpPassword(result.temporaryPassword ?? null)
         setMsg("Temporary password generated. Copy it — it won't appear again.")
-      } catch (err: any) {
+      } catch (err) {
         console.error("[Athlete-Drawer] Unexpected error in handleResetPassword:", err)
-        setMsg(err?.message?.includes("Server Action") ? "App was updated. Please refresh the page." : "Failed to reset password.")
+        setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to reset password.")
       }
     })
   }
@@ -205,12 +206,11 @@ export function AthleteDrawer({
     const next = isPaused ? "active" : "paused"
     startTransition(async () => {
       try {
-        console.log("[Athlete-Drawer] Toggling account status to:", next)
         const result = await toggleAthleteAccountStatus(athlete.id, next)
         setMsg(result.error ?? `Account ${next}.`)
-      } catch (err: any) {
+      } catch (err) {
         console.error("[Athlete-Drawer] Unexpected error in handleTogglePause:", err)
-        setMsg(err?.message?.includes("Server Action") ? "App was updated. Please refresh the page." : "Failed to update account status.")
+        setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to update account status.")
       }
     })
   }
@@ -224,7 +224,6 @@ export function AthleteDrawer({
       return
     startTransition(async () => {
       try {
-        console.log("[Athlete-Drawer] Permanently deleting athlete:", athlete.id)
         const result = await permanentlyDeleteAthlete(athlete.id)
         if (result.error) {
           console.error("[Athlete-Drawer] Delete error:", result.error)
@@ -232,25 +231,24 @@ export function AthleteDrawer({
           return
         }
         onOpenChange(false)
-      } catch (err: any) {
+      } catch (err) {
         console.error("[Athlete-Drawer] Unexpected error in handleDelete:", err)
-        setMsg(err?.message?.includes("Server Action") ? "App was updated. Please refresh the page." : "Failed to delete athlete.")
+        setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to delete athlete.")
       }
     })
   }
 
   async function handleSelfieReview(selfie: Selfie) {
     try {
-      console.log("[Athlete-Drawer] Reviewing selfie:", { id: selfie.id, type: selfie.selfie_type })
       if (selfie.selfie_type === "program") {
         await markExerciseSelfieReviewed(selfie.id)
       } else {
         await reviewSessionSelfie(selfie.id)
       }
       setSelfieItems((current) => current.filter((s) => s.id !== selfie.id))
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Athlete-Drawer] Unexpected error reviewing selfie:", err)
-      setMsg(err?.message?.includes("Server Action") ? "App was updated. Please refresh the page." : "Failed to review selfie.")
+      setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to review selfie.")
     }
   }
 

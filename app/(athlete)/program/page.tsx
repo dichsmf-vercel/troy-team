@@ -4,6 +4,7 @@ import { AthleteHeader } from "@/components/athlete/athlete-header"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { readProgramSessions, readProgramSource } from "@/lib/program-data"
 import { Calendar, AlertCircle, CheckCircle2, XCircle, Dumbbell, ArrowRight } from "lucide-react"
 
 export default async function AthleteProgramPage() {
@@ -29,9 +30,7 @@ export default async function AthleteProgramPage() {
 
   const isAssignedOnly = athlete?.goals?.includes("Assigned exercises only")
   const monthStart = assignment?.month_start ? new Date(`${assignment.month_start}T12:00:00`) : new Date()
-  const programSessions = Array.isArray((assignment?.generation_reason as any)?.sessions)
-    ? (assignment?.generation_reason as any).sessions
-    : []
+  const programSessions = readProgramSessions(assignment?.generation_reason)
   const today = new Date().toISOString().slice(0, 10)
 
   const { data: completionRows } = assignment
@@ -42,9 +41,9 @@ export default async function AthleteProgramPage() {
         .eq("athlete_id", user.id)
     : { data: [] }
 
-  const completionByDate = new Map((completionRows ?? []).map((row: any) => [row.session_date, row]))
-  const visibleSessions = programSessions.filter((session: any) => session.date <= today)
-  const sessionDates = new Set(programSessions.map((session: any) => session.date))
+  const completionByDate = new Map((completionRows ?? []).map((row: { session_date: string; status: string; completed_at: string | null }) => [row.session_date, row]))
+  const visibleSessions = programSessions.filter((session) => session.date <= today)
+  const sessionDates = new Set(programSessions.map((session) => session.date))
 
   const monthTitle = monthStart.toLocaleDateString("en", { month: "long", year: "numeric" })
   const days = Array.from({ length: 28 }, (_, index) => {
@@ -69,7 +68,7 @@ export default async function AthleteProgramPage() {
               <CardContent className="p-5">
                 <p className="text-sm text-muted-foreground">Your four-week training plan</p>
                 <h1 className="mt-2 text-2xl font-bold text-balance">
-                  {(assignment?.generation_reason as any)?.source ? "Custom program" : "Monthly Program"}
+                  {readProgramSource(assignment?.generation_reason) ? "Custom program" : "Monthly Program"}
                 </h1>
                 <div className="mt-3 flex items-center gap-2">
                   {assignment?.status === "approved" ? (
@@ -133,7 +132,7 @@ export default async function AthleteProgramPage() {
             <section className="grid gap-3">
               <h2 className="text-lg font-semibold">Training sessions</h2>
               <div className="flex flex-col gap-3">
-                {visibleSessions.map((session: any, idx: number) => (
+                {visibleSessions.map((session, idx) => (
                   <Card key={idx} className="border-0 overflow-hidden">
                     <CardContent className="p-4">
                       <div className="mb-3 flex items-center justify-between gap-2">
@@ -190,13 +189,13 @@ export default async function AthleteProgramPage() {
                       {/* Sections */}
                       <div className="space-y-3">
                         {["warm-up", "mobility", "power", "strength", "accessory", "conditioning", "cooldown"].map((section) => {
-                          const sectionExercises = (session.exercises ?? []).filter((e: any) => String(e.section).toLowerCase().includes(section))
+                          const sectionExercises = (session.exercises ?? []).filter((e) => String(e.section).toLowerCase().includes(section))
                           if (sectionExercises.length === 0) return null
                           return (
                             <div key={section}>
                               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{section}</p>
                               <div className="space-y-1.5">
-                                {sectionExercises.map((exercise: any, exIdx: number) => (
+                                {sectionExercises.map((exercise, exIdx) => (
                                   <div key={exIdx} className="rounded-lg bg-muted/50 p-2 flex items-center justify-between gap-2 text-xs">
                                     <span className="font-medium truncate">{exercise.name_en ?? exercise.name}</span>
                                     <span className="text-muted-foreground text-nowrap">

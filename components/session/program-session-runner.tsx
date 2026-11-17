@@ -8,6 +8,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { completeProgramSession, uploadProgramExerciseSelfie } from "@/app/(athlete)/program/session/actions"
+import type { StoredProgramExercise } from "@/lib/program-data"
+
+type ProgramFeedbackRow = { exercise_index: number; difficulty: number | null; pain_notes: string | null; enjoyment: number | null }
 
 export function ProgramSessionRunner({
   programId,
@@ -21,8 +24,8 @@ export function ProgramSessionRunner({
   programId: string
   date: string
   time: string
-  exercises: any[]
-  initialFeedback: any[]
+  exercises: StoredProgramExercise[]
+  initialFeedback: ProgramFeedbackRow[]
   initialCompleted?: boolean
   showExerciseRecap?: boolean
 }) {
@@ -143,7 +146,7 @@ export function ProgramSessionRunner({
         </div>
 
         <div className="grid gap-2">
-          {exercises.map((ex: any, idx: number) => {
+          {exercises.map((ex, idx) => {
             const isDone = completed.includes(idx) || finished
             return (
               <div

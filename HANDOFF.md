@@ -74,7 +74,7 @@ create table if not exists public.assessment_form_schema (
 alter table public.assessment_form_schema enable row level security;
 create policy "admins manage assessment schema"
   on public.assessment_form_schema for all to authenticated
-  using (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin','supporting_coach')));
+  using (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin','supporting_coach')))
   with check (exists (select 1 from public.profiles where id = auth.uid() and role in ('admin','supporting_coach')));
 
 -- session_exercise_selfies
@@ -167,10 +167,11 @@ on conflict (id) do nothing;
 
 ## 🛠️ Verification & Build Status
 
-- [x] `npx tsc --noEmit` = **0 errors (Clean pass)**
-- [x] `npx next build --webpack` = **Successful production build across all 22 static and dynamic routes**
-- [x] Database migrations fully executed
-- [x] Git repository synced with `main`
+Last verified 2026-11-18 (see PROJECT_MAP.md for how to re-run):
+- [x] `pnpm typecheck` = 0 errors (type errors now fail the build; `ignoreBuildErrors` was removed)
+- [x] `pnpm test` = unit tests pass (guards, redirects, Gemini validation, Excel import template round-trip, …)
+- [x] `pnpm build` = passes. CI (`.github/workflows/ci.yml`) runs all three on every PR.
+- [ ] Supabase migrations `202611180001` and `202611180002` must be run by hand BEFORE deploying this version (see `supabase/README.md`).
 
 ---
 
@@ -188,3 +189,8 @@ on conflict (id) do nothing;
 ### 3. Supabase Edge Functions for Alerting
 - Implement a lightweight Supabase Edge Function triggered by `system_log` inserts for errors.
 - Dispatches instant email notifications to Coach Ahmed or the tech lead when Gemini API quotas or demand spikes occur.
+
+### 4. FULL ARABIC TRANSLATION (toggle button) + a prettier Arabic font
+- **Complete the language toggle**: today only part of the UI is translated (`lib/i18n/dictionaries.ts` has ~440 lines, but admin screens, program/session pages, error messages, server-action messages, the import dialog, emails and validation text are still English-only). Make **every** user-visible string go through the dictionary so pressing the EN/AR toggle switches the whole app, including RTL layout checks on every page.
+- **Pretty Arabic font**: replace `IBM Plex Sans Arabic` (set up in `app/layout.tsx` via `next/font/google`) with a more elegant face. Candidates to trial side by side: **Cairo**, **Tajawal**, **Readex Pro**, **Noto Naskh Arabic** (for long text), **El Messiri / Almarai** (headings). Pick one for UI text and optionally one display font for headings; check numerals, weights 400–700 and mixed Arabic/Latin text (Troy IDs, exercise names).
+- Deliverable: no English strings visible in Arabic mode, a screenshot review of every route in RTL, and the chosen font loaded with `display: swap`.

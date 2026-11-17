@@ -19,9 +19,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { generateProgramWithAI, saveAIGeneratedProgram, saveAdminEditsAndLearn, generateLegacyFallbackProgram } from "@/app/admin/actions"
-import type { GeminiProgramOutput, GeminiSession, GeminiExercise } from "@/lib/gemini"
+import { generateProgramWithAI, saveAIGeneratedProgram, saveAdminEditsAndLearn, generateLegacyFallbackProgram } from "@/app/admin/actions/ai"
+import type { GeminiProgramOutput, GeminiSession, GeminiExercise } from "@/lib/gemini-types"
 import { weekdayLabel, monthLabel } from "@/lib/program-engine"
+import { actionErrorMessage } from "@/lib/client-errors"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
 
@@ -35,7 +36,14 @@ type EditState = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
+export type AthleteOption = {
+  id: string
+  latest_assessment?: unknown
+  profiles?: { full_name?: string | null } | null
+}
+
+
+export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) {
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [time, setTime] = useState("18:00")
@@ -55,33 +63,6 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
   // Save state
   const [saving, setSaving] = useState(false)
   const [fallbackGenerating, setFallbackGenerating] = useState(false)
-
-  async function handleFallbackGenerate() {
-    setFallbackGenerating(true)
-    setSaveMsg(null)
-    console.log("[AI-Program-Generator] Triggered Option B: Fallback to Rules Engine")
-    try {
-      const result = await generateLegacyFallbackProgram({
-        athleteId,
-        startDate,
-        time,
-        weekdays: days,
-      })
-      if (result.error || !result.data) {
-        setGenError(result.error ?? "Fallback generation failed.")
-        return
-      }
-      setProgram(result.data)
-      setOriginalProgram(result.data)
-      setGenError(null)
-      console.log("[AI-Program-Generator] Fallback program generated successfully:", result.data)
-    } catch (err: any) {
-      console.error("[AI-Program-Generator] Fallback execution error:", err)
-      setGenError(err?.message ?? "Fallback generation failed.")
-    } finally {
-      setFallbackGenerating(false)
-    }
-  }
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
 
   const selectedAthlete = athletes.find((a) => a.id === athleteId)
@@ -101,58 +82,51 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
       }
     : null
 
-  async function handleGenerate() {
-    setGenerating(true)
-    setGenError(null)
+  function resetForNewProgram() {
     setProgram(null)
     setOriginalProgram(null)
     setEdits({})
     setEditMode(false)
     setSaveMsg(null)
     setExpandedSession(0)
+  }
 
-    console.group("[AI-Program-Generator] Generating 4-Week Program")
-    console.log("Input parameters:", {
-      athleteId,
-      athleteName: selectedAthlete?.profiles?.full_name ?? "Unknown",
-      startDate,
-      time,
-      weekdays: days,
-    })
+  async function handleFallbackGenerate() {
+    setFallbackGenerating(true)
+    setSaveMsg(null)
+    try {
+      const result = await generateLegacyFallbackProgram({ athleteId, startDate, time, weekdays: days })
+      if (result.error || !result.data) {
+        setGenError(result.error ?? "Fallback generation failed.")
+        return
+      }
+      setProgram(result.data)
+      setOriginalProgram(result.data)
+      setGenError(null)
+    } catch (err) {
+      setGenError(actionErrorMessage(err, "Fallback generation failed."))
+    } finally {
+      setFallbackGenerating(false)
+    }
+  }
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setGenError(null)
+    resetForNewProgram()
 
     try {
       const result = await generateProgramWithAI({ athleteId, startDate, time, weekdays: days })
-      if ((result as any).rawText) {
-        console.groupCollapsed("%c[AI-Program-Generator] Raw Gemini Model Output (Click to inspect quality)", "color: #8b5cf6; font-weight: bold;")
-        console.log((result as any).rawText)
-        console.groupEnd()
-      }
-      console.log("Server response:", result)
-
       if (result.error || !result.data) {
-        console.error("[AI-Program-Generator] Server returned error:", result.error)
         setGenError(result.error ?? "Generation failed.")
         return
       }
-
-      console.log("[AI-Program-Generator] Successfully generated program:", result.data)
       setProgram(result.data)
       setOriginalProgram(result.data)
-    } catch (err: any) {
-      console.error("[AI-Program-Generator] Client execution error:", err)
-      const isActionMismatch =
-        err?.message?.includes("Server Action") ||
-        err?.name === "UnrecognizedActionError" ||
-        String(err).includes("Failed to find Server Action")
-
-      if (isActionMismatch) {
-        setGenError("The app was recently updated on the server. Please refresh the page (Ctrl + F5 or Cmd + Shift + R) to synchronize the latest build.")
-      } else {
-        setGenError(err?.message ?? "An unexpected error occurred while communicating with the server.")
-      }
+    } catch (err) {
+      setGenError(actionErrorMessage(err, "An unexpected error occurred while communicating with the server."))
     } finally {
       setGenerating(false)
-      console.groupEnd()
     }
   }
 
@@ -161,67 +135,37 @@ export function AIProgramGenerator({ athletes }: { athletes: any[] }) {
     setSaving(true)
     setSaveMsg(null)
 
-    console.group("[AI-Program-Generator] Saving AI Program")
-    console.log("Saving payload:", {
-      athleteId,
-      startDate,
-      time,
-      weekdays: days,
-      sessionsCount: displayProgram.sessions.length,
-      isEdited: editMode,
-    })
-
     try {
-      // If edits were made, run the learning flow
+      // 1. Save the program first so the learning step can refer to it.
+      const saved = await saveAIGeneratedProgram({ athleteId, startDate, time, weekdays: days, program: displayProgram })
+      if (saved.error || !saved.id) {
+        setSaveMsg(saved.error ?? "Unable to save program.")
+        return
+      }
+
+      // 2. If the coach edited it and explained why, ask the AI to PROPOSE a prompt improvement.
+      //    The proposal is not applied until an admin approves it.
       if (editMode && originalProgram && adminReason.trim()) {
-        console.log("[AI-Program-Generator] Saving admin edits with learning cue:", adminReason)
-        try {
-          const learnResult = await saveAdminEditsAndLearn({
-            programId: "", // will be filled after save
-            editedProgram: displayProgram,
-            originalProgram,
-            adminReason,
-            athleteName: selectedAthlete?.profiles?.full_name ?? "Athlete",
-          })
-          console.log("[AI-Program-Generator] Learning result:", learnResult)
-          if (learnResult.error) {
-            console.warn("[AI-Program-Generator] Learning step warning:", learnResult.error)
-            setSaveMsg(`Warning: edits saved but learning failed: ${learnResult.error}`)
-          }
-        } catch (learnErr) {
-          console.error("[AI-Program-Generator] Error in learning step:", learnErr)
-        }
+        const learned = await saveAdminEditsAndLearn({
+          programId: saved.id,
+          editedProgram: displayProgram,
+          originalProgram,
+          adminReason,
+        })
+        setSaveMsg(
+          learned.error
+            ? `Program saved for admin review. The learning step failed: ${learned.error}`
+            : "Program saved for admin review. A prompt improvement was proposed and is waiting for admin approval.",
+        )
+        return
       }
 
-      const result = await saveAIGeneratedProgram({
-        athleteId,
-        startDate,
-        time,
-        weekdays: days,
-        program: displayProgram,
-      })
-      console.log("[AI-Program-Generator] Save result:", result)
-      setSaveMsg(result.error ?? "Program saved for admin review.")
-    } catch (err: any) {
-      console.error("[AI-Program-Generator] Error saving program:", err)
-      const isActionMismatch =
-        err?.message?.includes("Server Action") ||
-        err?.name === "UnrecognizedActionError" ||
-        String(err).includes("Failed to find Server Action")
-
-      if (isActionMismatch) {
-        setSaveMsg("Error: The app was recently updated. Please refresh the page to reload the newest version.")
-      } else {
-        setSaveMsg(resultErrorText(err))
-      }
+      setSaveMsg("Program saved for admin review.")
+    } catch (err) {
+      setSaveMsg(`Error: ${actionErrorMessage(err, "Unable to save program.")}`)
     } finally {
       setSaving(false)
-      console.groupEnd()
     }
-  }
-
-  function resultErrorText(err: any): string {
-    return `Error: ${err?.message ?? "Unable to save program."}`
   }
 
   function updateExercise(sIdx: number, eIdx: number, field: keyof GeminiExercise, value: unknown) {

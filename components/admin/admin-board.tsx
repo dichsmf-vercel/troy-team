@@ -9,15 +9,18 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { SessionPanel } from "@/components/admin/session-panel"
 import { RulesPanel } from "@/components/admin/rules-panel"
-import { createExercise, createTeam, updateExerciseVideo } from "@/app/admin/actions"
+import { createExercise, updateExerciseVideo } from "@/app/admin/actions/exercises"
+import { createTeam } from "@/app/admin/actions/teams-sessions"
 import { ProgramGenerator } from "@/components/admin/program-generator"
 import { AthletesPanel, AthleteStats } from "@/components/admin/athletes-panel"
 import { AthleteCreateForm } from "@/components/admin/athlete-create-form"
 import { ProgramReviewPanel } from "@/components/admin/program-review-panel"
 import { AIProgramGenerator } from "@/components/admin/ai-program-generator"
+import { PromptProposalsPanel } from "@/components/admin/prompt-proposals-panel"
+import type { AdminAthlete, AdminExercise, AdminNotification, AdminProgram, AdminRule, AdminSelfie, AdminSession, AdminTeam } from "@/lib/admin/types"
 import { AthleteFeedbackPanel, type AthleteSessionSummary, type AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 
-type Props = { teams: any[]; sessions: any[]; athletes: any[]; exercises: any[]; selfies: any[]; notifications: any[]; rules: any[]; programs: any[]; feedbackSummaries?: AthleteSessionSummary[]; feedbackPainReports?: AthleteExercisePain[] }
+type Props = { teams: AdminTeam[]; sessions: AdminSession[]; athletes: AdminAthlete[]; exercises: AdminExercise[]; selfies: AdminSelfie[]; notifications: AdminNotification[]; rules: AdminRule[]; programs: AdminProgram[]; feedbackSummaries?: AthleteSessionSummary[]; feedbackPainReports?: AthleteExercisePain[] }
 
 export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises = [], selfies = [], rules = [], programs = [], feedbackSummaries = [], feedbackPainReports = [] }: Props) {
   const [tab, setTab] = useState("sessions")
@@ -30,7 +33,6 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
   useEffect(() => {
     // [athlete-debug] logs commented out for production
     // console.groupCollapsed("[athlete-debug] Admin roster received in browser")
-    // console.log("Roster counts", { athletes: safeAthletes.length, ... })
     // console.groupEnd()
   }, [programs, safeAthletes, safeSessions, safeTeams])
 
@@ -79,7 +81,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
   )
 }
 
-function AthletesWorkspace({ teams, athletes, selfies, feedbackSummaries, feedbackPainReports }: { teams: any[]; athletes: any[]; selfies: any[]; feedbackSummaries: any[]; feedbackPainReports: any[] }) {
+function AthletesWorkspace({ teams, athletes, selfies, feedbackSummaries, feedbackPainReports }: { teams: AdminTeam[]; athletes: AdminAthlete[]; selfies: AdminSelfie[]; feedbackSummaries: AthleteSessionSummary[]; feedbackPainReports: AthleteExercisePain[] }) {
   const [showCreate, setShowCreate] = useState(false)
   return (
     <div className="grid gap-6">
@@ -105,7 +107,7 @@ function TeamManagementForm() {
   return <Card><CardHeader className="flex flex-row items-center justify-between gap-3"><div><CardTitle>Teams</CardTitle><p className="mt-1 text-sm text-muted-foreground">Create teams with branding, colors, and a team photo.</p></div><Button type="button" variant="outline" onClick={() => setOpen((value) => !value)}>{open ? "Close" : "Add team"}</Button></CardHeader>{open ? <CardContent><form action={async (formData) => { await createTeam(formData) }} className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><Label htmlFor="team-name-en">Team name</Label><Input id="team-name-en" name="name_en" required placeholder="e.g. First Team" /></div><div className="grid gap-2"><Label htmlFor="team-name-ar">Arabic name</Label><Input id="team-name-ar" name="name_ar" placeholder="اسم الفريق" /></div><div className="grid gap-2"><Label htmlFor="team-image">Team photo URL</Label><Input id="team-image" name="image_url" type="url" placeholder="https://..." /></div><div className="grid gap-2"><Label htmlFor="team-color">Team color</Label><Input id="team-color" name="color_hex" type="color" defaultValue="#2563eb" className="h-10 p-1" /></div><div className="flex items-center gap-2"><input id="team-national" name="is_national_team" type="checkbox" value="true" /><Label htmlFor="team-national">National team</Label></div><div className="flex items-end sm:justify-end"><Button type="submit">Create team</Button></div></form></CardContent> : null}</Card>
 }
 
-function ProgramsWorkspace({ athletes, exercises, rules, programs }: { athletes: any[]; exercises: any[]; rules: any[]; programs: any[] }) {
+function ProgramsWorkspace({ athletes, exercises, rules, programs }: { athletes: AdminAthlete[]; exercises: AdminExercise[]; rules: AdminRule[]; programs: AdminProgram[] }) {
   const [mode, setMode] = useState<"rules" | "ai">("rules")
   return (
     <div className="grid gap-6">
@@ -128,14 +130,17 @@ function ProgramsWorkspace({ athletes, exercises, rules, programs }: { athletes:
       {mode === "rules" ? (
         <ProgramGenerator athletes={athletes} exercises={exercises} rules={rules} />
       ) : (
-        <AIProgramGenerator athletes={athletes} />
+        <>
+          <AIProgramGenerator athletes={athletes} />
+          <PromptProposalsPanel />
+        </>
       )}
       <ProgramReviewPanel programs={programs} />
     </div>
   )
 }
 
-function ExercisePanel({ exercises }: { exercises: any[] }) {
+function ExercisePanel({ exercises }: { exercises: AdminExercise[] }) {
   return (
     <div className="grid gap-6">
       <Card>

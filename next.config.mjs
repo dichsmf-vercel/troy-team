@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     unoptimized: true,
+  },
+  experimental: {
+    serverActions: {
+      // Athletes upload selfies (up to 8 MB) through server actions; the default limit is 1 MB.
+      bodySizeLimit: "10mb",
+    },
   },
   async headers() {
     return [

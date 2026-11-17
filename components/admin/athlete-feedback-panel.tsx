@@ -5,6 +5,7 @@ import { Activity, AlertTriangle, ChevronDown, ChevronUp, HeartPulse, MessageSqu
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import type { AdminAthlete } from "@/lib/admin/types"
 import { Input } from "@/components/ui/input"
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ export type AthleteExercisePain = {
 }
 
 type Props = {
-  athletes: any[]
+  athletes: AdminAthlete[]
   summaries: AthleteSessionSummary[]
   painReports: AthleteExercisePain[]
 }

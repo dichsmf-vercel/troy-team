@@ -21,11 +21,20 @@ export type GeneratedSession = {
   tooFewExercises: boolean
 }
 
+/** Exercise-catalog row as the rules engine needs it. */
+export type EngineExercise = {
+  id: string
+  name_en: string
+  category?: string | null
+  movement_pattern?: string | null
+  [column: string]: unknown
+}
+
 export type ProgramInput = {
   startDate: string
   weekdays: number[]
   time: string
-  exercises: any[]
+  exercises: EngineExercise[]
   weeks?: number
   birthYear?: number | null
   sport?: string | null
@@ -78,10 +87,10 @@ export function getEgyptianSeason(sport: string | null, date: Date): {
  * Filters candidates matching category or pattern keywords
  */
 function findMatching(
-  pool: any[],
+  pool: EngineExercise[],
   keywords: string[],
   excludeIds: Set<string> = new Set()
-): any[] {
+): EngineExercise[] {
   const lowerKeywords = keywords.map((k) => k.toLowerCase())
   return pool.filter((item) => {
     if (excludeIds.has(item.id)) return false

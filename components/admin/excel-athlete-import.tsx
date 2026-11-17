@@ -1,83 +1,138 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Download, FileSpreadsheet, Upload } from "lucide-react"
-import { importAthletesFromExcel } from "@/app/admin/actions"
+import { importAthletesFromExcel, type ImportCredential, type ImportSkipped } from "@/app/admin/actions/imports"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { IMPORT_CHUNK_SIZE, findRowProblems } from "@/lib/admin/athlete-import-validation"
 import {
+  IMPORT_COLUMNS,
   generateAthleteImportTemplate,
   parseAthletesFromExcel,
   type ParsedAthleteRow,
 } from "@/lib/excel-import"
 
-type ImportCredential = {
-  name: string
-  troyId: string
-  temporaryPassword: string
+const MAX_FILE_BYTES = 5 * 1024 * 1024
+const MAX_ROWS = 500
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+type Step = "template" | "review" | "done"
+
+function download(data: BlobPart, filename: string, type: string) {
+  const url = URL.createObjectURL(new Blob([data], { type }))
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`
+
 export function ExcelAthleteImport() {
-  const [rows, setRows] = useState<ParsedAthleteRow[] | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState<Step>("template")
+  const [fileName, setFileName] = useState("")
+  const [rows, setRows] = useState<ParsedAthleteRow[]>([])
+  const [problems, setProblems] = useState<{ rowNumber: number; message: string }[]>([])
   const [credentials, setCredentials] = useState<ImportCredential[]>([])
+  const [skipped, setSkipped] = useState<ImportSkipped[]>([])
   const [message, setMessage] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function handleFileChange(file: File | undefined) {
-    setRows(null)
+  function reset() {
+    setStep("template")
+    setFileName("")
+    setRows([])
+    setProblems([])
     setCredentials([])
+    setSkipped([])
+    setMessage(null)
+    setProgress(null)
+    if (fileInput.current) fileInput.current.value = ""
+  }
+
+  function handleOpenChange(next: boolean) {
+    // Never close mid-import, and never lose credentials the coach has not saved yet.
+    if (!next && busy) return
+    if (!next && credentials.length && !window.confirm("Have you saved the temporary passwords? They cannot be shown again.")) return
+    setOpen(next)
+    if (!next) reset()
+  }
+
+  async function handleFile(file: File | undefined) {
+    setRows([])
+    setProblems([])
     setMessage(null)
     if (!file) return
+    setFileName(file.name)
 
+    if (file.size > MAX_FILE_BYTES) return setMessage("The file is larger than 5 MB.")
     try {
       const parsed = parseAthletesFromExcel(await file.arrayBuffer())
-      if (parsed.error) {
-        setMessage(parsed.error)
-        return
-      }
+      if (parsed.error) return setMessage(parsed.error)
       if (!parsed.athletes.length) {
-        setMessage("No athlete rows were found. Check the spreadsheet headers and data.")
-        return
+        return setMessage("No athlete rows were found. Fill the “Athletes” sheet of the template under the header row.")
       }
+      if (parsed.athletes.length > MAX_ROWS) return setMessage(`The file has ${parsed.athletes.length} athletes. Import at most ${MAX_ROWS} at a time.`)
       setRows(parsed.athletes)
-      setMessage(`Ready to import ${parsed.athletes.length} athlete${parsed.athletes.length === 1 ? "" : "s"}.`)
+      setProblems(findRowProblems(parsed.athletes))
+      setStep("review")
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not read the spreadsheet.")
     }
   }
 
-  function downloadTemplate() {
-    const data = generateAthleteImportTemplate()
-    const url = URL.createObjectURL(
-      new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
-    )
-    const link = document.createElement("a")
-    link.href = url
-    link.download = "troy-athlete-import-template.xlsx"
-    link.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
-
   async function importRows() {
-    if (!rows) return
+    if (!rows.length || problems.length) return
     setBusy(true)
     setMessage(null)
     setCredentials([])
+    setSkipped([])
+
+    const collected: ImportCredential[] = []
+    const skippedRows: ImportSkipped[] = []
+    let imported = 0
+    let failure: string | null = null
+
     try {
-      const result = await importAthletesFromExcel(rows)
-      setCredentials(result.credentials)
-      setMessage(
-        result.error
-          ? `${result.error}${result.imported ? ` ${result.imported} athlete${result.imported === 1 ? "" : "s"} imported before the error.` : ""}`
-          : `Imported ${result.imported} athlete${result.imported === 1 ? "" : "s"}.`
-      )
-      if (!result.error) setRows(null)
+      // Small batches keep each request fast; the server skips players that already exist.
+      for (let start = 0; start < rows.length; start += IMPORT_CHUNK_SIZE) {
+        setProgress({ done: start, total: rows.length })
+        const result = await importAthletesFromExcel(rows.slice(start, start + IMPORT_CHUNK_SIZE))
+        collected.push(...result.credentials)
+        skippedRows.push(...result.skipped)
+        imported += result.imported
+        setCredentials([...collected])
+        if (result.error) {
+          failure = result.error
+          break
+        }
+      }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "An error occurred during Excel import.")
+      failure = error instanceof Error ? error.message : "An error occurred during the import."
     } finally {
+      setProgress(null)
       setBusy(false)
     }
+
+    setSkipped(skippedRows)
+    setMessage(
+      failure
+        ? `${failure} ${imported} athlete${imported === 1 ? "" : "s"} were imported before the problem. Fix it and upload the file again: players already imported are skipped.`
+        : `Imported ${imported} athlete${imported === 1 ? "" : "s"}${skippedRows.length ? `, skipped ${skippedRows.length} that already exist` : ""}.`,
+    )
+    setStep("done")
+  }
+
+  function downloadCredentials() {
+    const lines = [["Athlete", "Troy ID", "Temporary password"].map(csvCell).join(",")]
+    for (const credential of credentials) lines.push([credential.name, credential.troyId, credential.temporaryPassword].map(csvCell).join(","))
+    download(`﻿${lines.join("\r\n")}`, "troy-athlete-credentials.csv", "text/csv;charset=utf-8")
   }
 
   return (
@@ -88,67 +143,211 @@ export function ExcelAthleteImport() {
             <FileSpreadsheet className="size-4" />
             Bulk import from Excel
           </CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Review the detected row count before creating athlete accounts.
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Add a whole roster at once. You will see the template to follow first.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
-            <Download className="mr-1.5 size-3.5" />
-            Download template
-          </Button>
-          <Input
-            type="file"
-            accept=".xlsx,.xls"
-            aria-label="Choose an Excel athlete roster"
-            className="h-8 max-w-xs text-xs"
-            onChange={(event) => void handleFileChange(event.currentTarget.files?.[0])}
-          />
-          {rows && (
-            <Button type="button" size="sm" disabled={busy} onClick={() => void importRows()}>
-              <Upload className="mr-1.5 size-3.5" />
-              {busy ? "Importing…" : `Import ${rows.length} athlete${rows.length === 1 ? "" : "s"}`}
-            </Button>
-          )}
-        </div>
+        <Button type="button" size="sm" onClick={() => setOpen(true)}>
+          <Upload className="mr-1.5 size-3.5" />
+          Import from Excel
+        </Button>
       </CardHeader>
-      {(message || credentials.length > 0) && (
-        <CardContent className="grid gap-3 pt-0">
-          {message && (
-            <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
-              {message}
-            </p>
-          )}
-          {credentials.length > 0 && (
-            <div className="grid gap-2">
-              <p className="text-sm font-semibold">Temporary login credentials</p>
-              <p className="text-xs text-amber-700">
-                Save these credentials now. Temporary passwords are only shown once.
-              </p>
+
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {step === "template" && "Import athletes from Excel"}
+              {step === "review" && "Review before importing"}
+              {step === "done" && "Import finished"}
+            </DialogTitle>
+            <DialogDescription>
+              {step === "template" && "Your file must look like this template. Download it, fill it in, then choose it below."}
+              {step === "review" && `${fileName} — ${rows.length} athlete${rows.length === 1 ? "" : "s"} found.`}
+              {step === "done" && "Save the login details below. Temporary passwords are only shown once."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {step === "template" && (
+            <div className="grid gap-4">
+              <ol className="list-decimal space-y-1 pl-5 text-sm">
+                <li>
+                  <strong>Download the template</strong> and fill the first sheet, <strong>“Athletes”</strong>, one player per row under the header.
+                </li>
+                <li>
+                  Only the <strong>name</strong> is required. Empty cells are saved as “Not Set”.
+                </li>
+                <li>Do not change, move or delete the header row. The “Example” sheet shows three filled-in players.</li>
+                <li>Players that already exist (same name and birth year) are skipped, so re-uploading is safe.</li>
+              </ol>
+
               <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th className="p-2 font-medium">Athlete</th>
-                      <th className="p-2 font-medium">Troy ID</th>
-                      <th className="p-2 font-medium">Temporary password</th>
+                      <th className="p-2 font-medium">#</th>
+                      <th className="p-2 font-medium">Column</th>
+                      <th className="p-2 font-medium">Required</th>
+                      <th className="p-2 font-medium">What to enter</th>
+                      <th className="p-2 font-medium">Example</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {credentials.map((credential) => (
-                      <tr key={credential.troyId} className="border-t">
-                        <td className="p-2">{credential.name}</td>
-                        <td className="p-2 font-mono">{credential.troyId}</td>
-                        <td className="p-2 font-mono">{credential.temporaryPassword}</td>
+                    {IMPORT_COLUMNS.map((column, index) => (
+                      <tr key={column.en} className="border-t align-top">
+                        <td className="p-2 text-muted-foreground">{index + 1}</td>
+                        <td className="p-2">
+                          <span dir="rtl" className="block font-medium">{column.ar}</span>
+                          <span className="text-muted-foreground">{column.en}</span>
+                        </td>
+                        <td className="p-2">{column.required ? "Yes" : "No"}</td>
+                        <td className="p-2">
+                          {column.hint}
+                          <span dir="rtl" className="block text-muted-foreground">{column.hintAr}</span>
+                        </td>
+                        <td className="p-2 font-mono">{String(column.example1) || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => download(generateAthleteImportTemplate(), "troy-athlete-import-template.xlsx", XLSX_MIME)}>
+                  <Download className="mr-1.5 size-4" />
+                  Download template (.xlsx)
+                </Button>
+                <Button type="button" onClick={() => fileInput.current?.click()}>
+                  <Upload className="mr-1.5 size-4" />
+                  Choose filled file
+                </Button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  hidden
+                  aria-label="Choose an Excel athlete roster"
+                  onChange={(event) => void handleFile(event.currentTarget.files?.[0])}
+                />
+              </div>
             </div>
           )}
-        </CardContent>
-      )}
+
+          {step === "review" && (
+            <div className="grid gap-3">
+              {problems.length > 0 && (
+                <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs">
+                  <p className="font-semibold">Fix these rows in Excel, then choose the file again:</p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {problems.slice(0, 15).map((problem) => (
+                      <li key={problem.rowNumber}>Excel row {problem.rowNumber}: {problem.message}</li>
+                    ))}
+                    {problems.length > 15 && <li>…and {problems.length - 15} more.</li>}
+                  </ul>
+                </div>
+              )}
+              <div className="max-h-72 overflow-auto rounded-lg border">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-muted">
+                    <tr>
+                      <th className="p-2 font-medium">Row</th>
+                      <th className="p-2 font-medium">Name</th>
+                      <th className="p-2 font-medium">Club</th>
+                      <th className="p-2 font-medium">Sport</th>
+                      <th className="p-2 font-medium">Position</th>
+                      <th className="p-2 font-medium">Birth year</th>
+                      <th className="p-2 font-medium">FMS total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.rowNumber} className="border-t">
+                        <td className="p-2 text-muted-foreground">{row.rowNumber}</td>
+                        <td className="p-2">{row.fullName}</td>
+                        <td className="p-2">{row.clubName ?? "—"}</td>
+                        <td className="p-2">{row.sport ?? "—"}</td>
+                        <td className="p-2">{row.position ?? "—"}</td>
+                        <td className="p-2">{row.birthYear ?? "—"}</td>
+                        <td className="p-2">{row.fmsTotal ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {progress && (
+                <p role="status" className="text-xs text-muted-foreground">
+                  Importing… {progress.done} of {progress.total}
+                </p>
+              )}
+              {message && <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">{message}</p>}
+            </div>
+          )}
+
+          {step === "done" && (
+            <div className="grid gap-3">
+              {message && <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs">{message}</p>}
+              {credentials.length > 0 && (
+                <>
+                  <p className="text-xs font-medium text-amber-700">Save these now — temporary passwords are shown only once.</p>
+                  <div className="max-h-64 overflow-auto rounded-lg border">
+                    <table className="w-full text-left text-xs">
+                      <thead className="sticky top-0 bg-muted">
+                        <tr>
+                          <th className="p-2 font-medium">Athlete</th>
+                          <th className="p-2 font-medium">Troy ID</th>
+                          <th className="p-2 font-medium">Temporary password</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {credentials.map((credential) => (
+                          <tr key={credential.troyId} className="border-t">
+                            <td className="p-2">{credential.name}</td>
+                            <td className="p-2 font-mono">{credential.troyId}</td>
+                            <td className="p-2 font-mono">{credential.temporaryPassword}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <Button type="button" variant="outline" size="sm" onClick={downloadCredentials}>
+                      <Download className="mr-1.5 size-3.5" />
+                      Download credentials (.csv)
+                    </Button>
+                  </div>
+                </>
+              )}
+              {skipped.length > 0 && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer font-medium">{skipped.length} skipped (already exist)</summary>
+                  <ul className="mt-1 list-disc pl-5">
+                    {skipped.map((entry) => (
+                      <li key={`${entry.rowNumber}-${entry.name}`}>Row {entry.rowNumber}: {entry.name}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {step === "template" && message && <p role="status" className="mr-auto text-xs text-destructive">{message}</p>}
+            {step === "review" && (
+              <>
+                <Button type="button" variant="outline" disabled={busy} onClick={reset}>
+                  Choose another file
+                </Button>
+                <Button type="button" disabled={busy || problems.length > 0} onClick={() => void importRows()}>
+                  {busy ? "Importing…" : `Import ${rows.length} athlete${rows.length === 1 ? "" : "s"}`}
+                </Button>
+              </>
+            )}
+            {step === "done" && (
+              <Button type="button" onClick={() => handleOpenChange(false)}>
+                Close
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

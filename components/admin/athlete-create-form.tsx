@@ -2,11 +2,12 @@
 
 import { useState } from "react"
 import { Copy, CheckCheck, Plus, Trash2, SlidersHorizontal, Sparkles } from "lucide-react"
-import { createAthleteAccount } from "@/app/admin/actions"
+import { createAthleteAccount } from "@/app/admin/actions/athletes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import type { AdminTeam } from "@/lib/admin/types"
 import { getPerformanceRag } from "@/lib/rag-thresholds"
 
 // FMS: 0 = ضعيف جدا, 1 = ضعيف, 2 = جيد/متوسط, 3 = ممتاز
@@ -57,7 +58,7 @@ function epley1RM(kg: number, reps: number): number {
   return Math.round(kg * (1 + reps / 30))
 }
 
-export function AthleteCreateForm({ teams = [] }: { teams: any[] }) {
+export function AthleteCreateForm({ teams = [] }: { teams: AdminTeam[] }) {
   const [message, setMessage] = useState<string | null>(null)
   const [created, setCreated] = useState<CreatedAthlete | null>(null)
   const [copied, setCopied] = useState<"id" | "pass" | null>(null)
