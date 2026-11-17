@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { AdminBoard } from "@/components/admin/admin-board"
 import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
 import { AdminErrorBoundary } from "@/components/admin/admin-error-boundary"
+import { getT } from "@/lib/i18n/get-language"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // AI program generation runs as a server action hosted by this page; allow it the full minute.
@@ -17,6 +18,7 @@ type ExerciseName = { name_en?: string | null }
 type SessionExerciseRow = { id: string; exercises: ExerciseName | ExerciseName[] | null }
 
 export default async function AdminPage() {
+  const t = await getT()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
@@ -109,7 +111,7 @@ export default async function AdminPage() {
     return {
       ...athlete,
       athlete_teams: teamsByAthlete.get(athlete.id) ?? [],
-      profiles: athleteProfileById.get(athlete.id) ?? { id: athlete.id, full_name: "Unnamed athlete", role: "athlete" },
+      profiles: athleteProfileById.get(athlete.id) ?? { id: athlete.id, full_name: t("Unnamed athlete"), role: "athlete" },
       auth_email: authEmailById.get(athlete.id) ?? "",
       latest_measurement: measurements?.find((row) => row.athlete_id === athlete.id),
       latest_inbody: inbodyRecords?.find((row) => row.athlete_id === athlete.id),
@@ -145,7 +147,7 @@ export default async function AdminPage() {
   const feedbackSummaries = ((rawSummaries ?? []) as SummaryRow[]).map((row) => {
     const sa = saMap.get(row.session_athlete_id)
     const sp = sa?.session_post_id ? spMap.get(sa.session_post_id) : undefined
-    return { id: row.id, athlete_id: sa?.athlete_id ?? "", session_post_id: sa?.session_post_id ?? "", session_title: sp?.title_en ?? "Training session", session_date: sp?.session_date ?? "", submitted_at: row.submitted_at, rpe: row.rpe, overall_rating: row.overall_rating, sleep_quality: row.sleep_quality, soreness_level: row.soreness_level, symptoms: row.symptoms, feedback_text: row.feedback_text }
+    return { id: row.id, athlete_id: sa?.athlete_id ?? "", session_post_id: sa?.session_post_id ?? "", session_title: sp?.title_en ?? t("Training session"), session_date: sp?.session_date ?? "", submitted_at: row.submitted_at, rpe: row.rpe, overall_rating: row.overall_rating, sleep_quality: row.sleep_quality, soreness_level: row.soreness_level, symptoms: row.symptoms, feedback_text: row.feedback_text }
   }).filter((row) => row.athlete_id)
 
   const feedbackPainReports = ((rawPainRows ?? []) as PainRow[]).map((row) => {
@@ -153,7 +155,7 @@ export default async function AdminPage() {
     const sp = sa?.session_post_id ? spMap.get(sa.session_post_id) : undefined
     const se = row.session_exercise_id ? seMap.get(row.session_exercise_id) : undefined
     const exName = Array.isArray(se?.exercises) ? se.exercises[0]?.name_en : se?.exercises?.name_en
-    return { id: row.id, athlete_id: sa?.athlete_id ?? "", session_post_id: sa?.session_post_id ?? "", session_title: sp?.title_en ?? "Training session", session_date: sp?.session_date ?? "", exercise_name: exName ?? "Exercise", pain_location: row.pain_location, pain_severity: row.pain_severity, pain_notes: row.pain_notes, reported_at: row.created_at }
+    return { id: row.id, athlete_id: sa?.athlete_id ?? "", session_post_id: sa?.session_post_id ?? "", session_title: sp?.title_en ?? t("Training session"), session_date: sp?.session_date ?? "", exercise_name: exName ?? t("Exercise"), pain_location: row.pain_location, pain_severity: row.pain_severity, pain_notes: row.pain_notes, reported_at: row.created_at }
   }).filter((row) => row.athlete_id)
 
   return (

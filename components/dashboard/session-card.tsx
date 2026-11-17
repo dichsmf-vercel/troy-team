@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useLanguage } from "@/components/providers/language-provider"
+import { useLanguage, useT } from "@/components/providers/language-provider"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { safeTime } from "@/lib/formatters"
@@ -24,6 +24,7 @@ export type SessionCardData = {
 }
 
 export function SessionCard({ session }: { session: SessionCardData }) {
+  const t = useT()
   const { language, dict, dir } = useLanguage()
   const title = language === "ar" ? session.titleAr : session.titleEn
   const teamName = language === "ar" ? session.teamNameAr : session.teamNameEn
@@ -73,7 +74,7 @@ export function SessionCard({ session }: { session: SessionCardData }) {
         </div>
         {isComplete ? (
           <Badge variant="secondary" className="rounded-md shrink-0 gap-1 bg-emerald-500/15 text-emerald-500"><span aria-hidden="true">✓</span>{dict.dashboard.completed}</Badge>
-        ) : <Badge className="shrink-0 bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25">Start training</Badge>}
+        ) : <Badge className="shrink-0 bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-md shadow-primary/25">{t("Start training")}</Badge>}
       </div>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">

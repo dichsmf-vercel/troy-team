@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache"
 import { requireAdmin, requireStaff } from "@/lib/auth/guards"
 import { formString } from "@/lib/admin/forms"
+import { getT } from "@/lib/i18n/get-language"
 
 export async function createTeam(form: FormData) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
   const { supabase, user } = auth.ctx
 
   const nameEn = formString(form, "name_en")
-  if (!nameEn) return { error: "Team name is required." }
+  if (!nameEn) return { error: t("Team name is required.") }
 
   const { error } = await supabase.from("teams").insert({
     name_en: nameEn,
@@ -33,7 +35,8 @@ export async function updateTeam(id: string, values: { name_en: string; name_ar:
 }
 
 export async function deleteTeam(id: string) {
-  const auth = await requireAdmin("Only admins can delete teams.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can delete teams."))
   if (!auth.ok) return { error: auth.error }
 
   const { error } = await auth.ctx.supabase.from("teams").delete().eq("id", id)
@@ -42,21 +45,22 @@ export async function deleteTeam(id: string) {
 }
 
 export async function createSessionPost(form: FormData) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
   const { supabase, user } = auth.ctx
 
   const exerciseIds = form.getAll("exercise_id").map(String).filter(Boolean)
-  if (!exerciseIds.length) return { error: "Add at least one exercise before saving this assigned training." }
+  if (!exerciseIds.length) return { error: t("Add at least one exercise before saving this assigned training.") }
 
   const targetType = formString(form, "target_type") || "team"
   const targetId = formString(form, "target_id")
   const sessionDate = formString(form, "session_date")
   const startTime = formString(form, "start_time")
   if (!/^\d{4}-\d{2}-\d{2}$/.test(sessionDate) || !/^\d{2}:\d{2}$/.test(startTime)) {
-    return { error: "Choose a valid session date and start time." }
+    return { error: t("Choose a valid session date and start time.") }
   }
-  if (!targetId) return { error: "Choose a team or athlete." }
+  if (!targetId) return { error: t("Choose a team or athlete.") }
 
   const titleEn = formString(form, "title_en")
   const { data: session, error } = await supabase
@@ -73,7 +77,7 @@ export async function createSessionPost(form: FormData) {
     })
     .select("id")
     .single()
-  if (error || !session) return { error: error?.message ?? "Unable to create session" }
+  if (error || !session) return { error: error?.message ?? t("Unable to create session") }
 
   const sets = form.getAll("exercise_sets")
   const reps = form.getAll("exercise_reps")
@@ -98,9 +102,10 @@ export async function createSessionPost(form: FormData) {
 }
 
 export async function deleteSessionPost(id: string) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
-  if (!id?.trim()) return { error: "Missing session id" }
+  if (!id?.trim()) return { error: t("Missing session id") }
 
   const { error } = await auth.ctx.supabase.from("session_posts").delete().eq("id", id)
   revalidatePath("/admin")

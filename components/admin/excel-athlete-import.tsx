@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { IMPORT_CHUNK_SIZE, findRowProblems } from "@/lib/admin/athlete-import-validation"
+import { useT } from "@/components/providers/language-provider"
 import {
   IMPORT_COLUMNS,
   generateAthleteImportTemplate,
@@ -32,6 +33,7 @@ function download(data: BlobPart, filename: string, type: string) {
 const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`
 
 export function ExcelAthleteImport() {
+  const t = useT()
   const fileInput = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<Step>("template")
@@ -59,7 +61,7 @@ export function ExcelAthleteImport() {
   function handleOpenChange(next: boolean) {
     // Never close mid-import, and never lose credentials the coach has not saved yet.
     if (!next && busy) return
-    if (!next && credentials.length && !window.confirm("Have you saved the temporary passwords? They cannot be shown again.")) return
+    if (!next && credentials.length && !window.confirm(t("Have you saved the temporary passwords? They cannot be shown again."))) return
     setOpen(next)
     if (!next) reset()
   }
@@ -71,19 +73,19 @@ export function ExcelAthleteImport() {
     if (!file) return
     setFileName(file.name)
 
-    if (file.size > MAX_FILE_BYTES) return setMessage("The file is larger than 5 MB.")
+    if (file.size > MAX_FILE_BYTES) return setMessage(t("The file is larger than 5 MB."))
     try {
       const parsed = parseAthletesFromExcel(await file.arrayBuffer())
-      if (parsed.error) return setMessage(parsed.error)
+      if (parsed.error) return setMessage(t(parsed.error))
       if (!parsed.athletes.length) {
-        return setMessage("No athlete rows were found. Fill the “Athletes” sheet of the template under the header row.")
+        return setMessage(t("No athlete rows were found. Fill the “Athletes” sheet of the template under the header row."))
       }
-      if (parsed.athletes.length > MAX_ROWS) return setMessage(`The file has ${parsed.athletes.length} athletes. Import at most ${MAX_ROWS} at a time.`)
+      if (parsed.athletes.length > MAX_ROWS) return setMessage(t("The file has {athletesCount} athletes. Import at most {MAX_ROWS} at a time.", { athletesCount: parsed.athletes.length, MAX_ROWS }))
       setRows(parsed.athletes)
-      setProblems(findRowProblems(parsed.athletes))
+      setProblems(findRowProblems(parsed.athletes, t))
       setStep("review")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not read the spreadsheet.")
+      setMessage(error instanceof Error ? error.message : t("Could not read the spreadsheet."))
     }
   }
 
@@ -114,7 +116,7 @@ export function ExcelAthleteImport() {
         }
       }
     } catch (error) {
-      failure = error instanceof Error ? error.message : "An error occurred during the import."
+      failure = error instanceof Error ? error.message : t("An error occurred during the import.")
     } finally {
       setProgress(null)
       setBusy(false)
@@ -123,8 +125,10 @@ export function ExcelAthleteImport() {
     setSkipped(skippedRows)
     setMessage(
       failure
-        ? `${failure} ${imported} athlete${imported === 1 ? "" : "s"} were imported before the problem. Fix it and upload the file again: players already imported are skipped.`
-        : `Imported ${imported} athlete${imported === 1 ? "" : "s"}${skippedRows.length ? `, skipped ${skippedRows.length} that already exist` : ""}.`,
+        ? `${failure} ${t.plural(imported, "{count} athlete was imported before the problem.", "{count} athletes were imported before the problem.")} ${t("Fix it and upload the file again: players already imported are skipped.")}`
+        : skippedRows.length
+          ? t.plural(imported, "Imported {count} athlete, skipped {skipped} that already exist.", "Imported {count} athletes, skipped {skipped} that already exist.", { skipped: skippedRows.length })
+          : t.plural(imported, "Imported {count} athlete.", "Imported {count} athletes."),
     )
     setStep("done")
   }
@@ -141,13 +145,13 @@ export function ExcelAthleteImport() {
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
             <FileSpreadsheet className="size-4" />
-            Bulk import from Excel
+            {t("Bulk import from Excel")}
           </CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">Add a whole roster at once. You will see the template to follow first.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("Add a whole roster at once. You will see the template to follow first.")}</p>
         </div>
         <Button type="button" size="sm" onClick={() => setOpen(true)}>
           <Upload className="mr-1.5 size-3.5" />
-          Import from Excel
+          {t("Import from Excel")}
         </Button>
       </CardHeader>
 
@@ -155,14 +159,14 @@ export function ExcelAthleteImport() {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {step === "template" && "Import athletes from Excel"}
-              {step === "review" && "Review before importing"}
-              {step === "done" && "Import finished"}
+              {step === "template" && t("Import athletes from Excel")}
+              {step === "review" && t("Review before importing")}
+              {step === "done" && t("Import finished")}
             </DialogTitle>
             <DialogDescription>
-              {step === "template" && "Your file must look like this template. Download it, fill it in, then choose it below."}
-              {step === "review" && `${fileName} — ${rows.length} athlete${rows.length === 1 ? "" : "s"} found.`}
-              {step === "done" && "Save the login details below. Temporary passwords are only shown once."}
+              {step === "template" && t("Your file must look like this template. Download it, fill it in, then choose it below.")}
+              {step === "review" && `${fileName} — ${t.plural(rows.length, "{count} athlete found.", "{count} athletes found.")}`}
+              {step === "done" && t("Save the login details below. Temporary passwords are only shown once.")}
             </DialogDescription>
           </DialogHeader>
 
@@ -170,13 +174,13 @@ export function ExcelAthleteImport() {
             <div className="grid gap-4">
               <ol className="list-decimal space-y-1 pl-5 text-sm">
                 <li>
-                  <strong>Download the template</strong> and fill the first sheet, <strong>“Athletes”</strong>, one player per row under the header.
+                  {t("Download the template and fill the first sheet, “Athletes”, one player per row under the header.")}
                 </li>
                 <li>
-                  Only the <strong>name</strong> is required. Empty cells are saved as “Not Set”.
+                  {t("Only the name is required. Empty cells are saved as “Not Set”.")}
                 </li>
-                <li>Do not change, move or delete the header row. The “Example” sheet shows three filled-in players.</li>
-                <li>Players that already exist (same name and birth year) are skipped, so re-uploading is safe.</li>
+                <li>{t("Do not change, move or delete the header row. The “Example” sheet shows three filled-in players.")}</li>
+                <li>{t("Players that already exist (same name and birth year) are skipped, so re-uploading is safe.")}</li>
               </ol>
 
               <div className="overflow-x-auto rounded-lg border">
@@ -184,10 +188,10 @@ export function ExcelAthleteImport() {
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="p-2 font-medium">#</th>
-                      <th className="p-2 font-medium">Column</th>
-                      <th className="p-2 font-medium">Required</th>
-                      <th className="p-2 font-medium">What to enter</th>
-                      <th className="p-2 font-medium">Example</th>
+                      <th className="p-2 font-medium">{t("Column")}</th>
+                      <th className="p-2 font-medium">{t("Required")}</th>
+                      <th className="p-2 font-medium">{t("What to enter")}</th>
+                      <th className="p-2 font-medium">{t("Example")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -198,7 +202,7 @@ export function ExcelAthleteImport() {
                           <span dir="rtl" className="block font-medium">{column.ar}</span>
                           <span className="text-muted-foreground">{column.en}</span>
                         </td>
-                        <td className="p-2">{column.required ? "Yes" : "No"}</td>
+                        <td className="p-2">{column.required ? t("Yes") : t("No")}</td>
                         <td className="p-2">
                           {column.hint}
                           <span dir="rtl" className="block text-muted-foreground">{column.hintAr}</span>
@@ -213,18 +217,18 @@ export function ExcelAthleteImport() {
               <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" variant="outline" onClick={() => download(generateAthleteImportTemplate(), "troy-athlete-import-template.xlsx", XLSX_MIME)}>
                   <Download className="mr-1.5 size-4" />
-                  Download template (.xlsx)
+                  {t("Download template (.xlsx)")}
                 </Button>
                 <Button type="button" onClick={() => fileInput.current?.click()}>
                   <Upload className="mr-1.5 size-4" />
-                  Choose filled file
+                  {t("Choose filled file")}
                 </Button>
                 <input
                   ref={fileInput}
                   type="file"
                   accept=".xlsx,.xls"
                   hidden
-                  aria-label="Choose an Excel athlete roster"
+                  aria-label={t("Choose an Excel athlete roster")}
                   onChange={(event) => void handleFile(event.currentTarget.files?.[0])}
                 />
               </div>
@@ -235,12 +239,12 @@ export function ExcelAthleteImport() {
             <div className="grid gap-3">
               {problems.length > 0 && (
                 <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs">
-                  <p className="font-semibold">Fix these rows in Excel, then choose the file again:</p>
+                  <p className="font-semibold">{t("Fix these rows in Excel, then choose the file again:")}</p>
                   <ul className="mt-1 list-disc pl-5">
                     {problems.slice(0, 15).map((problem) => (
-                      <li key={problem.rowNumber}>Excel row {problem.rowNumber}: {problem.message}</li>
+                      <li key={problem.rowNumber}>{problem.message}</li>
                     ))}
-                    {problems.length > 15 && <li>…and {problems.length - 15} more.</li>}
+                    {problems.length > 15 && <li>{t("…and {count} more.", { count: problems.length - 15 })}</li>}
                   </ul>
                 </div>
               )}
@@ -248,13 +252,13 @@ export function ExcelAthleteImport() {
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 bg-muted">
                     <tr>
-                      <th className="p-2 font-medium">Row</th>
-                      <th className="p-2 font-medium">Name</th>
-                      <th className="p-2 font-medium">Club</th>
-                      <th className="p-2 font-medium">Sport</th>
-                      <th className="p-2 font-medium">Position</th>
-                      <th className="p-2 font-medium">Birth year</th>
-                      <th className="p-2 font-medium">FMS total</th>
+                      <th className="p-2 font-medium">{t("Row")}</th>
+                      <th className="p-2 font-medium">{t("Name")}</th>
+                      <th className="p-2 font-medium">{t("Club")}</th>
+                      <th className="p-2 font-medium">{t("Sport")}</th>
+                      <th className="p-2 font-medium">{t("Position")}</th>
+                      <th className="p-2 font-medium">{t("Birth year")}</th>
+                      <th className="p-2 font-medium">{t("FMS total")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -274,7 +278,7 @@ export function ExcelAthleteImport() {
               </div>
               {progress && (
                 <p role="status" className="text-xs text-muted-foreground">
-                  Importing… {progress.done} of {progress.total}
+                  {t("Importing… {done} of {total}", { done: progress.done, total: progress.total })}
                 </p>
               )}
               {message && <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">{message}</p>}
@@ -286,14 +290,14 @@ export function ExcelAthleteImport() {
               {message && <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs">{message}</p>}
               {credentials.length > 0 && (
                 <>
-                  <p className="text-xs font-medium text-amber-700">Save these now — temporary passwords are shown only once.</p>
+                  <p className="text-xs font-medium text-amber-700">{t("Save these now — temporary passwords are shown only once.")}</p>
                   <div className="max-h-64 overflow-auto rounded-lg border">
                     <table className="w-full text-left text-xs">
                       <thead className="sticky top-0 bg-muted">
                         <tr>
-                          <th className="p-2 font-medium">Athlete</th>
-                          <th className="p-2 font-medium">Troy ID</th>
-                          <th className="p-2 font-medium">Temporary password</th>
+                          <th className="p-2 font-medium">{t("Athlete")}</th>
+                          <th className="p-2 font-medium">{t("Troy ID")}</th>
+                          <th className="p-2 font-medium">{t("Temporary password")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -310,17 +314,17 @@ export function ExcelAthleteImport() {
                   <div>
                     <Button type="button" variant="outline" size="sm" onClick={downloadCredentials}>
                       <Download className="mr-1.5 size-3.5" />
-                      Download credentials (.csv)
+                      {t("Download credentials (.csv)")}
                     </Button>
                   </div>
                 </>
               )}
               {skipped.length > 0 && (
                 <details className="text-xs">
-                  <summary className="cursor-pointer font-medium">{skipped.length} skipped (already exist)</summary>
+                  <summary className="cursor-pointer font-medium">{t("{skippedCount} skipped (already exist)", { skippedCount: skipped.length })}</summary>
                   <ul className="mt-1 list-disc pl-5">
                     {skipped.map((entry) => (
-                      <li key={`${entry.rowNumber}-${entry.name}`}>Row {entry.rowNumber}: {entry.name}</li>
+                      <li key={`${entry.rowNumber}-${entry.name}`}>{t("Row {rowNumber}: {name}", { rowNumber: entry.rowNumber, name: entry.name })}</li>
                     ))}
                   </ul>
                 </details>
@@ -333,16 +337,16 @@ export function ExcelAthleteImport() {
             {step === "review" && (
               <>
                 <Button type="button" variant="outline" disabled={busy} onClick={reset}>
-                  Choose another file
+                  {t("Choose another file")}
                 </Button>
                 <Button type="button" disabled={busy || problems.length > 0} onClick={() => void importRows()}>
-                  {busy ? "Importing…" : `Import ${rows.length} athlete${rows.length === 1 ? "" : "s"}`}
+                  {busy ? t("Importing…") : t.plural(rows.length, "Import {count} athlete", "Import {count} athletes")}
                 </Button>
               </>
             )}
             {step === "done" && (
               <Button type="button" onClick={() => handleOpenChange(false)}>
-                Close
+                {t("Close")}
               </Button>
             )}
           </DialogFooter>

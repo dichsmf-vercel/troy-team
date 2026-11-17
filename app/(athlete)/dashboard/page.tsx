@@ -9,6 +9,7 @@ import Link from "next/link"
 import { Calendar, Target, AlertCircle } from "lucide-react"
 import { SessionCard, type SessionCardData } from "@/components/dashboard/session-card"
 import { AssignedTrainingDiagnostics } from "@/components/dashboard/assigned-training-diagnostics"
+import { getT } from "@/lib/i18n/get-language"
 import { readProgramSessions } from "@/lib/program-data"
 
 type TeamLite = { name_en?: string | null; name_ar?: string | null; color_hex?: string | null; image_url?: string | null; is_national_team?: boolean | null }
@@ -25,6 +26,7 @@ type AssignedPostRow = {
 type AttendanceRow = { id: string; session_post_id: string; attended_at: string | null; completed_at: string | null; session_summaries?: { id: string }[] | null }
 
 export default async function DashboardPage() {
+  const t = await getT()
   const supabase = await createClient()
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) redirect("/auth/login")
@@ -35,7 +37,7 @@ export default async function DashboardPage() {
     supabase.from("athlete_programs").select("*").eq("athlete_id", userData.user.id).in("status", ["approved", "active"]).order("month_start", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("athlete_teams").select("team_id, teams(id,name_en,name_ar,color_hex,image_url,is_national_team)").eq("athlete_id", userData.user.id),
   ])
-  if (athleteProfile?.account_status === "paused") return <main className="grid min-h-screen place-items-center p-6"><Card className="max-w-md"><CardHeader><CardTitle>Account paused</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Your account is currently paused. Please contact your coach when you are ready to resume training.</p></CardContent></Card></main>
+  if (athleteProfile?.account_status === "paused") return <main className="grid min-h-screen place-items-center p-6"><Card className="max-w-md"><CardHeader><CardTitle>{t("Account paused")}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{t("Your account is currently paused. Please contact your coach when you are ready to resume training.")}</p></CardContent></Card></main>
   const todayStr = new Date().toISOString().slice(0, 10)
   const teamIds = (athleteTeams ?? []).map((row: { team_id: string | null }) => row.team_id).filter((id): id is string => !!id)
   const assignedPostQuery = "id,title_en,title_ar,session_date,start_time,team_id,athlete_id,teams(name_en,name_ar,color_hex,image_url,is_national_team)"
@@ -71,33 +73,33 @@ export default async function DashboardPage() {
   const completedSessions = ((attendanceRows ?? []) as unknown as AttendanceRow[]).filter((row) => row.completed_at).length
   const upcomingSessionsCount = assignedUpcoming.length
   const firstName = profile?.full_name?.split(" ")[0] ?? ""
-  const programStatus = athleteProgram?.status === "approved" ? "Ready" : athleteProgram?.status === "active" ? "Active" : "Pending"
+  const programStatus = athleteProgram?.status === "approved" ? t("Ready") : athleteProgram?.status === "active" ? t("Active") : t("Pending")
   const programSessions = readProgramSessions(athleteProgram?.generation_reason)
   const programToday = programSessions.find((session) => session.date === todayStr)
 
   return (
     <div>
-      <AthleteHeader title={`Welcome${firstName ? ", " + firstName : ""}`} />
+      <AthleteHeader title={firstName ? t("Welcome, {name}", { name: firstName }) : t("Welcome")} />
       <AssignedTrainingDiagnostics athleteId={userData.user.id} directPosts={directPosts.map((post) => ({ id: post.id, title: post.title_en }))} teamPosts={teamPosts.map((post) => ({ id: post.id, title: post.title_en }))} teamIds={teamIds} exerciseCounts={Object.fromEntries(exerciseCountByPost)} errors={{ direct: directPostsError?.message ?? null, team: teamPostsError?.message ?? null, exercises: assignedRowsError?.message ?? null, attendance: attendanceRowsError?.message ?? null }} />
       <main className="flex flex-col gap-6 px-4 py-6">
-        <section className="relative overflow-hidden rounded-3xl bg-primary p-6 text-primary-foreground shadow-xl shadow-primary/20"><div className="relative z-10 flex items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary-foreground/75">Your training space</p><h2 className="mt-1 text-3xl font-bold tracking-tight">Ready when you are.</h2><p className="mt-2 max-w-[18rem] text-sm text-primary-foreground/75">Stay consistent, follow your plan, and make today count.</p></div><Target className="size-12 shrink-0 text-primary-foreground/80" aria-hidden="true" /></div><div className="absolute -right-10 -top-10 size-36 rounded-full border-[18px] border-primary-foreground/10" /></section>
+        <section className="relative overflow-hidden rounded-3xl bg-primary p-6 text-primary-foreground shadow-xl shadow-primary/20"><div className="relative z-10 flex items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary-foreground/75">{t("Your training space")}</p><h2 className="mt-1 text-3xl font-bold tracking-tight">{t("Ready when you are.")}</h2><p className="mt-2 max-w-[18rem] text-sm text-primary-foreground/75">{t("Stay consistent, follow your plan, and make today count.")}</p></div><Target className="size-12 shrink-0 text-primary-foreground/80" aria-hidden="true" /></div><div className="absolute -right-10 -top-10 size-36 rounded-full border-[18px] border-primary-foreground/10" /></section>
         {/* Status cards */}
         <section className="grid grid-cols-3 gap-2">
           <Card className="border-border/60 bg-card/80 shadow-sm">
             <CardContent className="p-3">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Program</p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("Program")}</p>
               <p className="mt-2 text-lg font-bold text-accent">{programStatus}</p>
             </CardContent>
           </Card>
           <Card className="border-border/60 bg-card/80 shadow-sm">
             <CardContent className="p-3">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Completed</p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("Completed")}</p>
               <p className="mt-2 text-lg font-bold text-primary">{completedSessions}</p>
             </CardContent>
           </Card>
           <Card className="border-border/60 bg-card/80 shadow-sm">
             <CardContent className="p-3">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Upcoming</p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("Upcoming")}</p>
               <p className="mt-2 text-lg font-bold">{upcomingSessionsCount}</p>
             </CardContent>
           </Card>
@@ -106,15 +108,15 @@ export default async function DashboardPage() {
 
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold tracking-tight">Today&apos;s training</h2>
-            {programToday && <Badge variant="secondary" className="text-xs">Ready</Badge>}
+            <h2 className="text-lg font-bold tracking-tight">{t("Today's training")}</h2>
+            {programToday && <Badge variant="secondary" className="text-xs">{t("Ready")}</Badge>}
           </div>
-          {programToday ? <Link href={`/program/session/${programToday.date}`} className="rounded-2xl border border-accent/40 bg-accent/5 p-5 transition-colors hover:bg-accent/10"><p className="text-xs font-semibold uppercase tracking-wide text-accent">Program session</p><p className="mt-1 font-semibold">Today&apos;s program training</p><p className="mt-1 text-xs text-muted-foreground">{programToday.exercises?.length ?? 0} exercises · Start sequential training</p></Link> : <div className="rounded-2xl border border-dashed p-5 text-center"><Calendar className="mx-auto size-8 text-muted-foreground" /><p className="mt-2 text-sm font-medium">Rest day</p><p className="text-xs text-muted-foreground">No program session scheduled for today</p></div>}
+          {programToday ? <Link href={`/program/session/${programToday.date}`} className="rounded-2xl border border-accent/40 bg-accent/5 p-5 transition-colors hover:bg-accent/10"><p className="text-xs font-semibold uppercase tracking-wide text-accent">{t("Program session")}</p><p className="mt-1 font-semibold">{t("Today's program training")}</p><p className="mt-1 text-xs text-muted-foreground">{programToday.exercises?.length ?? 0} {t("exercises · Start sequential training")}</p></Link> : <div className="rounded-2xl border border-dashed p-5 text-center"><Calendar className="mx-auto size-8 text-muted-foreground" /><p className="mt-2 text-sm font-medium">{t("Rest day")}</p><p className="text-xs text-muted-foreground">{t("No program session scheduled for today")}</p></div>}
         </section>
 
         <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold tracking-tight">Assigned trainings</h2><p className="text-xs text-muted-foreground">Coach-assigned sessions follow the same exercise-by-exercise flow.</p></div>{assignedToday.length > 0 && <Badge variant="secondary" className="text-xs">Ready</Badge>}</div>
-          {assignedToday.length > 0 ? <div className="flex flex-col gap-3">{assignedToday.map((session) => <SessionCard key={session.sessionPostId} session={session} />)}</div> : assignedUpcoming.length > 0 ? <div className="flex flex-col gap-3">{assignedUpcoming.map((session) => <SessionCard key={session.sessionPostId} session={session} />)}</div> : <div className="rounded-2xl border border-dashed p-5 text-center"><p className="text-sm font-medium">No assigned trainings</p><p className="text-xs text-muted-foreground">New coach assignments will appear here.</p></div>}
+          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold tracking-tight">{t("Assigned trainings")}</h2><p className="text-xs text-muted-foreground">{t("Coach-assigned sessions follow the same exercise-by-exercise flow.")}</p></div>{assignedToday.length > 0 && <Badge variant="secondary" className="text-xs">{t("Ready")}</Badge>}</div>
+          {assignedToday.length > 0 ? <div className="flex flex-col gap-3">{assignedToday.map((session) => <SessionCard key={session.sessionPostId} session={session} />)}</div> : assignedUpcoming.length > 0 ? <div className="flex flex-col gap-3">{assignedUpcoming.map((session) => <SessionCard key={session.sessionPostId} session={session} />)}</div> : <div className="rounded-2xl border border-dashed p-5 text-center"><p className="text-sm font-medium">{t("No assigned trainings")}</p><p className="text-xs text-muted-foreground">{t("New coach assignments will appear here.")}</p></div>}
         </section>
 
         {/* Program alert */}
@@ -123,8 +125,8 @@ export default async function DashboardPage() {
             <CardContent className="p-4 flex gap-3">
               <AlertCircle className="size-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium">Program under review</p>
-                <p className="text-xs text-muted-foreground mt-1">Your coach is preparing your monthly training program. Check back soon!</p>
+                <p className="text-sm font-medium">{t("Program under review")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("Your coach is preparing your monthly training program. Check back soon!")}</p>
               </div>
             </CardContent>
           </Card>
@@ -132,14 +134,14 @@ export default async function DashboardPage() {
 
         {/* Quick stats */}
         <section className="grid gap-3 pt-4 border-t">
-          <h3 className="text-sm font-semibold">Session stats</h3>
+          <h3 className="text-sm font-semibold">{t("Session stats")}</h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-muted/50 p-3">
-              <p className="text-xs text-muted-foreground">Program status</p>
+              <p className="text-xs text-muted-foreground">{t("Program status")}</p>
               <p className="mt-1 text-xl font-bold">{programStatus}</p>
             </div>
             <div className="rounded-xl bg-muted/50 p-3">
-              <p className="text-xs text-muted-foreground">Today&apos;s exercises</p>
+              <p className="text-xs text-muted-foreground">{t("Today's exercises")}</p>
               <p className="mt-1 text-xl font-bold">{programToday?.exercises?.length ?? 0}</p>
             </div>
           </div>

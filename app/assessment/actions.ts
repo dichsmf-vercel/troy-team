@@ -3,13 +3,15 @@
 import { revalidatePath } from "next/cache"
 import { requireUser } from "@/lib/auth/guards"
 import { formNumber, formString } from "@/lib/admin/forms"
+import { getT } from "@/lib/i18n/get-language"
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024
 const splitList = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean)
 
 export async function submitAssessment(formData: FormData) {
+  const t = await getT()
   const auth = await requireUser()
-  if (!auth.ok) return { error: "Please sign in first." }
+  if (!auth.ok) return { error: t("Please sign in first.") }
   const { supabase, user } = auth.ctx
 
   const injuryFlags = splitList(formString(formData, "injury_flags"))
@@ -20,7 +22,7 @@ export async function submitAssessment(formData: FormData) {
     .insert({ athlete_id: user.id, status: "submitted", submitted_at: new Date().toISOString(), injury_flags: injuryFlags, goals })
     .select("id")
     .single()
-  if (error || !assessment) return { error: error?.message || "Unable to submit assessment." }
+  if (error || !assessment) return { error: error?.message || t("Unable to submit assessment.") }
 
   // `training_days` is not collected by the form yet; it is stored as null so readers keep working.
   const answers = ["training_days", "experience", "equipment", "medical_notes"].map((key) => ({
@@ -44,13 +46,14 @@ export async function submitAssessment(formData: FormData) {
 }
 
 export async function uploadAssessmentPhoto(formData: FormData) {
+  const t = await getT()
   const auth = await requireUser()
-  if (!auth.ok) return { error: "Please sign in first." }
+  if (!auth.ok) return { error: t("Please sign in first.") }
   const { supabase, user } = auth.ctx
 
   const photo = formData.get("assessment_photo")
-  if (!(photo instanceof File) || photo.size === 0) return { error: "Choose an image first." }
-  if (!photo.type.startsWith("image/") || photo.size > MAX_PHOTO_BYTES) return { error: "Upload an image smaller than 8 MB." }
+  if (!(photo instanceof File) || photo.size === 0) return { error: t("Choose an image first.") }
+  if (!photo.type.startsWith("image/") || photo.size > MAX_PHOTO_BYTES) return { error: t("Upload an image smaller than 8 MB.") }
 
   const { data: assessment } = await supabase
     .from("athlete_assessments")
@@ -59,7 +62,7 @@ export async function uploadAssessmentPhoto(formData: FormData) {
     .order("submitted_at", { ascending: false })
     .limit(1)
     .maybeSingle()
-  if (!assessment) return { error: "Submit your assessment before uploading an image." }
+  if (!assessment) return { error: t("Submit your assessment before uploading an image.") }
 
   const path = `${user.id}/${crypto.randomUUID()}-${photo.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`
   const { error: uploadError } = await supabase.storage.from("inbody-photos").upload(path, photo, { contentType: photo.type, upsert: false })
@@ -77,8 +80,9 @@ export async function uploadAssessmentPhoto(formData: FormData) {
 }
 
 export async function saveInbody(formData: FormData) {
+  const t = await getT()
   const auth = await requireUser()
-  if (!auth.ok) return { error: "Please sign in first." }
+  if (!auth.ok) return { error: t("Please sign in first.") }
   const { supabase, user } = auth.ctx
 
   const { error } = await supabase.from("inbody_records").insert({

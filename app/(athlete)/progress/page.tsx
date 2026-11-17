@@ -3,8 +3,10 @@ import { firstRelation } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/server"
 import { ProgressDashboard } from "@/components/progress/progress-dashboard"
 import { logPageHealth } from "@/lib/formatters"
+import { getT } from "@/lib/i18n/get-language"
 
 export default async function ProgressPage() {
+  const t = await getT()
   const supabase = await createClient()
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) redirect("/auth/login")
@@ -25,5 +27,5 @@ export default async function ProgressPage() {
   const assessmentStatus = assessments?.[0]?.status ?? "not_started"
   const program = athletePrograms?.[0]
   logPageHealth("athlete-progress", { athleteId, measurements: measurements?.length ?? 0, sessions: rows.length, summaries: summaries?.length ?? 0, queryErrors: [measurementsError, attendanceError, assessmentError, programError, summariesError].filter(Boolean).map((error) => error?.message) })
-  return <ProgressDashboard measurements={(measurements ?? []).map((m) => ({ date: m.recorded_at, weight: m.weight_kg == null ? null : Number(m.weight_kg), bodyFat: m.body_fat_pct == null ? null : Number(m.body_fat_pct) }))} rpeHistory={(summaries ?? []).map((s) => ({ date: s.submitted_at, rpe: Number(s.rpe) || 0 }))} attendance={rows.map((row) => ({ date: firstRelation(row.session_posts)?.session_date ?? row.attended_at, status: row.status ?? (row.attended_at ? "present" : "absent"), title: firstRelation(row.session_posts)?.title_en ?? "Training session" }))} attendanceRate={totalAssigned ? Math.round((totalAttended / totalAssigned) * 100) : 0} totalAssigned={totalAssigned} totalAttended={totalAttended} avgRpe={rpes.length ? Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10 : null} assessmentStatus={assessmentStatus} activeProgram={program ? { name: firstRelation(program.programs)?.name_en ?? "Training program", status: program.status } : null} />
+  return <ProgressDashboard measurements={(measurements ?? []).map((m) => ({ date: m.recorded_at, weight: m.weight_kg == null ? null : Number(m.weight_kg), bodyFat: m.body_fat_pct == null ? null : Number(m.body_fat_pct) }))} rpeHistory={(summaries ?? []).map((s) => ({ date: s.submitted_at, rpe: Number(s.rpe) || 0 }))} attendance={rows.map((row) => ({ date: firstRelation(row.session_posts)?.session_date ?? row.attended_at, status: row.status ?? (row.attended_at ? "present" : "absent"), title: firstRelation(row.session_posts)?.title_en ?? t("Training session") }))} attendanceRate={totalAssigned ? Math.round((totalAttended / totalAssigned) * 100) : 0} totalAssigned={totalAssigned} totalAttended={totalAttended} avgRpe={rpes.length ? Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10 : null} assessmentStatus={assessmentStatus} activeProgram={program ? { name: firstRelation(program.programs)?.name_en ?? t("Training program"), status: program.status } : null} />
 }

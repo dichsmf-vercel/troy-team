@@ -47,6 +47,9 @@ tests/         vitest unit tests (guards, redirect, site-url, gemini, excel-impo
 public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 ```
 
+## 3b. Translations
+`t("English")` everywhere (provider `useT/useLanguage/useLn`, server `getT`); Arabic in `lib/i18n/ar/part1-4.ts`; legacy nested dictionary `lib/i18n/dictionaries.ts` still used for the first screens. `tests/i18n.test.ts` fails on any missing Arabic string. Dates use `locale` from the language.
+
 ## 4. Key flows
 - **Auth**: Supabase email/password; athletes log in with Troy ID -> `troy-<id>@troy.internal`. Proxy guards `/dashboard /intake /admin /profile /session /program /progress`; `/assessment` and `/parent` guard themselves. Roles in `profiles.role` (`athlete|admin|supporting_coach`).
 - **Authorization rule**: server actions are public endpoints. Each starts with `requireAdmin()` / `requireStaff()` / `requireUser()`; athlete-side actions also check ownership (`lib/auth/ownership.ts`). Admin-only: create/edit/delete athletes, imports, rules, program review, deletes of teams/programs/exercises, prompt approval. Staff (admin + supporting_coach): teams create/edit, sessions, exercises create/edit/media, selfie review, AI generate/save, program templates.
@@ -61,7 +64,7 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 3. Dump the base schema + RLS to `supabase/schema.sql` (needs DB access; commands in `supabase/README.md`).
 4. Scaling: `app/admin/page.tsx` uses `.in("athlete_id", ids)` with ALL athlete ids (URL length breaks around a few hundred athletes) and `listUsers(perPage:1000)`; page or batch these.
 5. Public repo exposes coaching IP (`public/CoachAhmedRules.csv`, prompts, SQL): decide on making it private.
-6. FULL Arabic translation + prettier Arabic font (HANDOFF section 4).
+6. Arabic is implemented (see 3b); remaining: native proofread, RTL visual pass of admin/athlete screens, metadata/manifest, DB-stored English text.
 7. Review RLS for `teams/programs/exercises` writes now that actions are role-guarded (defence in depth), and remove the legacy fallback in `deleteAthleteCompletely` once migration 202611180001 is live.
 8. Still-dense single-line JSX in `session-panel`, `rules-panel`, `programs-panel`, `program-review-panel`: reformat when next touched.
 

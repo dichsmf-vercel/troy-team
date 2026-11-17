@@ -5,9 +5,11 @@ import { submitAssessment, uploadAssessmentPhoto } from "@/app/assessment/action
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useT } from "@/components/providers/language-provider"
 import { Textarea } from "@/components/ui/textarea"
 
 export function AssessmentForm({ equipmentOptions = [] }: { equipmentOptions?: string[] }) {
+  const t = useT()
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
   function submit(action: (data: FormData) => Promise<{ error: string | null }>, event: React.FormEvent<HTMLFormElement>) {
@@ -18,24 +20,24 @@ export function AssessmentForm({ equipmentOptions = [] }: { equipmentOptions?: s
       try {
         const result = await action(data)
         const isPhotoUpload = action === uploadAssessmentPhoto
-        setMessage(result.error || (isPhotoUpload ? "InBody image uploaded successfully." : "Assessment submitted successfully."))
+        setMessage(result.error || (isPhotoUpload ? t("InBody image uploaded successfully.") : t("Assessment submitted successfully.")))
         if (!result.error && action === submitAssessment) form.reset()
       } catch {
-        setMessage("Something went wrong. Please try again.")
+        setMessage(t("Something went wrong. Please try again."))
       }
     })
   }
   return <div className="grid gap-6">
     <form onSubmit={(event) => submit(submitAssessment, event)} className="grid gap-4 rounded-xl border bg-card p-5">
-      <div><h1 className="text-2xl font-semibold">Athlete assessment</h1><p className="text-sm text-muted-foreground">Tell Coach Ahmed what you need so your monthly plan can be generated safely.</p></div>
-      <div className="grid gap-2"><Label htmlFor="experience">Experience and current level</Label><Textarea id="experience" name="experience" required /></div>
-      <div className="grid gap-2"><Label htmlFor="equipment">Available equipment</Label><select id="equipment" name="equipment" multiple className="min-h-28 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm" aria-describedby="equipment-help">{equipmentOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select><p id="equipment-help" className="text-xs text-muted-foreground">Hold Ctrl on Windows/Linux or Cmd on Mac to select multiple options.</p></div>
-      <div className="grid gap-2"><Label htmlFor="injury_flags">Injuries or limitations</Label><Textarea id="injury_flags" name="injury_flags" placeholder="Separate items with commas" /></div>
-      <div className="grid gap-2"><Label htmlFor="goals">Goals</Label><Textarea id="goals" name="goals" placeholder="Separate goals with commas" required /></div>
-      <div className="grid gap-2"><Label htmlFor="medical_notes">Medical notes</Label><Textarea id="medical_notes" name="medical_notes" /></div>
-      <Button type="submit" disabled={pending}>{pending ? "Submitting..." : "Submit assessment"}</Button>
+      <div><h1 className="text-2xl font-semibold">{t("Athlete assessment")}</h1><p className="text-sm text-muted-foreground">{t("Tell Coach Ahmed what you need so your monthly plan can be generated safely.")}</p></div>
+      <div className="grid gap-2"><Label htmlFor="experience">{t("Experience and current level")}</Label><Textarea id="experience" name="experience" required /></div>
+      <div className="grid gap-2"><Label htmlFor="equipment">{t("Available equipment")}</Label><select id="equipment" name="equipment" multiple className="min-h-28 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm" aria-describedby="equipment-help">{equipmentOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select><p id="equipment-help" className="text-xs text-muted-foreground">{t("Hold Ctrl on Windows/Linux or Cmd on Mac to select multiple options.")}</p></div>
+      <div className="grid gap-2"><Label htmlFor="injury_flags">{t("Injuries or limitations")}</Label><Textarea id="injury_flags" name="injury_flags" placeholder={t("Separate items with commas")} /></div>
+      <div className="grid gap-2"><Label htmlFor="goals">{t("Goals")}</Label><Textarea id="goals" name="goals" placeholder={t("Separate goals with commas")} required /></div>
+      <div className="grid gap-2"><Label htmlFor="medical_notes">{t("Medical notes")}</Label><Textarea id="medical_notes" name="medical_notes" /></div>
+      <Button type="submit" disabled={pending}>{pending ? t("Submitting...") : t("Submit assessment")}</Button>
     </form>
-    <form onSubmit={(event) => submit(uploadAssessmentPhoto, event)} className="grid gap-4 rounded-xl border bg-card p-5"><div><h2 className="font-semibold">Assessment image</h2><p className="text-sm text-muted-foreground">Upload an InBody or assessment screenshot for your admin and coach to review.</p></div><div className="grid gap-2"><Label htmlFor="assessment_photo">Image</Label><Input id="assessment_photo" name="assessment_photo" type="file" accept="image/png,image/jpeg,image/webp" /></div><Button type="submit" variant="outline" disabled={pending}>{pending ? "Uploading..." : "Upload assessment image"}</Button></form>
+    <form onSubmit={(event) => submit(uploadAssessmentPhoto, event)} className="grid gap-4 rounded-xl border bg-card p-5"><div><h2 className="font-semibold">{t("Assessment image")}</h2><p className="text-sm text-muted-foreground">{t("Upload an InBody or assessment screenshot for your admin and coach to review.")}</p></div><div className="grid gap-2"><Label htmlFor="assessment_photo">{t("Image")}</Label><Input id="assessment_photo" name="assessment_photo" type="file" accept="image/png,image/jpeg,image/webp" /></div><Button type="submit" variant="outline" disabled={pending}>{pending ? t("Uploading...") : t("Upload assessment image")}</Button></form>
     {message ? <p className="text-sm text-muted-foreground" role="status">{message}</p> : null}
   </div>
 }

@@ -11,6 +11,7 @@
 
 import { validateProgram, validatePromptText } from "@/lib/gemini-validate"
 import type { CatalogExercise, GeminiProgramOutput } from "@/lib/gemini-types"
+import type { TFunction } from "@/lib/i18n/translate"
 
 export type { GeminiExercise, GeminiProgramOutput, GeminiSession } from "@/lib/gemini-types"
 
@@ -150,6 +151,8 @@ export type GenerateProgramInput = {
   time: string
   weekdays: number[]
   coachSystemPrompt?: string | null
+  /** Translator for validation messages shown to the coach. */
+  t?: TFunction
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are an expert strength and conditioning coach for Egyptian athletes.
@@ -241,6 +244,7 @@ export async function generateProgramWithGemini(
     const validated = validateProgram(extractJson(raw), input.exercises, {
       startDate: input.startDate,
       weekdays: input.weekdays,
+      t: input.t,
     })
     if (validated.error || !validated.program) return { data: null, rawText: raw, error: validated.error }
     return { data: validated.program, rawText: raw, error: null }

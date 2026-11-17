@@ -1,5 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
+import { getT } from "@/lib/i18n/get-language"
 
 /**
  * Authorization guards for server actions.
@@ -24,16 +25,17 @@ export type AuthContext = {
 export type AuthResult = { ok: true; ctx: AuthContext } | { ok: false; error: string }
 
 async function authorize(allowed: readonly string[] | null, deniedMessage: string): Promise<AuthResult> {
+  const t = await getT()
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return { ok: false, error: "Unauthorized" }
+  if (!user) return { ok: false, error: t("Unauthorized") }
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
   const role = typeof profile?.role === "string" ? profile.role : ""
 
-  if (allowed && !allowed.includes(role)) return { ok: false, error: deniedMessage }
+  if (allowed && !allowed.includes(role)) return { ok: false, error: t(deniedMessage) }
   return { ok: true, ctx: { supabase, user, role } }
 }
 

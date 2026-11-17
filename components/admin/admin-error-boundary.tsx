@@ -1,6 +1,7 @@
 "use client"
 
 import { Component, type ErrorInfo, type ReactNode } from "react"
+import { useT } from "@/components/providers/language-provider"
 import { Button } from "@/components/ui/button"
 
 type Props = { children: ReactNode }
@@ -21,6 +22,18 @@ export class AdminErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.hasError) return this.props.children
-    return <section role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 p-6"><h2 className="font-semibold">The admin section could not render.</h2><p className="mt-2 text-sm text-muted-foreground">Check the browser console for the diagnostic ID and component stack.</p><p className="mt-1 font-mono text-xs text-muted-foreground">{this.state.errorId}</p><Button className="mt-4" variant="outline" onClick={() => this.setState({ hasError: false, errorId: "" })}>Retry</Button></section>
+    return <AdminErrorFallback errorId={this.state.errorId} onRetry={() => this.setState({ hasError: false, errorId: "" })} />
   }
+}
+
+function AdminErrorFallback({ errorId, onRetry }: { errorId: string; onRetry: () => void }) {
+  const t = useT()
+  return (
+    <section role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 p-6">
+      <h2 className="font-semibold">{t("The admin section could not render.")}</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{t("Check the browser console for the diagnostic ID and component stack.")}</p>
+      <p className="mt-1 font-mono text-xs text-muted-foreground">{errorId}</p>
+      <Button className="mt-4" variant="outline" onClick={onRetry}>{t("Retry")}</Button>
+    </section>
+  )
 }

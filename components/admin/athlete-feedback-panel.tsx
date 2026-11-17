@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { AdminAthlete } from "@/lib/admin/types"
 import { Input } from "@/components/ui/input"
+import { useT } from "@/components/providers/language-provider"
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ function ratingStars(n: number | null, max = 5) {
 // ─── main component ───────────────────────────────────────────────────────────
 
 export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props) {
+  const t = useT()
   const [query, setQuery] = useState("")
   const [expandedAthlete, setExpandedAthlete] = useState<string | null>(null)
 
@@ -87,14 +89,14 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Session feedback</CardTitle>
+          <CardTitle>{t("Session feedback")}</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Athlete session summaries and pain reports will appear here after sessions are completed.
+            {t("Athlete session summaries and pain reports will appear here after sessions are completed.")}
           </p>
         </CardHeader>
         <CardContent>
           <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No feedback submitted yet.
+            {t("No feedback submitted yet.")}
           </div>
         </CardContent>
       </Card>
@@ -105,16 +107,16 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Session feedback</h2>
+          <h2 className="text-lg font-semibold">{t("Session feedback")}</h2>
           <p className="text-sm text-muted-foreground">
-            {summaries.length} session {summaries.length === 1 ? "summary" : "summaries"} ·{" "}
-            {painReports.length} pain {painReports.length === 1 ? "report" : "reports"}
+            {t.plural(summaries.length, "{count} session summary", "{count} session summaries")} ·{" "}
+            {t.plural(painReports.length, "{count} pain report", "{count} pain reports")}
           </p>
         </div>
         <div className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search athletes"
+            placeholder={t("Search athletes")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-9"
@@ -124,7 +126,7 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
 
       {filtered.map((athleteId) => {
         const athlete = athletes.find((a) => a.id === athleteId)
-        const name = athlete?.profiles?.full_name ?? athlete?.full_name ?? "Unknown athlete"
+        const name = athlete?.profiles?.full_name ?? athlete?.full_name ?? t("Unknown athlete")
         const athleteSummaries = summaries.filter((s) => s.athlete_id === athleteId)
           .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
         const athletePain = painReports.filter((p) => p.athlete_id === athleteId)
@@ -150,7 +152,7 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                   {hasPain && (
                     <Badge variant="destructive" className="gap-1 text-xs">
                       <AlertTriangle className="size-3" />
-                      {athletePain.length} pain {athletePain.length === 1 ? "report" : "reports"}
+                      {t.plural(athletePain.length, "{count} pain report", "{count} pain reports")}
                     </Badge>
                   )}
                 </div>
@@ -161,12 +163,12 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                     </span>
                     {avgRpe != null && (
                       <span className={`font-semibold tabular-nums ${rpeColor(avgRpe)}`}>
-                        RPE {avgRpe}
+                        {t("RPE {avgRpe}", { avgRpe })}
                       </span>
                     )}
                     {avgSoreness != null && (
                       <span className="text-muted-foreground text-xs">
-                        Soreness {avgSoreness}/5
+                        {t("Soreness {avgSoreness}/5", { avgSoreness })}
                       </span>
                     )}
                   </div>
@@ -185,7 +187,7 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                 {athletePain.length > 0 && (
                   <div className="flex flex-col gap-3">
                     <p className="flex items-center gap-2 text-sm font-semibold text-red-600">
-                      <AlertTriangle className="size-4" /> Pain reports
+                      <AlertTriangle className="size-4" /> {t("Pain reports")}
                     </p>
                     <div className="flex flex-col gap-2">
                       {athletePain.map((report) => (
@@ -205,7 +207,7 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                           </div>
                           {report.pain_location && (
                             <p className="mt-1 text-xs">
-                              <span className="text-muted-foreground">Location: </span>
+                              <span className="text-muted-foreground">{t("Location:")} </span>
                               {report.pain_location}
                             </p>
                           )}
@@ -222,7 +224,7 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                 {athleteSummaries.length > 0 && (
                   <div className="flex flex-col gap-3">
                     <p className="flex items-center gap-2 text-sm font-semibold">
-                      <Activity className="size-4" /> Session summaries
+                      <Activity className="size-4" /> {t("Session summaries")}
                     </p>
                     <div className="flex flex-col gap-3">
                       {athleteSummaries.map((summary) => (
@@ -234,33 +236,33 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                             </div>
                             {summary.rpe != null && (
                               <span className={`text-sm font-bold tabular-nums ${rpeColor(summary.rpe)}`}>
-                                RPE {summary.rpe}/10
+                                {t("RPE {rpe}/10", { rpe: summary.rpe })}
                               </span>
                             )}
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                             <div className="flex items-center gap-1">
                               <Zap className="size-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">Overall</span>
+                              <span className="text-muted-foreground">{t("Overall")}</span>
                               <span className="ml-auto font-medium">{ratingStars(summary.overall_rating)}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <HeartPulse className="size-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">Soreness</span>
+                              <span className="text-muted-foreground">{t("Soreness")}</span>
                               <span className="ml-auto font-medium">{summary.soreness_level ?? "—"}/5</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <Smile className="size-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">Sleep</span>
+                              <span className="text-muted-foreground">{t("Sleep")}</span>
                               <span className="ml-auto font-medium">{summary.sleep_quality ?? "—"}/5</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <AlertTriangle className="size-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">Symptoms</span>
+                              <span className="text-muted-foreground">{t("Symptoms")}</span>
                               <span className="ml-auto font-medium">
                                 {summary.symptoms?.filter((s) => s !== "none").length
                                   ? summary.symptoms?.filter((s) => s !== "none").join(", ")
-                                  : "None"}
+                                  : t("None")}
                               </span>
                             </div>
                           </div>
@@ -277,7 +279,7 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                 )}
 
                 {athleteSummaries.length === 0 && athletePain.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No feedback recorded yet.</p>
+                  <p className="text-sm text-muted-foreground">{t("No feedback recorded yet.")}</p>
                 )}
               </CardContent>
             )}

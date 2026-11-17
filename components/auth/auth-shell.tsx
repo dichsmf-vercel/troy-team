@@ -1,4 +1,7 @@
+"use client"
+
 import Image from "next/image"
+import { useT } from "@/components/providers/language-provider"
 import { LanguageSwitchButton } from "@/components/language-switch-button"
 
 export function AuthShell({
@@ -10,6 +13,7 @@ export function AuthShell({
   tagline: string
   children: React.ReactNode
 }) {
+  const t = useT()
   return (
     <div className="flex min-h-svh w-full flex-col bg-background">
       <div className="flex justify-end p-4">
@@ -22,7 +26,7 @@ export function AuthShell({
               <source media="(prefers-color-scheme: dark)" srcSet="/main-logo.png" />
               <Image
                 src="/main-logo.png"
-                alt="Troy Team"
+                alt={t("Troy Team")}
                 width={240}
                 height={240}
                 className="size-48 object-contain"

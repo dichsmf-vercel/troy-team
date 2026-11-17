@@ -3,17 +3,19 @@
 import { revalidatePath } from "next/cache"
 import { requireAdmin, requireStaff, requireUser } from "@/lib/auth/guards"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getT } from "@/lib/i18n/get-language"
 import { formString } from "@/lib/admin/forms"
 
 const RULES_PROGRAM_NAME = "Coach Ahmed Rules Engine"
 
 export async function createProgram(form: FormData) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
   const { supabase, user } = auth.ctx
 
   const nameEn = formString(form, "name_en")
-  if (!nameEn) return { error: "Program name is required." }
+  if (!nameEn) return { error: t("Program name is required.") }
 
   const { data: program, error } = await supabase
     .from("programs")
@@ -27,7 +29,7 @@ export async function createProgram(form: FormData) {
     })
     .select("id")
     .single()
-  if (error || !program) return { error: error?.message ?? "Unable to create program." }
+  if (error || !program) return { error: error?.message ?? t("Unable to create program.") }
 
   const ids = form.getAll("exercise_id").map(String)
   const sets = form.getAll("sets")
@@ -68,7 +70,8 @@ export async function updateProgram(
 }
 
 export async function deleteProgram(id: string) {
-  const auth = await requireAdmin("Only admins can delete programs.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can delete programs."))
   if (!auth.ok) return { error: auth.error }
 
   const { error } = await auth.ctx.supabase.from("programs").delete().eq("id", id)
@@ -77,7 +80,8 @@ export async function deleteProgram(id: string) {
 }
 
 export async function createProgramRule(form: FormData) {
-  const auth = await requireAdmin("Only admins can add rules.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can add rules."))
   if (!auth.ok) return { error: auth.error }
 
   const { error } = await auth.ctx.supabase.from("program_rules").insert({
@@ -101,7 +105,8 @@ export async function createProgramRule(form: FormData) {
 }
 
 export async function createManualProgramRule(formData: FormData) {
-  const auth = await requireAdmin("Only admins can add rules.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can add rules."))
   if (!auth.ok) return { error: auth.error }
 
   const ruleId = formString(formData, "rule_id")
@@ -111,12 +116,12 @@ export async function createManualProgramRule(formData: FormData) {
   const action = formString(formData, "action").toUpperCase()
   const exerciseId = formString(formData, "exercise_id")
   if (!ruleId || !metric || !operator || !threshold || !["ADD", "REMOVE"].includes(action) || !exerciseId) {
-    return { error: "Complete every rule field." }
+    return { error: t("Complete every rule field.") }
   }
 
   const service = createAdminClient()
   const { data: program } = await service.from("programs").select("id").eq("name_en", RULES_PROGRAM_NAME).maybeSingle()
-  if (!program) return { error: "Rules engine program is missing." }
+  if (!program) return { error: t("Rules engine program is missing.") }
 
   const { error } = await service.from("program_rules").insert({
     program_id: program.id,
@@ -136,10 +141,11 @@ export async function createManualProgramRule(formData: FormData) {
 }
 
 export async function reviewAthleteProgram(id: string, status: "approved" | "rejected") {
-  const auth = await requireAdmin("Only admins can review programs.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can review programs."))
   if (!auth.ok) return { error: auth.error }
-  if (!id?.trim()) return { error: "Missing program id" }
-  if (status !== "approved" && status !== "rejected") return { error: "Invalid status." }
+  if (!id?.trim()) return { error: t("Missing program id") }
+  if (status !== "approved" && status !== "rejected") return { error: t("Invalid status.") }
 
   const { error } = await auth.ctx.supabase
     .from("athlete_programs")
@@ -157,11 +163,12 @@ export async function saveGeneratedProgram(input: {
   weekdays: number[]
   sessions: unknown[]
 }) {
-  const auth = await requireAdmin("Only admins can create programs.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can create programs."))
   if (!auth.ok) return { error: auth.error }
 
   if (!input.athleteId || !input.startDate || !input.time || !input.weekdays?.length || !input.sessions?.length) {
-    return { error: "Complete the schedule before saving." }
+    return { error: t("Complete the schedule before saving.") }
   }
 
   const start = new Date(`${input.startDate}T12:00:00`)
@@ -183,7 +190,7 @@ export async function saveGeneratedProgram(input: {
     })
     .select("id")
     .single()
-  if (error || !data) return { error: error?.message || "Unable to save program." }
+  if (error || !data) return { error: error?.message || t("Unable to save program.") }
 
   revalidatePath("/admin")
   revalidatePath("/program")

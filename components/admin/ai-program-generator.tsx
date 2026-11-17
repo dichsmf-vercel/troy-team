@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { generateProgramWithAI, saveAIGeneratedProgram, saveAdminEditsAndLearn, generateLegacyFallbackProgram } from "@/app/admin/actions/ai"
 import type { GeminiProgramOutput, GeminiSession, GeminiExercise } from "@/lib/gemini-types"
 import { weekdayLabel, monthLabel } from "@/lib/program-engine"
+import { useLanguage } from "@/components/providers/language-provider"
 import { actionErrorMessage } from "@/lib/client-errors"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
@@ -44,6 +45,7 @@ export type AthleteOption = {
 
 
 export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) {
+  const { t, locale } = useLanguage()
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [time, setTime] = useState("18:00")
@@ -66,7 +68,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
 
   const selectedAthlete = athletes.find((a) => a.id === athleteId)
-  const month = monthLabel(startDate)
+  const month = monthLabel(startDate, locale)
 
   // Merge edits into program
   const displayProgram: GeminiProgramOutput | null = program
@@ -97,14 +99,14 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
     try {
       const result = await generateLegacyFallbackProgram({ athleteId, startDate, time, weekdays: days })
       if (result.error || !result.data) {
-        setGenError(result.error ?? "Fallback generation failed.")
+        setGenError(result.error ?? t("Fallback generation failed."))
         return
       }
       setProgram(result.data)
       setOriginalProgram(result.data)
       setGenError(null)
     } catch (err) {
-      setGenError(actionErrorMessage(err, "Fallback generation failed."))
+      setGenError(actionErrorMessage(err, t("Fallback generation failed."), t))
     } finally {
       setFallbackGenerating(false)
     }
@@ -118,13 +120,13 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
     try {
       const result = await generateProgramWithAI({ athleteId, startDate, time, weekdays: days })
       if (result.error || !result.data) {
-        setGenError(result.error ?? "Generation failed.")
+        setGenError(result.error ?? t("Generation failed."))
         return
       }
       setProgram(result.data)
       setOriginalProgram(result.data)
     } catch (err) {
-      setGenError(actionErrorMessage(err, "An unexpected error occurred while communicating with the server."))
+      setGenError(actionErrorMessage(err, t("An unexpected error occurred while communicating with the server."), t))
     } finally {
       setGenerating(false)
     }
@@ -139,7 +141,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
       // 1. Save the program first so the learning step can refer to it.
       const saved = await saveAIGeneratedProgram({ athleteId, startDate, time, weekdays: days, program: displayProgram })
       if (saved.error || !saved.id) {
-        setSaveMsg(saved.error ?? "Unable to save program.")
+        setSaveMsg(saved.error ?? t("Unable to save program."))
         return
       }
 
@@ -154,15 +156,15 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
         })
         setSaveMsg(
           learned.error
-            ? `Program saved for admin review. The learning step failed: ${learned.error}`
-            : "Program saved for admin review. A prompt improvement was proposed and is waiting for admin approval.",
+            ? t("Program saved for admin review. The learning step failed: {error}", { error: learned.error })
+            : t("Program saved for admin review. A prompt improvement was proposed and is waiting for admin approval."),
         )
         return
       }
 
-      setSaveMsg("Program saved for admin review.")
+      setSaveMsg(t("Program saved for admin review."))
     } catch (err) {
-      setSaveMsg(`Error: ${actionErrorMessage(err, "Unable to save program.")}`)
+      setSaveMsg(`Error: ${actionErrorMessage(err, t("Unable to save program."), t)}`)
     } finally {
       setSaving(false)
     }
@@ -185,15 +187,15 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Brain className="size-4 text-violet-500" />
-            AI program generation
+            {t("AI program generation")}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Gemini designs a personalized 4-week plan from the athlete's profile, assessment scores, and sport season.
+            {t("Gemini designs a personalized 4-week plan from the athlete's profile, assessment scores, and sport season.")}
           </p>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="ai-athlete">Athlete</Label>
+            <Label htmlFor="ai-athlete">{t("Athlete")}</Label>
             <select
               id="ai-athlete"
               value={athleteId}
@@ -209,12 +211,12 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="ai-start">Month start</Label>
+            <Label htmlFor="ai-start">{t("Month start")}</Label>
             <Input id="ai-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="ai-time">Session time</Label>
+            <Label htmlFor="ai-time">{t("Session time")}</Label>
             <div className="relative">
               <Clock3 className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
               <Input id="ai-time" className="pl-9" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
@@ -222,7 +224,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
           </div>
 
           <fieldset className="grid gap-2">
-            <legend className="text-sm font-medium">Training days</legend>
+            <legend className="text-sm font-medium">{t("Training days")}</legend>
             <div className="grid grid-cols-4 gap-2">
               {weekdays.map((day) => (
                 <label
@@ -241,7 +243,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
                       )
                     }
                   />
-                  {weekdayLabel(day)}
+                  {t(weekdayLabel(day))}
                 </label>
               ))}
             </div>
@@ -249,7 +251,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
 
           {selectedAthlete && !selectedAthlete.latest_assessment && (
             <p role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700">
-              No assessment data for this athlete. Gemini will design a conservative baseline program.
+              {t("No assessment data for this athlete. Gemini will design a conservative baseline program.")}
             </p>
           )}
 
@@ -259,9 +261,9 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
             className="gap-2 bg-violet-600 hover:bg-violet-700"
           >
             {generating ? (
-              <><Loader2 className="size-4 animate-spin" />Generating…</>
+              <><Loader2 className="size-4 animate-spin" />{t("Generating…")}</>
             ) : (
-              <><Sparkles className="size-4" />Generate with AI</>
+              <><Sparkles className="size-4" />{t("Generate with AI")}</>
             )}
           </Button>
 
@@ -279,13 +281,13 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
                   className="mt-1 w-fit h-7 text-xs"
                   onClick={() => window.location.reload()}
                 >
-                  Reload Page Now
+                  {t("Reload Page Now")}
                 </Button>
               )}
               <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5 text-foreground">
-                <p className="font-semibold text-xs">Automatic Fallback Available (Option B)</p>
+                <p className="font-semibold text-xs">{t("Automatic Fallback Available (Option B)")}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Generate this 4-week program immediately using Coach Ahmed's structured rules engine.
+                  {t("Generate this 4-week program immediately using Coach Ahmed's structured rules engine.")}
                 </p>
                 <Button
                   type="button"
@@ -296,9 +298,9 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
                   disabled={fallbackGenerating}
                 >
                   {fallbackGenerating ? (
-                    <><Loader2 className="size-3.5 animate-spin" /> Generating with Rules Engine…</>
+                    <><Loader2 className="size-3.5 animate-spin" /> {t("Generating with Rules Engine…")}</>
                   ) : (
-                    <><Sparkles className="size-3.5" /> Generate with Rules Engine Instead</>
+                    <><Sparkles className="size-3.5" /> {t("Generate with Rules Engine Instead")}</>
                   )}
                 </Button>
               </div>
@@ -311,7 +313,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
       <div className="grid gap-4">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm text-muted-foreground">{selectedAthlete?.profiles?.full_name ?? "Select an athlete"}</p>
+            <p className="text-sm text-muted-foreground">{selectedAthlete?.profiles?.full_name ?? t("Select an athlete")}</p>
             <h2 className="text-2xl font-semibold">{month}</h2>
           </div>
           <CalendarDays className="size-7 text-violet-500" />
@@ -320,7 +322,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
         {!displayProgram && !generating && (
           <Card>
             <CardContent className="flex min-h-64 items-center justify-center p-6 text-center text-sm text-muted-foreground">
-              Click "Generate with AI" to create a personalized program.
+              {t("Click \"Generate with AI\" to create a personalized program.")}
             </CardContent>
           </Card>
         )}
@@ -329,8 +331,8 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
           <Card>
             <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 p-6 text-center">
               <Loader2 className="size-8 animate-spin text-violet-500" />
-              <p className="text-sm font-medium">Gemini is designing the program…</p>
-              <p className="text-xs text-muted-foreground">This usually takes 10–20 seconds.</p>
+              <p className="text-sm font-medium">{t("Gemini is designing the program…")}</p>
+              <p className="text-xs text-muted-foreground">{t("This usually takes 10–20 seconds.")}</p>
             </CardContent>
           </Card>
         )}
@@ -367,10 +369,10 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
                 onClick={() => setEditMode((v) => !v)}
               >
                 <Edit3 className="size-4" />
-                {editMode ? "Editing mode on" : "Edit program"}
+                {editMode ? t("Editing mode on") : t("Edit program")}
               </Button>
               {editMode && (
-                <p className="text-xs text-muted-foreground">Click any field in a session to edit it.</p>
+                <p className="text-xs text-muted-foreground">{t("Click any field in a session to edit it.")}</p>
               )}
             </div>
 
@@ -392,12 +394,12 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
             {/* Admin edit reason (shown in edit mode) */}
             {editMode && (
               <div className="grid gap-2">
-                <Label htmlFor="admin-reason">Why did you make these changes? (helps Gemini learn)</Label>
+                <Label htmlFor="admin-reason">{t("Why did you make these changes? (helps Gemini learn)")}</Label>
                 <Textarea
                   id="admin-reason"
                   value={adminReason}
                   onChange={(e) => setAdminReason(e.target.value)}
-                  placeholder="e.g. Replaced squats with leg press because athlete has knee issues..."
+                  placeholder={t("e.g. Replaced squats with leg press because athlete has knee issues...")}
                   rows={3}
                 />
               </div>
@@ -410,9 +412,9 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
               className="gap-2"
             >
               {saving ? (
-                <><Loader2 className="size-4 animate-spin" />Saving…</>
+                <><Loader2 className="size-4 animate-spin" />{t("Saving…")}</>
               ) : (
-                <><Check className="size-4" />Save for admin review</>
+                <><Check className="size-4" />{t("Save for admin review")}</>
               )}
             </Button>
             {saveMsg && <p role="status" className="text-xs text-muted-foreground">{saveMsg}</p>}
@@ -440,7 +442,8 @@ function SessionCard({
   onToggle: () => void
   onEditExercise: (eIdx: number, field: keyof GeminiExercise, value: unknown) => void
 }) {
-  const dateLabel = new Date(`${session.date}T12:00:00`).toLocaleDateString("en", {
+  const { t, locale } = useLanguage()
+  const dateLabel = new Date(`${session.date}T12:00:00`).toLocaleDateString(locale, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -455,11 +458,11 @@ function SessionCard({
       >
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="shrink-0 text-xs">
-            Week {session.week}
+            {t("Week {week}", { week: session.week })}
           </Badge>
           <div>
             <p className="text-sm font-semibold">{dateLabel}</p>
-            <p className="text-xs text-muted-foreground">{session.time} · {session.exercises.length} exercises</p>
+            <p className="text-xs text-muted-foreground">{t("{time} · {exercisesCount} exercises", { time: session.time, exercisesCount: session.exercises.length })}</p>
           </div>
         </div>
         {expanded ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
@@ -495,6 +498,7 @@ function ExerciseRow({
   editMode: boolean
   onEdit: (field: keyof GeminiExercise, value: unknown) => void
 }) {
+  const { t, locale } = useLanguage()
   if (!editMode) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
@@ -520,11 +524,11 @@ function ExerciseRow({
         value={exercise.name_en}
         onChange={(e) => onEdit("name_en", e.target.value)}
         className="h-8 text-sm font-medium"
-        placeholder="Exercise name"
+        placeholder={t("Exercise name")}
       />
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <Label className="text-xs">Sets</Label>
+          <Label className="text-xs">{t("Sets")}</Label>
           <Input
             type="number"
             min="1"
@@ -534,7 +538,7 @@ function ExerciseRow({
           />
         </div>
         <div>
-          <Label className="text-xs">Reps</Label>
+          <Label className="text-xs">{t("Reps")}</Label>
           <Input
             value={exercise.reps}
             onChange={(e) => onEdit("reps", e.target.value)}
@@ -543,7 +547,7 @@ function ExerciseRow({
           />
         </div>
         <div>
-          <Label className="text-xs">Load %</Label>
+          <Label className="text-xs">{t("Load %")}</Label>
           <Input
             type="number"
             min="0"
@@ -556,12 +560,12 @@ function ExerciseRow({
         </div>
       </div>
       <div>
-        <Label className="text-xs">Coaching notes</Label>
+        <Label className="text-xs">{t("Coaching notes")}</Label>
         <Input
           value={exercise.notes ?? ""}
           onChange={(e) => onEdit("notes", e.target.value || null)}
           className="h-8 text-sm"
-          placeholder="Optional coaching cue..."
+          placeholder={t("Optional coaching cue...")}
         />
       </div>
     </div>

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { firstRelation } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getLanguage } from "@/lib/i18n/get-language"
+import { getLanguage, getT } from "@/lib/i18n/get-language"
 import { SessionRunner } from "@/components/session/session-runner"
 
 export default async function SessionPage({
@@ -10,6 +10,7 @@ export default async function SessionPage({
 }: {
   params: Promise<{ sessionPostId: string }>
 }) {
+  const t = await getT()
   const { sessionPostId } = await params
   const supabase = await createClient()
   const { data: userData } = await supabase.auth.getUser()
@@ -34,7 +35,7 @@ export default async function SessionPage({
   // [assigned-session-debug] logs commented out for production
   if (!post) {
     console.error("[assigned-session-debug] Session post missing after navigation", { sessionPostId, athleteId: userData.user.id, postError: postError?.message ?? null })
-    return <main className="mx-auto max-w-xl p-6"><div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6"><h1 className="text-xl font-semibold">This assigned training is unavailable</h1><p className="mt-2 text-sm text-muted-foreground">The training could not be loaded. Return to the dashboard and try again.</p><a href="/dashboard" className="mt-4 inline-flex text-sm font-medium text-primary underline">Back to dashboard</a></div></main>
+    return <main className="mx-auto max-w-xl p-6"><div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6"><h1 className="text-xl font-semibold">{t("This assigned training is unavailable")}</h1><p className="mt-2 text-sm text-muted-foreground">{t("The training could not be loaded. Return to the dashboard and try again.")}</p><a href="/dashboard" className="mt-4 inline-flex text-sm font-medium text-primary underline">{t("Back to dashboard")}</a></div></main>
   }
   // Dashboard already derives this card from the athlete's assigned sessions. Do not
   // repeat the team-membership check here: it can reject valid assigned sessions when

@@ -1,6 +1,6 @@
 import { Analytics } from "@vercel/analytics/next"
 import type { Metadata, Viewport } from "next"
-import { Fraunces, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google"
+import { Fraunces, IBM_Plex_Sans, Cairo } from "next/font/google"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { LanguageProvider } from "@/components/providers/language-provider"
 import { Toaster } from "@/components/ui/sonner"
@@ -21,10 +21,12 @@ const ibmPlexSans = IBM_Plex_Sans({
   variable: "--font-ibm-plex-sans",
 })
 
-const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
-  subsets: ["arabic"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-ibm-plex-arabic",
+// Arabic UI font. Cairo is a modern, well-balanced face with matching Latin glyphs; it replaces IBM Plex Sans Arabic.
+const cairo = Cairo({
+  subsets: ["arabic", "latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-cairo",
+  display: "swap",
 })
 
 export const metadata: Metadata = {
@@ -64,7 +66,7 @@ export default async function RootLayout({
     <html
       lang={language}
       dir={dir}
-      className={`${fraunces.variable} ${ibmPlexSans.variable} ${ibmPlexSansArabic.variable} bg-background`}
+      className={`${fraunces.variable} ${ibmPlexSans.variable} ${cairo.variable} bg-background`}
       suppressHydrationWarning
     >
       <body className="antialiased font-sans">

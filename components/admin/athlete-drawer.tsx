@@ -42,7 +42,9 @@ import { markExerciseSelfieReviewed, reviewSessionSelfie } from "@/app/admin/act
 import { getPerformanceRag } from "@/lib/rag-thresholds"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 import type { AdminAthlete, AdminAthleteProfile } from "@/lib/admin/types"
+import { useLn, useLanguage } from "@/components/providers/language-provider"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
+import { tx } from "@/lib/i18n/translate"
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +68,7 @@ type AthleteDrawerProps = {
   onOpenChange: (open: boolean) => void
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const DAY_NAMES = [tx("Sun"), tx("Mon"), tx("Tue"), tx("Wed"), tx("Thu"), tx("Fri"), tx("Sat")]
 
 const FMS_AR_LABELS: Record<string, string> = {
   "0": "ضعيف جدا",
@@ -76,39 +78,39 @@ const FMS_AR_LABELS: Record<string, string> = {
 }
 
 const FMS_TESTS = [
-  { key: "deep_squat", label: "Deep Squat" },
-  { key: "hurdle_step", label: "Hurdle Step" },
-  { key: "inline_lunge", label: "Inline Lunge" },
-  { key: "shoulder_mobility", label: "Shoulder Mobility" },
-  { key: "active_straight_leg_raise", label: "Active Straight-Leg Raise" },
-  { key: "trunk_stability", label: "Trunk Stability" },
-  { key: "rotary_stability", label: "Rotary Stability" },
+  { key: "deep_squat", label: tx("Deep Squat") },
+  { key: "hurdle_step", label: tx("Hurdle Step") },
+  { key: "inline_lunge", label: tx("Inline Lunge") },
+  { key: "shoulder_mobility", label: tx("Shoulder Mobility") },
+  { key: "active_straight_leg_raise", label: tx("Active Straight-Leg Raise") },
+  { key: "trunk_stability", label: tx("Trunk Stability") },
+  { key: "rotary_stability", label: tx("Rotary Stability") },
 ]
 
 const PERF_METRICS: { key: string; label: string; unit: string; ragEnabled?: boolean }[] = [
-  { key: "v_jump_cm", label: "Vertical Jump", unit: "cm" },
-  { key: "horizontal_jump_cm", label: "Horizontal Jump", unit: "cm", ragEnabled: false },
-  { key: "sprint_30m_seconds", label: "30m Sprint", unit: "sec" },
-  { key: "sprint_20m_seconds", label: "20m Sprint", unit: "sec", ragEnabled: false },
-  { key: "agility_505_r_seconds", label: "505 Agility (R)", unit: "sec", ragEnabled: false },
-  { key: "agility_505_l_seconds", label: "505 Agility (L)", unit: "sec", ragEnabled: false },
-  { key: "t_test_seconds", label: "T-Test", unit: "sec" },
-  { key: "beep_test_level", label: "Beep Test Level", unit: "" },
-  { key: "beep_test_vo2_max", label: "Beep Test VO₂", unit: "" },
-  { key: "star_balance", label: "Star Balance", unit: "" },
-  { key: "agility_rshaqah_seconds", label: "Agility (Rshaqah)", unit: "sec" },
-  { key: "push_ups", label: "Push-ups", unit: "reps", ragEnabled: false },
-  { key: "pull_ups", label: "Pull-ups", unit: "reps", ragEnabled: false },
-  { key: "plank_seconds", label: "Plank Hold", unit: "sec", ragEnabled: false },
-  { key: "row_machine_result", label: "Row Machine", unit: "", ragEnabled: false },
+  { key: "v_jump_cm", label: tx("Vertical Jump"), unit: "cm" },
+  { key: "horizontal_jump_cm", label: tx("Horizontal Jump"), unit: "cm", ragEnabled: false },
+  { key: "sprint_30m_seconds", label: tx("30m Sprint"), unit: "sec" },
+  { key: "sprint_20m_seconds", label: tx("20m Sprint"), unit: "sec", ragEnabled: false },
+  { key: "agility_505_r_seconds", label: tx("505 Agility (R)"), unit: "sec", ragEnabled: false },
+  { key: "agility_505_l_seconds", label: tx("505 Agility (L)"), unit: "sec", ragEnabled: false },
+  { key: "t_test_seconds", label: tx("T-Test"), unit: "sec" },
+  { key: "beep_test_level", label: tx("Beep Test Level"), unit: "" },
+  { key: "beep_test_vo2_max", label: tx("Beep Test VO₂"), unit: "" },
+  { key: "star_balance", label: tx("Star Balance"), unit: "" },
+  { key: "agility_rshaqah_seconds", label: tx("Agility (Rshaqah)"), unit: "sec" },
+  { key: "push_ups", label: tx("Push-ups"), unit: "reps", ragEnabled: false },
+  { key: "pull_ups", label: tx("Pull-ups"), unit: "reps", ragEnabled: false },
+  { key: "plank_seconds", label: tx("Plank Hold"), unit: "sec", ragEnabled: false },
+  { key: "row_machine_result", label: tx("Row Machine"), unit: "", ragEnabled: false },
 ]
 
 const STRENGTH_METRICS = [
-  { key: "squat_1rm_kg", label: "Back Squat" },
-  { key: "bench_press_1rm_kg", label: "Bench Press" },
-  { key: "deadlift_1rm_kg", label: "Deadlift" },
-  { key: "power_clean_1rm_kg", label: "Power Clean" },
-  { key: "shoulder_press_1rm_kg", label: "Shoulder Press" },
+  { key: "squat_1rm_kg", label: tx("Back Squat") },
+  { key: "bench_press_1rm_kg", label: tx("Bench Press") },
+  { key: "deadlift_1rm_kg", label: tx("Deadlift") },
+  { key: "power_clean_1rm_kg", label: tx("Power Clean") },
+  { key: "shoulder_press_1rm_kg", label: tx("Shoulder Press") },
 ]
 
 function rpeColor(rpe: number | null) {
@@ -133,6 +135,8 @@ export function AthleteDrawer({
   open,
   onOpenChange,
 }: AthleteDrawerProps) {
+  const { t, locale } = useLanguage()
+  const ln = useLn()
   const [msg, setMsg] = useState<string | null>(null)
   const [tmpPassword, setTmpPassword] = useState<string | null>(null)
   const [copied, setCopied] = useState<"id" | "pass" | null>(null)
@@ -148,7 +152,7 @@ export function AthleteDrawer({
   const athleteSelfies = selfieItems.filter((s) => s.athlete_id === athlete.id)
 
   const profile: Partial<AdminAthleteProfile> = athlete.profiles ?? {}
-  const name = profile.full_name ?? athlete.full_name ?? "Unnamed athlete"
+  const name = profile.full_name ?? athlete.full_name ?? t("Unnamed athlete")
   const nameAr = profile.full_name_ar ?? null
   const troyId = profile.troy_id ?? null
   const team = firstRelation(athlete.athlete_teams?.[0]?.teams)
@@ -194,10 +198,10 @@ export function AthleteDrawer({
           return
         }
         setTmpPassword(result.temporaryPassword ?? null)
-        setMsg("Temporary password generated. Copy it — it won't appear again.")
+        setMsg(t("Temporary password generated. Copy it — it won't appear again."))
       } catch (err) {
         console.error("[Athlete-Drawer] Unexpected error in handleResetPassword:", err)
-        setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to reset password.")
+        setMsg(isStaleActionError(err) ? t("App was updated. Please refresh the page.") : t("Failed to reset password."))
       }
     })
   }
@@ -207,10 +211,10 @@ export function AthleteDrawer({
     startTransition(async () => {
       try {
         const result = await toggleAthleteAccountStatus(athlete.id, next)
-        setMsg(result.error ?? `Account ${next}.`)
+        setMsg(result.error ?? t("Account {next}.", { next }))
       } catch (err) {
         console.error("[Athlete-Drawer] Unexpected error in handleTogglePause:", err)
-        setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to update account status.")
+        setMsg(isStaleActionError(err) ? t("App was updated. Please refresh the page.") : t("Failed to update account status."))
       }
     })
   }
@@ -218,7 +222,7 @@ export function AthleteDrawer({
   function handleDelete() {
     if (
       !window.confirm(
-        `Permanently delete ${name}? This removes the account, assessments, measurements, programs, sessions, and all uploaded data. This cannot be undone.`
+        t("Permanently delete {name}? This removes the account, assessments, measurements, programs, sessions, and all uploaded data. This cannot be undone.", { name })
       )
     )
       return
@@ -233,7 +237,7 @@ export function AthleteDrawer({
         onOpenChange(false)
       } catch (err) {
         console.error("[Athlete-Drawer] Unexpected error in handleDelete:", err)
-        setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to delete athlete.")
+        setMsg(isStaleActionError(err) ? t("App was updated. Please refresh the page.") : t("Failed to delete athlete."))
       }
     })
   }
@@ -248,7 +252,7 @@ export function AthleteDrawer({
       setSelfieItems((current) => current.filter((s) => s.id !== selfie.id))
     } catch (err) {
       console.error("[Athlete-Drawer] Unexpected error reviewing selfie:", err)
-      setMsg(isStaleActionError(err) ? "App was updated. Please refresh the page." : "Failed to review selfie.")
+      setMsg(isStaleActionError(err) ? t("App was updated. Please refresh the page.") : t("Failed to review selfie."))
     }
   }
 
@@ -257,7 +261,7 @@ export function AthleteDrawer({
       <SheetContent
         side="right"
         className="w-full overflow-y-auto sm:max-w-xl p-0"
-        aria-label={`${name} athlete profile`}
+        aria-label={t("{name} athlete profile", { name })}
       >
         {/* ── Header ─────────────────────────────────────────────────── */}
         <SheetHeader className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur px-5 py-4">
@@ -282,16 +286,16 @@ export function AthleteDrawer({
             <div className="flex flex-col items-end gap-1 shrink-0">
               {isPaused ? (
                 <Badge variant="secondary" className="bg-amber-500/10 text-amber-700">
-                  Paused
+                  {t("Paused")}
                 </Badge>
               ) : (
                 <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">
-                  Active
+                  {t("Active")}
                 </Badge>
               )}
               {!hasProgramSetting && (
                 <Badge variant="secondary" className="text-[10px] text-muted-foreground">
-                  Assigned Only
+                  {t("Assigned Only")}
                 </Badge>
               )}
             </div>
@@ -303,48 +307,48 @@ export function AthleteDrawer({
           {/* ── Quick Stats Grid ─────────────────────────────────────────── */}
           <section className="grid grid-cols-2 gap-2.5 rounded-xl border bg-muted/20 p-3.5 sm:grid-cols-4">
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">Height / Weight</p>
+              <p className="text-[11px] text-muted-foreground">{t("Height / Weight")}</p>
               <p className="mt-0.5 text-xs font-semibold">
-                {height ? `${height} cm` : "—"} · {weight ? `${weight} kg` : "—"}
+                {height ? t("{height} cm", { height }) : "—"} · {weight ? t("{weight} kg", { weight }) : "—"}
               </p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">BMI</p>
+              <p className="text-[11px] text-muted-foreground">{t("BMI")}</p>
               <p className="mt-0.5 text-xs font-semibold">{bmi ?? "—"}</p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">Club / Team</p>
-              <p className="mt-0.5 text-xs font-semibold truncate">{team?.name_en ?? "Individual"}</p>
+              <p className="text-[11px] text-muted-foreground">{t("Club / Team")}</p>
+              <p className="mt-0.5 text-xs font-semibold truncate">{ln(team?.name_en, team?.name_ar) || t("Individual")}</p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">Birth Year</p>
+              <p className="text-[11px] text-muted-foreground">{t("Birth Year")}</p>
               <p className="mt-0.5 text-xs font-semibold">{athlete.birth_year ?? "—"}</p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">Program Mode</p>
+              <p className="text-[11px] text-muted-foreground">{t("Program Mode")}</p>
               <p className="mt-0.5 text-xs font-semibold truncate">
-                {hasProgramSetting ? "Monthly Program" : "Assigned Exercises"}
+                {hasProgramSetting ? t("Monthly Program") : t("Assigned Exercises")}
               </p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">Assessment</p>
+              <p className="text-[11px] text-muted-foreground">{t("Assessment")}</p>
               <p className="mt-0.5 text-xs font-semibold capitalize truncate">
-                {athlete.assessment_status?.replaceAll("_", " ") ?? "Draft"}
+                {athlete.assessment_status?.replaceAll("_", " ") ?? t("Draft")}
               </p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">Avg Session RPE</p>
+              <p className="text-[11px] text-muted-foreground">{t("Avg Session RPE")}</p>
               <p className="mt-0.5 text-xs font-semibold">
                 {avgRpe ? <span className={rpeColor(Number(avgRpe))}>{avgRpe} / 10</span> : "—"}
               </p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">
-              <p className="text-[11px] text-muted-foreground">Pain Reports</p>
+              <p className="text-[11px] text-muted-foreground">{t("Pain Reports")}</p>
               <p className="mt-0.5 text-xs font-semibold">
                 {athletePain.length > 0 ? (
-                  <span className="text-red-500 font-bold">{athletePain.length} reported</span>
+                  <span className="text-red-500 font-bold">{t("{athletePainCount} reported", { athletePainCount: athletePain.length })}</span>
                 ) : (
-                  <span className="text-emerald-500">None</span>
+                  <span className="text-emerald-500">{t("None")}</span>
                 )}
               </p>
             </div>
@@ -355,7 +359,7 @@ export function AthleteDrawer({
             <section className="grid gap-3 rounded-xl border bg-card p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Troy ID Login</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("Troy ID Login")}</p>
                   <p className="mt-1 font-mono text-base font-bold tracking-widest text-primary">{troyId}</p>
                 </div>
                 <Button
@@ -365,12 +369,12 @@ export function AthleteDrawer({
                   className="gap-1.5 shrink-0"
                 >
                   {copied === "id" ? <CheckCheck className="size-3.5" /> : <Copy className="size-3.5" />}
-                  {copied === "id" ? "Copied" : "Copy"}
+                  {copied === "id" ? t("Copied") : t("Copy")}
                 </Button>
               </div>
               {profile.password_change_required && (
                 <p className="text-xs text-amber-700 bg-amber-500/10 rounded-md p-2">
-                  Athlete will be asked to set a personalized password on their next login.
+                  {t("Athlete will be asked to set a personalized password on their next login.")}
                 </p>
               )}
             </section>
@@ -386,10 +390,10 @@ export function AthleteDrawer({
             >
               <span className="flex items-center gap-2">
                 <Activity className="size-4 text-primary" />
-                Physical & Performance Tests
+                {t("Physical & Performance Tests")}
                 {fmsRag && (
                   <span className={`rounded-full border px-2 py-0.2 text-[10px] font-semibold ${fmsRag.badgeClass}`}>
-                    FMS {fmsTotal}/21 · {fmsRag.label}
+                    {t("FMS {fmsTotal}/21 · {label}", { fmsTotal, label: t(fmsRag.label) })}
                   </span>
                 )}
               </span>
@@ -401,7 +405,7 @@ export function AthleteDrawer({
                 {/* Performance tests RAG cards */}
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                    Performance Tests (RAG Indicator)
+                    {t("Performance Tests (RAG Indicator)")}
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {PERF_METRICS.map(({ key, label, unit, ragEnabled = true }) => {
@@ -409,17 +413,17 @@ export function AthleteDrawer({
                       const rag = ragEnabled && val != null ? getPerformanceRag(key, val) : null
                       return (
                         <div key={key} className="rounded-lg border bg-card p-2.5">
-                          <p className="text-[11px] text-muted-foreground truncate">{label}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{t(label)}</p>
                           <p className="mt-1 text-sm font-bold">
                             {val != null ? `${val} ${unit}` : "—"}
                           </p>
                           {rag ? (
                             <span className={`mt-1.5 inline-block rounded-full border px-2 py-0.5 text-[9px] font-semibold ${rag.badgeClass}`}>
-                              {rag.label}
+                              {t(rag.label)}
                             </span>
                           ) : (
                             <span className="mt-1.5 inline-block text-[9px] text-muted-foreground">
-                              {val != null ? "Recorded" : "Not recorded"}
+                              {val != null ? t("Recorded") : t("Not recorded")}
                             </span>
                           )}
                         </div>
@@ -432,9 +436,9 @@ export function AthleteDrawer({
                 <div className="border-t pt-3">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      FMS Movement Screen
+                      {t("FMS Movement Screen")}
                     </p>
-                    <span className="text-xs font-bold">Total: {fmsTotal ?? "—"}/21</span>
+                    <span className="text-xs font-bold">{t("Total:")} {fmsTotal ?? "—"}/21</span>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {FMS_TESTS.map(({ key, label }) => {
@@ -444,7 +448,7 @@ export function AthleteDrawer({
                       const scoreClass = scoreNum === 3 ? "text-emerald-600 font-bold" : scoreNum === 2 ? "text-amber-600 font-bold" : scoreNum != null ? "text-red-600 font-bold" : "text-muted-foreground"
                       return (
                         <div key={key} className="flex items-center justify-between rounded-lg border bg-card px-3 py-2 text-xs">
-                          <span className="font-medium text-foreground">{label}</span>
+                          <span className="font-medium text-foreground">{t(label)}</span>
                           <span className={scoreClass}>
                             {score != null ? `${score} (${arLabel})` : "—"}
                           </span>
@@ -457,16 +461,16 @@ export function AthleteDrawer({
                 {/* Strength 1RMs */}
                 <div className="border-t pt-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                    Estimated 1RM Strength (Epley)
+                    {t("Estimated 1RM Strength (Epley)")}
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {STRENGTH_METRICS.map(({ key, label }) => {
                       const val = answersMap[key] ?? null
                       return (
                         <div key={key} className="rounded-lg border bg-card p-2.5">
-                          <p className="text-[11px] text-muted-foreground truncate">{label}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{t(label)}</p>
                           <p className="mt-1 text-sm font-bold text-foreground">
-                            {val != null ? `${val} kg` : "—"}
+                            {val != null ? t("{val} kg", { val }) : "—"}
                           </p>
                         </div>
                       )
@@ -487,7 +491,7 @@ export function AthleteDrawer({
             >
               <span className="flex items-center gap-2">
                 <Settings2 className="size-4 text-muted-foreground" />
-                Athlete Settings & Preferences
+                {t("Athlete Settings & Preferences")}
               </span>
               {settingsOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
             </button>
@@ -499,7 +503,7 @@ export function AthleteDrawer({
                   const form = new FormData(e.currentTarget)
                   startTransition(async () => {
                     const result = await updateAthleteSettings(form)
-                    setMsg(result.error ?? "Settings saved successfully.")
+                    setMsg(result.error ?? t("Settings saved successfully."))
                   })
                 }}
                 className="grid gap-4 border-t p-4"
@@ -508,10 +512,11 @@ export function AthleteDrawer({
 
                 {/* Free training days */}
                 <div>
-                  <Label className="mb-1 block text-xs font-semibold">Available Training Days</Label>
-                  <p className="mb-2 text-xs text-muted-foreground">Select days athlete is available for training:</p>
+                  <Label className="mb-1 block text-xs font-semibold">{t("Available Training Days")}</Label>
+                  <p className="mb-2 text-xs text-muted-foreground">{t("Select days athlete is available for training:")}</p>
                   <div className="flex flex-wrap gap-2">
-                    {DAY_NAMES.map((day, i) => {
+                    {DAY_NAMES.map((dayKey, i) => {
+                      const day = t(dayKey)
                       const isActive = (athlete.free_training_days ?? [0, 1, 2, 3, 4, 5, 6]).includes(i)
                       return (
                         <label key={i} className="flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:checked]:text-primary">
@@ -532,9 +537,9 @@ export function AthleteDrawer({
                 {/* Program Assignment Toggle */}
                 <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
                   <div>
-                    <p className="text-sm font-medium">Program Assignment</p>
+                    <p className="text-sm font-medium">{t("Program Assignment")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Enable monthly 4-week program or restrict to assigned daily exercises only.
+                      {t("Enable monthly 4-week program or restrict to assigned daily exercises only.")}
                     </p>
                   </div>
                   <select
@@ -542,17 +547,17 @@ export function AthleteDrawer({
                     defaultValue={hasProgramSetting ? "true" : "false"}
                     className="h-9 rounded-md border bg-background px-2 text-xs font-semibold"
                   >
-                    <option value="true">Enable Program</option>
-                    <option value="false">Assigned Only (No Program)</option>
+                    <option value="true">{t("Enable Program")}</option>
+                    <option value="false">{t("Assigned Only (No Program)")}</option>
                   </select>
                 </div>
 
                 {/* Show exercise recap */}
                 <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
                   <div>
-                    <p className="text-sm font-medium">Session Exercise Recap</p>
+                    <p className="text-sm font-medium">{t("Session Exercise Recap")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Display full summary screen after completing all exercises before feedback.
+                      {t("Display full summary screen after completing all exercises before feedback.")}
                     </p>
                   </div>
                   <select
@@ -560,25 +565,25 @@ export function AthleteDrawer({
                     defaultValue={String(athlete.show_exercise_recap ?? true)}
                     className="h-9 rounded-md border bg-background px-2 text-xs font-semibold"
                   >
-                    <option value="true">Allowed (On)</option>
-                    <option value="false">Forbidden (Off)</option>
+                    <option value="true">{t("Allowed (On)")}</option>
+                    <option value="false">{t("Forbidden (Off)")}</option>
                   </select>
                 </div>
 
                 {/* Sport & Position */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="drawer-sport" className="text-xs font-medium">Sport</Label>
-                    <Input id="drawer-sport" name="sport" defaultValue={athlete.sport ?? ""} placeholder="e.g. handball" className="mt-1 h-9 text-xs" />
+                    <Label htmlFor="drawer-sport" className="text-xs font-medium">{t("Sport")}</Label>
+                    <Input id="drawer-sport" name="sport" defaultValue={athlete.sport ?? ""} placeholder={t("e.g. handball")} className="mt-1 h-9 text-xs" />
                   </div>
                   <div>
-                    <Label htmlFor="drawer-position" className="text-xs font-medium">Position</Label>
-                    <Input id="drawer-position" name="position" defaultValue={athlete.position ?? ""} placeholder="e.g. GK, Pivot" className="mt-1 h-9 text-xs" />
+                    <Label htmlFor="drawer-position" className="text-xs font-medium">{t("Position")}</Label>
+                    <Input id="drawer-position" name="position" defaultValue={athlete.position ?? ""} placeholder={t("e.g. GK, Pivot")} className="mt-1 h-9 text-xs" />
                   </div>
                 </div>
 
                 <Button type="submit" variant="default" disabled={isPending} className="w-full sm:w-auto">
-                  {isPending ? "Saving changes…" : "Save settings"}
+                  {isPending ? t("Saving changes…") : t("Save settings")}
                 </Button>
               </form>
             )}
@@ -588,9 +593,9 @@ export function AthleteDrawer({
           {athleteSelfies.length > 0 && (
             <section className="grid gap-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">Exercise selfies</p>
+                <p className="text-sm font-semibold">{t("Exercise selfies")}</p>
                 <Badge variant="secondary" className="bg-amber-500/10 text-amber-700">
-                  {athleteSelfies.length} unread
+                  {t("{athleteSelfiesCount} unread", { athleteSelfiesCount: athleteSelfies.length })}
                 </Badge>
               </div>
               <div className="grid gap-3">
@@ -600,12 +605,12 @@ export function AthleteDrawer({
                       <div>
                         <p className="text-sm font-medium">
                           {selfie.selfie_type === "program"
-                            ? `Exercise ${(selfie.exercise_index ?? 0) + 1}`
-                            : "Session exercise"}
+                            ? t("Exercise {number}", { number: (selfie.exercise_index ?? 0) + 1 })
+                            : t("Session exercise")}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {selfie.session_date ? `${selfie.session_date} · ` : ""}
-                          Uploaded {new Date(selfie.uploaded_at).toLocaleString()}
+                          {t("Uploaded")} {new Date(selfie.uploaded_at).toLocaleString(locale)}
                         </p>
                       </div>
                     </div>
@@ -618,13 +623,13 @@ export function AthleteDrawer({
                       >
                         <img
                           src={selfie.image_url}
-                          alt={`${name} exercise selfie`}
+                          alt={t("{name} exercise selfie", { name })}
                           className="aspect-video w-full object-cover transition-transform hover:scale-[1.02]"
                         />
                       </a>
                     ) : (
                       <div className="grid aspect-video place-items-center rounded-lg bg-muted text-sm text-muted-foreground">
-                        Image unavailable
+                        {t("Image unavailable")}
                       </div>
                     )}
                     <Button
@@ -635,7 +640,7 @@ export function AthleteDrawer({
                       onClick={() => handleSelfieReview(selfie)}
                     >
                       <CheckCheck className="size-4" />
-                      Mark reviewed and delete
+                      {t("Mark reviewed and delete")}
                     </Button>
                   </div>
                 ))}
@@ -654,10 +659,10 @@ export function AthleteDrawer({
               >
                 <span className="flex items-center gap-2">
                   <HeartPulse className="size-4 text-muted-foreground" />
-                  Session Feedback & Pain
+                  {t("Session Feedback & Pain")}
                   {athletePain.length > 0 && (
                     <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
-                      {athletePain.length} pain
+                      {t("{athletePainCount} pain", { athletePainCount: athletePain.length })}
                     </Badge>
                   )}
                 </span>
@@ -671,7 +676,7 @@ export function AthleteDrawer({
                     <div className="grid gap-2">
                       <p className="flex items-center gap-1.5 text-xs font-semibold text-red-600">
                         <AlertTriangle className="size-3.5" />
-                        Pain reports
+                        {t("Pain reports")}
                       </p>
                       {athletePain.map((pain) => (
                         <div key={pain.id} className="rounded-lg border border-red-200 bg-red-500/5 p-3 text-sm">
@@ -680,9 +685,9 @@ export function AthleteDrawer({
                             {pain.session_date} · {pain.session_title}
                           </p>
                           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                            <span>Location: <strong>{pain.pain_location ?? "—"}</strong></span>
+                            <span>{t("Location:")} <strong>{pain.pain_location ?? "—"}</strong></span>
                             <span className={severityColor(pain.pain_severity)}>
-                              Severity: {pain.pain_severity ?? "—"}/10
+                              {t("Severity:")} {pain.pain_severity ?? "—"}/10
                             </span>
                           </div>
                           {pain.pain_notes && (
@@ -697,7 +702,7 @@ export function AthleteDrawer({
                   {athleteSummaries.length > 0 && (
                     <div className="grid gap-2">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Recent Session Summaries
+                        {t("Recent Session Summaries")}
                       </p>
                       {athleteSummaries.slice(0, 5).map((summary) => (
                         <div key={summary.id} className="rounded-lg border p-3 text-sm bg-card">
@@ -706,10 +711,10 @@ export function AthleteDrawer({
                             <p className="shrink-0 text-xs text-muted-foreground">{summary.session_date}</p>
                           </div>
                           <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-muted-foreground sm:grid-cols-4">
-                            <span>RPE: <strong className={rpeColor(summary.rpe)}>{summary.rpe ?? "—"}</strong></span>
-                            <span>Soreness: <strong>{summary.soreness_level ?? "—"}/5</strong></span>
-                            <span>Sleep: <strong>{summary.sleep_quality ?? "—"}/5</strong></span>
-                            <span>Rating: <strong>{summary.overall_rating ?? "—"}/5</strong></span>
+                            <span>{t("RPE:")} <strong className={rpeColor(summary.rpe)}>{summary.rpe ?? "—"}</strong></span>
+                            <span>{t("Soreness:")} <strong>{summary.soreness_level ?? "—"}/5</strong></span>
+                            <span>{t("Sleep:")} <strong>{summary.sleep_quality ?? "—"}/5</strong></span>
+                            <span>{t("Rating:")} <strong>{summary.overall_rating ?? "—"}/5</strong></span>
                           </div>
                           {summary.feedback_text && (
                             <p className="mt-1.5 text-xs text-muted-foreground italic line-clamp-2">
@@ -727,7 +732,7 @@ export function AthleteDrawer({
 
           {/* ── Account Controls ──────────────────────────────────── */}
           <section className="grid gap-3 rounded-xl border p-4 bg-muted/10">
-            <p className="text-sm font-semibold">Account Controls & Security</p>
+            <p className="text-sm font-semibold">{t("Account Controls & Security")}</p>
 
             {/* Generate temp password */}
             <Button
@@ -738,14 +743,14 @@ export function AthleteDrawer({
               disabled={isPending}
             >
               <KeyRound className="size-4" />
-              Generate Temporary Password
+              {t("Generate Temporary Password")}
             </Button>
 
             {tmpPassword && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">New Temporary Password</p>
+                    <p className="text-xs text-muted-foreground">{t("New Temporary Password")}</p>
                     <p className="mt-0.5 font-mono text-sm font-bold text-foreground">{tmpPassword}</p>
                   </div>
                   <Button
@@ -755,11 +760,11 @@ export function AthleteDrawer({
                     className="gap-1.5 shrink-0"
                   >
                     {copied === "pass" ? <CheckCheck className="size-3.5" /> : <Copy className="size-3.5" />}
-                    {copied === "pass" ? "Copied" : "Copy"}
+                    {copied === "pass" ? t("Copied") : t("Copy")}
                   </Button>
                 </div>
                 <p className="mt-2 text-xs text-amber-700">
-                  Athlete will be asked to create a new password on login. Copy it now.
+                  {t("Athlete will be asked to create a new password on login. Copy it now.")}
                 </p>
               </div>
             )}
@@ -773,9 +778,9 @@ export function AthleteDrawer({
               disabled={isPending}
             >
               {isPaused ? (
-                <><PlayCircle className="size-4 text-emerald-600" />Resume Athlete Account</>
+                <><PlayCircle className="size-4 text-emerald-600" />{t("Resume Athlete Account")}</>
               ) : (
-                <><PauseCircle className="size-4 text-amber-600" />Pause Athlete Account</>
+                <><PauseCircle className="size-4 text-amber-600" />{t("Pause Athlete Account")}</>
               )}
             </Button>
 
@@ -788,7 +793,7 @@ export function AthleteDrawer({
               disabled={isPending}
             >
               <Trash2 className="size-4" />
-              Permanently Delete Athlete
+              {t("Permanently Delete Athlete")}
             </Button>
           </section>
 

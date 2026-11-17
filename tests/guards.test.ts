@@ -11,6 +11,11 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }))
 
+vi.mock("@/lib/i18n/get-language", async () => {
+  const { makeT } = await import("@/lib/i18n/translate")
+  return { getT: async () => makeT("en") }
+})
+
 import { requireAdmin, requireStaff, requireUser } from "@/lib/auth/guards"
 
 beforeEach(() => {

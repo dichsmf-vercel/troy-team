@@ -5,9 +5,13 @@ import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { readProgramSessions, readProgramSource } from "@/lib/program-data"
+import { getLocale, getT } from "@/lib/i18n/get-language"
 import { Calendar, AlertCircle, CheckCircle2, XCircle, Dumbbell, ArrowRight } from "lucide-react"
+import { tx } from "@/lib/i18n/translate"
 
 export default async function AthleteProgramPage() {
+  const t = await getT()
+  const locale = await getLocale()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
@@ -45,13 +49,13 @@ export default async function AthleteProgramPage() {
   const visibleSessions = programSessions.filter((session) => session.date <= today)
   const sessionDates = new Set(programSessions.map((session) => session.date))
 
-  const monthTitle = monthStart.toLocaleDateString("en", { month: "long", year: "numeric" })
+  const monthTitle = monthStart.toLocaleDateString(locale, { month: "long", year: "numeric" })
   const days = Array.from({ length: 28 }, (_, index) => {
     const date = new Date(monthStart)
     date.setDate(monthStart.getDate() + index)
     return {
       day: date.getDate(),
-      weekday: date.toLocaleDateString("en", { weekday: "short" }),
+      weekday: date.toLocaleDateString(locale, { weekday: "short" }),
       date: date.toISOString().slice(0, 10),
       hasSession: sessionDates.has(date.toISOString().slice(0, 10)),
     }
@@ -59,28 +63,28 @@ export default async function AthleteProgramPage() {
 
   return (
     <div>
-      <AthleteHeader title="Monthly program" />
+      <AthleteHeader title={t("Monthly program")} />
       <main className="grid gap-6 px-4 py-6">
         {programSessions.length > 0 ? (
           <>
             {/* Program header */}
             <Card className="border-0 bg-gradient-to-br from-primary/10 to-accent/5">
               <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground">Your four-week training plan</p>
+                <p className="text-sm text-muted-foreground">{t("Your four-week training plan")}</p>
                 <h1 className="mt-2 text-2xl font-bold text-balance">
-                  {readProgramSource(assignment?.generation_reason) ? "Custom program" : "Monthly Program"}
+                  {readProgramSource(assignment?.generation_reason) ? t("Custom program") : t("Monthly Program")}
                 </h1>
                 <div className="mt-3 flex items-center gap-2">
                   {assignment?.status === "approved" ? (
-                    <Badge className="gap-1"><CheckCircle2 className="size-3" /> Ready to start</Badge>
+                    <Badge className="gap-1"><CheckCircle2 className="size-3" /> {t("Ready to start")}</Badge>
                   ) : assignment?.status === "active" ? (
-                    <Badge variant="secondary" className="gap-1"><CheckCircle2 className="size-3" /> In progress</Badge>
+                    <Badge variant="secondary" className="gap-1"><CheckCircle2 className="size-3" /> {t("In progress")}</Badge>
                   ) : (
-                    <Badge variant="outline" className="gap-1"><Calendar className="size-3" /> Pending approval</Badge>
+                    <Badge variant="outline" className="gap-1"><Calendar className="size-3" /> {t("Pending approval")}</Badge>
                   )}
                   {assignment?.month_start && (
                     <span className="text-xs text-muted-foreground">
-                      Starting {new Date(assignment.month_start).toLocaleDateString("en", { month: "short", day: "numeric" })}
+                      {t("Starting")} {new Date(assignment.month_start).toLocaleDateString(locale, { month: "short", day: "numeric" })}
                     </span>
                   )}
                 </div>
@@ -91,12 +95,12 @@ export default async function AthleteProgramPage() {
             <section className="grid gap-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">{monthTitle}</h2>
-                <span className="text-xs text-muted-foreground">Calendar view</span>
+                <span className="text-xs text-muted-foreground">{t("Calendar view")}</span>
               </div>
               <div className="grid grid-cols-7 gap-1 text-center text-[10px]">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                {[tx("Sun"), tx("Mon"), tx("Tue"), tx("Wed"), tx("Thu"), tx("Fri"), tx("Sat")].map((day) => (
                   <span key={day} className="py-2 font-medium text-muted-foreground">
-                    {day}
+                    {t(day)}
                   </span>
                 ))}
                 {days.map((item) => (
@@ -114,12 +118,12 @@ export default async function AthleteProgramPage() {
                   >
                     <span className={`text-xs font-bold ${item.date === today ? "text-primary" : ""}`}>
                       {item.day}
-                      {item.date === today ? <span className="sr-only"> today</span> : null}
+                      {item.date === today ? <span className="sr-only"> {t("today")}</span> : null}
                     </span>
                     {item.hasSession && completionByDate.get(item.date)?.status === "completed" ? (
-                      <CheckCircle2 className="mt-1 size-4 text-emerald-500" aria-label="Attended" />
+                      <CheckCircle2 className="mt-1 size-4 text-emerald-500" aria-label={t("Attended")} />
                     ) : item.hasSession && item.date < today ? (
-                      <XCircle className="mt-1 size-4 text-red-500" aria-label="Missed" />
+                      <XCircle className="mt-1 size-4 text-red-500" aria-label={t("Missed")} />
                     ) : item.hasSession ? (
                       <span className="mt-1 size-1.5 rounded-full bg-accent" />
                     ) : null}
@@ -130,7 +134,7 @@ export default async function AthleteProgramPage() {
 
             {/* Session details */}
             <section className="grid gap-3">
-              <h2 className="text-lg font-semibold">Training sessions</h2>
+              <h2 className="text-lg font-semibold">{t("Training sessions")}</h2>
               <div className="flex flex-col gap-3">
                 {visibleSessions.map((session, idx) => (
                   <Card key={idx} className="border-0 overflow-hidden">
@@ -146,33 +150,33 @@ export default async function AthleteProgramPage() {
                           }
                         >
                           {completionByDate.get(session.date)?.status === "completed" ? (
-                            <><CheckCircle2 className="size-4" aria-hidden="true" /> Attended</>
+                            <><CheckCircle2 className="size-4" aria-hidden="true" /> {t("Attended")}</>
                           ) : session.date < today ? (
-                            <><XCircle className="size-4" aria-hidden="true" /> Missed</>
+                            <><XCircle className="size-4" aria-hidden="true" /> {t("Missed")}</>
                           ) : (
-                            "Available today"
+                            t("Available today")
                           )}
                         </span>
                         {completionByDate.get(session.date)?.status === "completed" ? (
-                          <CheckCircle2 className="size-5 text-emerald-500" aria-label="Attended" />
+                          <CheckCircle2 className="size-5 text-emerald-500" aria-label={t("Attended")} />
                         ) : session.date < today ? (
-                          <XCircle className="size-5 text-red-500" aria-label="Missed" />
+                          <XCircle className="size-5 text-red-500" aria-label={t("Missed")} />
                         ) : session.date === today ? (
                           <Link
                             href={`/program/session/${session.date}`}
                             className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                           >
-                            Start training
+                            {t("Start training")}
                           </Link>
                         ) : null}
                       </div>
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                            Week {session.week} • {session.time}
+                            {t("Week {week} • {time}", { week: session.week, time: session.time })}
                           </p>
                           <h3 className="mt-1 text-sm font-semibold">
-                            {new Date(`${session.date}T12:00:00`).toLocaleDateString("en", {
+                            {new Date(`${session.date}T12:00:00`).toLocaleDateString(locale, {
                               weekday: "long",
                               month: "short",
                               day: "numeric",
@@ -181,7 +185,7 @@ export default async function AthleteProgramPage() {
                         </div>
                         {session.tooFewExercises && (
                           <Badge variant="destructive" className="text-xs gap-1">
-                            <AlertCircle className="size-3" /> Review
+                            <AlertCircle className="size-3" /> {t("Review")}
                           </Badge>
                         )}
                       </div>
@@ -222,19 +226,19 @@ export default async function AthleteProgramPage() {
               <Dumbbell className="size-8" />
             </div>
             <h2 className="mt-4 text-xl font-bold">
-              {isAssignedOnly ? "Assigned Exercises Mode" : "No Program Assigned Yet"}
+              {isAssignedOnly ? t("Assigned Exercises Mode") : t("No Program Assigned Yet")}
             </h2>
             <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
               {isAssignedOnly
-                ? "Your account is set to train using coach-assigned daily sessions. Check your dashboard for today's workout."
-                : "Coach Ahmed has not generated a monthly program for your account yet. You can still access individual sessions assigned to you."}
+                ? t("Your account is set to train using coach-assigned daily sessions. Check your dashboard for today's workout.")
+                : t("Coach Ahmed has not generated a monthly program for your account yet. You can still access individual sessions assigned to you.")}
             </p>
             <div className="mt-6">
               <Link
                 href="/dashboard"
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
               >
-                Go to Today's Dashboard <ArrowRight className="size-4" />
+                {t("Go to Today's Dashboard")} <ArrowRight className="size-4" />
               </Link>
             </div>
           </div>

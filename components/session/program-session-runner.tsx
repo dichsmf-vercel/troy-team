@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { completeProgramSession, uploadProgramExerciseSelfie } from "@/app/(athlete)/program/session/actions"
 import type { StoredProgramExercise } from "@/lib/program-data"
+import { useT } from "@/components/providers/language-provider"
 
 type ProgramFeedbackRow = { exercise_index: number; difficulty: number | null; pain_notes: string | null; enjoyment: number | null }
 
@@ -29,6 +30,7 @@ export function ProgramSessionRunner({
   initialCompleted?: boolean
   showExerciseRecap?: boolean
 }) {
+  const t = useT()
   const [activeIndex, setActiveIndex] = useState(0)
   const [completed, setCompleted] = useState<number[]>(
     initialCompleted ? exercises.map((_, index) => index) : []
@@ -86,9 +88,9 @@ export function ProgramSessionRunner({
   if (!exercises.length) {
     return (
       <Card className="p-6 text-center">
-        <p className="font-medium">No exercises scheduled for this session.</p>
+        <p className="font-medium">{t("No exercises scheduled for this session.")}</p>
         <Link className="mt-4 inline-flex text-sm text-primary underline" href="/program">
-          Back to program
+          {t("Back to program")}
         </Link>
       </Card>
     )
@@ -102,9 +104,9 @@ export function ProgramSessionRunner({
           <Check className="size-8" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">Session Completed!</h1>
+          <h1 className="text-xl font-bold">{t("Session Completed!")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            This session has been recorded and marked attended in your training calendar.
+            {t("This session has been recorded and marked attended in your training calendar.")}
           </p>
         </div>
 
@@ -115,7 +117,7 @@ export function ProgramSessionRunner({
             onClick={() => setViewRecapAfterFinished(true)}
             className="mx-auto gap-2 text-xs"
           >
-            <Eye className="size-4" /> View Today's Exercise Recap
+            <Eye className="size-4" /> {t("View Today's Exercise Recap")}
           </Button>
         )}
 
@@ -124,7 +126,7 @@ export function ProgramSessionRunner({
             href="/dashboard"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
           >
-            Back to Dashboard
+            {t("Back to Dashboard")}
           </Link>
         </div>
       </Card>
@@ -140,8 +142,8 @@ export function ProgramSessionRunner({
             <ListChecks className="size-5" />
           </div>
           <div>
-            <h1 className="text-lg font-bold">Session Recap</h1>
-            <p className="text-xs text-muted-foreground">This is all the exercises you did today</p>
+            <h1 className="text-lg font-bold">{t("Session Recap")}</h1>
+            <p className="text-xs text-muted-foreground">{t("This is all the exercises you did today")}</p>
           </div>
         </div>
 
@@ -156,7 +158,7 @@ export function ProgramSessionRunner({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-foreground truncate">
-                      {ex.name_en ?? ex.name ?? "Exercise"}
+                      {ex.name_en ?? ex.name ?? t("Exercise")}
                     </span>
                     {ex.section && (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -165,17 +167,17 @@ export function ProgramSessionRunner({
                     )}
                   </div>
                   <p className="mt-0.5 text-muted-foreground">
-                    {ex.sets ?? "-"} sets × {ex.reps ?? "-"} reps
-                    {ex.loadPercentage ? ` @ ${ex.loadPercentage}% load` : ""}
+                    {t("{sets} sets × {reps} reps", { sets: ex.sets ?? "-", reps: ex.reps ?? "-" })}
+                    {ex.loadPercentage ? t(" @ {loadPercentage}% load", { loadPercentage: ex.loadPercentage }) : ""}
                   </p>
                 </div>
                 <div className="shrink-0 pl-2">
                   {isDone ? (
                     <span className="flex items-center gap-1 text-emerald-600 font-semibold text-xs">
-                      <CheckCircle2 className="size-4" /> Done
+                      <CheckCircle2 className="size-4" /> {t("Done")}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground text-xs">Skipped</span>
+                    <span className="text-muted-foreground text-xs">{t("Skipped")}</span>
                   )}
                 </div>
               </div>
@@ -190,7 +192,7 @@ export function ProgramSessionRunner({
               onClick={() => setViewRecapAfterFinished(false)}
               className="w-full text-xs"
             >
-              Close Recap
+              {t("Close Recap")}
             </Button>
           ) : (
             <Button
@@ -200,7 +202,7 @@ export function ProgramSessionRunner({
               }}
               className="w-full gap-2 text-xs font-semibold"
             >
-              Proceed to Session Feedback <ArrowRight className="size-4" />
+              {t("Proceed to Session Feedback")} <ArrowRight className="size-4" />
             </Button>
           )}
         </div>
@@ -214,17 +216,17 @@ export function ProgramSessionRunner({
       <Card className="mx-auto grid max-w-xl gap-4 p-5 sm:p-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Final Step
+            {t("Final Step")}
           </p>
-          <h1 className="mt-1 text-xl font-bold">Session Feedback</h1>
+          <h1 className="mt-1 text-xl font-bold">{t("Session Feedback")}</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            All exercises completed. Submit quick feedback to log your recovery and wellness.
+            {t("All exercises completed. Submit quick feedback to log your recovery and wellness.")}
           </p>
         </div>
 
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
-            <Label className="text-xs font-semibold">How hard was the training session? (RPE 0–5)</Label>
+            <Label className="text-xs font-semibold">{t("How hard was the training session? (RPE 0–5)")}</Label>
             <span className="font-mono text-xs font-bold text-primary">{difficulty} / 5</span>
           </div>
           <input
@@ -238,18 +240,18 @@ export function ProgramSessionRunner({
         </div>
 
         <div className="grid gap-1.5">
-          <Label className="text-xs font-semibold">Any unnatural aches or pains?</Label>
+          <Label className="text-xs font-semibold">{t("Any unnatural aches or pains?")}</Label>
           <Textarea
             value={painNotes}
             onChange={(e) => setPainNotes(e.target.value)}
-            placeholder="Describe any sharp discomfort, joint pain, or muscular stiffness..."
+            placeholder={t("Describe any sharp discomfort, joint pain, or muscular stiffness...")}
             className="text-xs"
           />
         </div>
 
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
-            <Label className="text-xs font-semibold">How did the session feel overall? (0–5)</Label>
+            <Label className="text-xs font-semibold">{t("How did the session feel overall? (0–5)")}</Label>
             <span className="font-mono text-xs font-bold text-primary">{enjoyment} / 5</span>
           </div>
           <input
@@ -263,7 +265,7 @@ export function ProgramSessionRunner({
         </div>
 
         <Button onClick={finishSession} disabled={pending} className="w-full font-semibold">
-          {pending ? "Saving feedback…" : "Submit Feedback & Complete"}
+          {pending ? t("Saving feedback…") : t("Submit Feedback & Complete")}
         </Button>
 
         {error && (
@@ -283,10 +285,10 @@ export function ProgramSessionRunner({
           <p className="text-xs text-muted-foreground">
             {date} · {time}
           </p>
-          <h1 className="text-xl font-bold">Training Session</h1>
+          <h1 className="text-xl font-bold">{t("Training Session")}</h1>
         </div>
         <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-          {activeIndex + 1} of {exercises.length}
+          {activeIndex + 1} {t("of {exercisesCount}", { exercisesCount: exercises.length })}
         </span>
       </div>
 
@@ -301,28 +303,28 @@ export function ProgramSessionRunner({
       <Card className="grid gap-4 p-5">
         <div>
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary uppercase tracking-wide">
-            {active.section ?? "Training"}
+            {active.section ?? t("Training")}
           </span>
-          <h2 className="mt-2 text-xl font-bold">{active.name_en ?? active.name ?? "Exercise"}</h2>
+          <h2 className="mt-2 text-xl font-bold">{active.name_en ?? active.name ?? t("Exercise")}</h2>
           <p className="mt-1 text-xs font-medium text-muted-foreground">
-            {active.sets ?? "-"} sets × {active.reps ?? "-"} reps
-            {active.loadPercentage ? ` @ ${active.loadPercentage}% load` : ""}
+            {t("{sets} sets × {reps} reps", { sets: active.sets ?? "-", reps: active.reps ?? "-" })}
+            {active.loadPercentage ? t(" @ {loadPercentage}% load", { loadPercentage: active.loadPercentage }) : ""}
           </p>
         </div>
 
         {active.image_url && (
           <img
             src={active.image_url}
-            alt={active.name_en ?? "Exercise"}
+            alt={active.name_en ?? t("Exercise")}
             className="aspect-video w-full rounded-lg object-cover"
           />
         )}
 
         {/* Selfie upload */}
         <div className="grid gap-2 rounded-lg border border-dashed p-3">
-          <p className="text-xs font-semibold">Proof of completion selfie (optional)</p>
+          <p className="text-xs font-semibold">{t("Proof of completion selfie (optional)")}</p>
           <p className="text-[11px] text-muted-foreground">
-            Coach Ahmed can review this selfie directly on your athlete profile.
+            {t("Coach Ahmed can review this selfie directly on your athlete profile.")}
           </p>
           <input
             type="file"
@@ -349,7 +351,7 @@ export function ProgramSessionRunner({
             className="text-xs"
           />
           {selfieState[activeIndex] === "uploaded" && (
-            <p className="text-xs font-semibold text-emerald-600">Selfie saved for coach review.</p>
+            <p className="text-xs font-semibold text-emerald-600">{t("Selfie saved for coach review.")}</p>
           )}
         </div>
 
@@ -360,14 +362,14 @@ export function ProgramSessionRunner({
             rel="noreferrer"
             className="text-xs text-primary underline"
           >
-            Watch exercise demonstration video
+            {t("Watch exercise demonstration video")}
           </a>
         )}
 
         <Button onClick={handleExerciseComplete} disabled={pending} className="w-full font-semibold">
           {activeIndex === exercises.length - 1
-            ? "Complete Session Exercises"
-            : "Complete Exercise & Continue"}
+            ? t("Complete Session Exercises")
+            : t("Complete Exercise & Continue")}
         </Button>
       </Card>
 
@@ -380,7 +382,7 @@ export function ProgramSessionRunner({
           onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
           className="gap-1 text-xs"
         >
-          <ChevronLeft className="size-4" /> Previous
+          <ChevronLeft className="size-4" /> {t("Previous")}
         </Button>
         <Button
           variant="ghost"
@@ -389,7 +391,7 @@ export function ProgramSessionRunner({
           onClick={() => setActiveIndex((index) => Math.min(exercises.length - 1, index + 1))}
           className="gap-1 text-xs"
         >
-          Next <ChevronRight className="size-4" />
+          {t("Next")} <ChevronRight className="size-4" />
         </Button>
       </div>
     </div>

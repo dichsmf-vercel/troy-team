@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button"
 import { LanguageSwitchButton } from "@/components/language-switch-button"
 import { createClient } from "@/lib/supabase/client"
 import { BRAND } from "@/lib/brand"
+import { useT } from "@/components/providers/language-provider"
 
 export function DashboardTopBar({ compact = false }: { compact?: boolean }) {
+  const t = useT()
   const router = useRouter()
   async function signOut() {
     await createClient().auth.signOut()
@@ -24,7 +26,7 @@ export function DashboardTopBar({ compact = false }: { compact?: boolean }) {
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <LanguageSwitchButton className="h-9 px-2 text-xs sm:px-3 sm:text-sm" />
-        <Button type="button" variant="outline" size="sm" onClick={signOut} className="h-9 px-2 text-xs sm:px-3 sm:text-sm"><LogOut className="size-4" aria-hidden="true" /><span className="hidden sm:inline">Sign out</span><span className="sr-only sm:hidden">Sign out</span></Button>
+        <Button type="button" variant="outline" size="sm" onClick={signOut} className="h-9 px-2 text-xs sm:px-3 sm:text-sm"><LogOut className="size-4" aria-hidden="true" /><span className="hidden sm:inline">{t("Sign out")}</span><span className="sr-only sm:hidden">{t("Sign out")}</span></Button>
       </div>
     </header>
   )

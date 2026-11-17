@@ -10,12 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { useLanguage } from "@/components/providers/language-provider"
+import type { Dictionary } from "@/lib/i18n/dictionaries"
 
-function loginErrorMessage(error: unknown): string {
+function loginErrorMessage(error: unknown, auth: Dictionary["auth"]): string {
   const { code } = (error ?? {}) as { code?: string }
-  if (code === "invalid_credentials") return "Incorrect ID/email or password."
-  if (code === "email_not_confirmed") return "Confirm your email before signing in."
-  return "Something went wrong. Please try again."
+  if (code === "invalid_credentials") return auth.incorrectCredentials
+  if (code === "email_not_confirmed") return auth.confirmEmailFirst
+  return auth.unexpectedError
 }
 
 export default function LoginPage() {
@@ -65,7 +66,7 @@ export default function LoginPage() {
       router.push("/")
       router.refresh()
     } catch (err) {
-      setError(loginErrorMessage(err))
+      setError(loginErrorMessage(err, dict.auth))
     } finally {
       setIsLoading(false)
     }
@@ -81,18 +82,18 @@ export default function LoginPage() {
           </div>
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
             <div className="grid gap-2">
-              <Label htmlFor="identifier">Troy ID or Email</Label>
+              <Label htmlFor="identifier">{dict.auth.identifierLabel}</Label>
               <Input
                 id="identifier"
                 type="text"
                 required
                 autoComplete="username"
-                placeholder="TROY-XXXXXXX or email@example.com"
+                placeholder={dict.auth.identifierPlaceholder}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Athletes can sign in with their Troy ID (e.g. TROY-A3X9K2M) or email address.
+                {dict.auth.identifierHelp}
               </p>
             </div>
             <div className="grid gap-2">
@@ -115,7 +116,7 @@ export default function LoginPage() {
           </form>
           <div className="mt-5 text-center text-sm text-muted-foreground">
             <a href="/parent" className="font-medium text-foreground underline underline-offset-4">
-              Parent View
+              {dict.auth.parentView}
             </a>
           </div>
         </CardContent>

@@ -16,6 +16,11 @@ CI (`.github/workflows/ci.yml`) runs typecheck, test and build on every PR. Ther
 ## Layout
 See PROJECT_MAP.md section 3 for the full map. Key rules: server actions live in `app/admin/actions/<domain>.ts` and EVERY action starts with a guard from `lib/auth/guards.ts`; `"use server"` must be the first statement in the file.
 
+## Translations (EN/AR)
+- Every user-visible string must go through `t("English text")` (client: `useT()` / `useLanguage()`; server: `await getT()`). Use `{placeholders}` instead of string concatenation and `t.plural(n, "{count} athlete", "{count} athletes")` for counts.
+- For module-level constants use `tx("English text")` and render with `t(label)`.
+- Add the Arabic in `lib/i18n/ar/part*.ts`. `pnpm test` fails if any `t("…")` / `tx("…")` string has no Arabic or its placeholders differ. Bilingual DB fields: `useLn()(row.name_en, row.name_ar)`.
+
 ## Environment variables (never commit; `.env*.local` is gitignored)
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `NEXT_PUBLIC_SITE_URL`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `GEMINI_MODEL` (optional).

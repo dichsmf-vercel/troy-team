@@ -1,4 +1,7 @@
 import type { ParsedAthleteRow } from "@/lib/excel-import"
+import { englishT, type TFunction } from "@/lib/i18n/translate"
+
+const english = englishT
 
 /** Max rows accepted by one server-action call. The client sends bigger files in chunks. */
 export const IMPORT_CHUNK_SIZE = 15
@@ -47,32 +50,32 @@ export type ImportValidation = { ok: true; rows: ParsedAthleteRow[] } | { ok: fa
 
 const text = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value.trim() : null)
 
-export function validateImportRows(input: unknown): ImportValidation {
-  if (!Array.isArray(input) || input.length === 0) return { ok: false, error: "The spreadsheet has no athlete rows." }
+export function validateImportRows(input: unknown, t: TFunction = english): ImportValidation {
+  if (!Array.isArray(input) || input.length === 0) return { ok: false, error: t("The spreadsheet has no athlete rows.") }
   if (input.length > IMPORT_MAX_ROWS_PER_CALL) {
-    return { ok: false, error: `Too many rows in one request (max ${IMPORT_MAX_ROWS_PER_CALL}).` }
+    return { ok: false, error: t("Too many rows in one request (max {max}).", { max: IMPORT_MAX_ROWS_PER_CALL }) }
   }
 
   const rows: ParsedAthleteRow[] = []
   for (const [index, raw] of input.entries()) {
     const row = raw as ParsedAthleteRow | null
-    const label = `Row ${row?.rowNumber ?? index + 1}`
-    if (!row || typeof row !== "object") return { ok: false, error: `${label} is not valid.` }
+    const rowNo = row?.rowNumber ?? index + 1
+    if (!row || typeof row !== "object") return { ok: false, error: t("Row {row} is not valid.", { row: rowNo }) }
 
     const fullName = text(row.fullName)
-    if (!fullName) return { ok: false, error: `${label} is missing the athlete name.` }
-    if (fullName.length > 120) return { ok: false, error: `${label} has a name longer than 120 characters.` }
+    if (!fullName) return { ok: false, error: t("Row {row} is missing the athlete name.", { row: rowNo }) }
+    if (fullName.length > 120) return { ok: false, error: t("Row {row} has a name longer than 120 characters.", { row: rowNo }) }
 
     for (const key of METRIC_KEYS) {
       const value = row[key]
       if (value != null && (typeof value !== "number" || !Number.isFinite(value))) {
-        return { ok: false, error: `${label} has an invalid numeric value.` }
+        return { ok: false, error: t("Row {row} has an invalid numeric value.", { row: rowNo }) }
       }
     }
     for (const key of FMS_KEYS) {
       const score = row[key]
       if (score != null && (!Number.isInteger(score) || score < 0 || score > 3)) {
-        return { ok: false, error: `${label} has an FMS score outside the 0–3 range.` }
+        return { ok: false, error: t("Row {row} has an FMS score outside the 0–3 range.", { row: rowNo }) }
       }
     }
 
@@ -91,11 +94,11 @@ export function validateImportRows(input: unknown): ImportValidation {
 }
 
 /** Per-row problems for the preview in the import dialog (the server re-checks everything). */
-export function findRowProblems(rows: ParsedAthleteRow[]): { rowNumber: number; message: string }[] {
+export function findRowProblems(rows: ParsedAthleteRow[], t: TFunction = english): { rowNumber: number; message: string }[] {
   const problems: { rowNumber: number; message: string }[] = []
   for (const row of rows) {
-    const single = validateImportRows([row])
-    if (!single.ok) problems.push({ rowNumber: row.rowNumber, message: single.error.replace(/^Row \d+ /, "") })
+    const single = validateImportRows([row], t)
+    if (!single.ok) problems.push({ rowNumber: row.rowNumber, message: single.error })
   }
   return problems
 }

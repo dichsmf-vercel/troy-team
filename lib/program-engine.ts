@@ -343,8 +343,8 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
   return sessions
 }
 
-export function monthLabel(date: string) {
-  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(
+export function monthLabel(date: string, locale = "en") {
+  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(
     new Date(`${date}T12:00:00`)
   )
 }

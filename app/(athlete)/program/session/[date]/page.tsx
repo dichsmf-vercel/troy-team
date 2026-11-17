@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { AthleteHeader } from "@/components/athlete/athlete-header"
 import { ProgramSessionRunner } from "@/components/session/program-session-runner"
 import { readProgramSessions } from "@/lib/program-data"
+import { getT } from "@/lib/i18n/get-language"
 
 export default async function ProgramSessionPage({ params }: { params: Promise<{ date: string }> }) {
+  const t = await getT()
   const { date } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -48,7 +50,7 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
 
   return (
     <div>
-      <AthleteHeader title="Program training" />
+      <AthleteHeader title={t("Program training")} />
       <main className="px-4 py-6">
         <ProgramSessionRunner
           programId={assignment.id}

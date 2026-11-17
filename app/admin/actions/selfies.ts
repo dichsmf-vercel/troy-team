@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache"
 import { requireStaff } from "@/lib/auth/guards"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getT } from "@/lib/i18n/get-language"
 
 /** Review (and delete) a per-exercise program selfie. Files live in the "exercise-selfies" bucket. */
 export async function markExerciseSelfieReviewed(selfieId: string) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
 
@@ -15,7 +17,7 @@ export async function markExerciseSelfieReviewed(selfieId: string) {
     .select("storage_path")
     .eq("id", selfieId)
     .single()
-  if (loadError || !selfie) return { error: loadError?.message || "Selfie not found." }
+  if (loadError || !selfie) return { error: loadError?.message || t("Selfie not found.") }
 
   const { error: fileError } = await service.storage.from("exercise-selfies").remove([selfie.storage_path])
   if (fileError) return { error: fileError.message }
@@ -29,6 +31,7 @@ export async function markExerciseSelfieReviewed(selfieId: string) {
 
 /** Review (and delete) a session exercise selfie. Files live in the "session-selfies" bucket. */
 export async function reviewSessionSelfie(selfieId: string) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
 
@@ -38,7 +41,7 @@ export async function reviewSessionSelfie(selfieId: string) {
     .select("storage_path")
     .eq("id", selfieId)
     .single()
-  if (loadError || !selfie) return { error: loadError?.message || "Selfie not found." }
+  if (loadError || !selfie) return { error: loadError?.message || t("Selfie not found.") }
 
   const { error: fileError } = await service.storage.from("session-selfies").remove([selfie.storage_path])
   if (fileError) return { error: fileError.message }

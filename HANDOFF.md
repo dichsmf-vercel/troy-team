@@ -190,7 +190,6 @@ Last verified 2026-11-18 (see PROJECT_MAP.md for how to re-run):
 - Implement a lightweight Supabase Edge Function triggered by `system_log` inserts for errors.
 - Dispatches instant email notifications to Coach Ahmed or the tech lead when Gemini API quotas or demand spikes occur.
 
-### 4. FULL ARABIC TRANSLATION (toggle button) + a prettier Arabic font
-- **Complete the language toggle**: today only part of the UI is translated (`lib/i18n/dictionaries.ts` has ~440 lines, but admin screens, program/session pages, error messages, server-action messages, the import dialog, emails and validation text are still English-only). Make **every** user-visible string go through the dictionary so pressing the EN/AR toggle switches the whole app, including RTL layout checks on every page.
-- **Pretty Arabic font**: replace `IBM Plex Sans Arabic` (set up in `app/layout.tsx` via `next/font/google`) with a more elegant face. Candidates to trial side by side: **Cairo**, **Tajawal**, **Readex Pro**, **Noto Naskh Arabic** (for long text), **El Messiri / Almarai** (headings). Pick one for UI text and optionally one display font for headings; check numerals, weights 400–700 and mixed Arabic/Latin text (Troy IDs, exercise names).
-- Deliverable: no English strings visible in Arabic mode, a screenshot review of every route in RTL, and the chosen font loaded with `display: swap`.
+### 4. Arabic translation + font (DONE 2026-11-18, needs a native proofread)
+- Whole UI now goes through `t("English text")` with Arabic in `lib/i18n/ar/part1-4.ts` (~800 strings); `tests/i18n.test.ts` keeps it complete. Arabic font is now **Cairo** (was IBM Plex Sans Arabic).
+- Still English / to review: metadata + PWA manifest, raw database error messages, program/exercise names stored only in English (AI/engine JSON uses `name_en`), text stored in the database at creation time (e.g. "Standard Program"), and the intake action errors. Arabic wording should be proofread by Coach Ahmed; RTL layout needs a visual pass on every admin and athlete screen.

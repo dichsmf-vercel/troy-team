@@ -9,8 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { ShieldCheck } from "lucide-react"
+import { useLanguage } from "@/components/providers/language-provider"
 
 function SetPasswordForm() {
+  const { dict } = useLanguage()
+  const t = dict.auth
   const router = useRouter()
   const searchParams = useSearchParams()
   const isForced = searchParams.get("forced") === "1"
@@ -24,12 +27,12 @@ function SetPasswordForm() {
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     if (password.length < 8) {
-      setMessage("Password must be at least 8 characters.")
+      setMessage(t.passwordTooShort)
       setIsError(true)
       return
     }
     if (password !== confirm) {
-      setMessage("Passwords don't match.")
+      setMessage(t.passwordMismatch)
       setIsError(true)
       return
     }
@@ -55,14 +58,14 @@ function SetPasswordForm() {
         .eq("id", user.id)
     }
 
-    setMessage("Password saved successfully.")
+    setMessage(t.passwordSaved)
     setIsError(false)
     setPending(false)
     setTimeout(() => router.push("/dashboard"), 800)
   }
 
   return (
-    <AuthShell appName="TROY TEAM" tagline="Finish setting up your athlete account">
+    <AuthShell appName={dict.app.name} tagline={t.finishSetupTagline}>
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={submit} className="grid gap-5">
@@ -70,21 +73,21 @@ function SetPasswordForm() {
               {isForced && (
                 <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
                   <ShieldCheck className="size-4 shrink-0" />
-                  You must set a new password before continuing.
+                  {t.forcedPasswordNotice}
                 </div>
               )}
               <h1 className="text-xl font-semibold">
-                {isForced ? "Create your password" : "Set your password"}
+                {isForced ? t.createPasswordTitle : t.setPasswordTitle}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {isForced
-                  ? "Your account was set up by an admin. Create a personal password to secure it."
-                  : "Create the password you'll use to sign in."}
+                  ? t.createPasswordForcedBody
+                  : t.createPasswordBody}
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="password">New password</Label>
+              <Label htmlFor="password">{t.newPassword}</Label>
               <Input
                 id="password"
                 type="password"
@@ -96,7 +99,7 @@ function SetPasswordForm() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="confirm">Confirm password</Label>
+              <Label htmlFor="confirm">{t.confirmPassword}</Label>
               <Input
                 id="confirm"
                 type="password"
@@ -114,7 +117,7 @@ function SetPasswordForm() {
             )}
 
             <Button disabled={pending}>
-              {pending ? "Saving…" : "Save password"}
+              {pending ? t.saving : t.savePassword}
             </Button>
           </form>
         </CardContent>

@@ -13,6 +13,7 @@ import { AthleteDrawer } from "@/components/admin/athlete-drawer"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 import type { AdminAthlete, AdminAthleteProfile, AdminSelfie } from "@/lib/admin/types"
+import { useT, useLn } from "@/components/providers/language-provider"
 
 // ─── props ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,8 @@ export function AthletesPanel({
   feedbackSummaries = [],
   feedbackPainReports = [],
 }: AthletePanelProps) {
+  const t = useT()
+  const ln = useLn()
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all")
   const [importMessage, setImportMessage] = useState<string | null>(null)
@@ -95,9 +98,9 @@ export function AthletesPanel({
         <CardHeader className="gap-4 p-4 sm:p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-xl">Athlete Roster</CardTitle>
+              <CardTitle className="text-xl">{t("Athlete Roster")}</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
-                Manage profiles, assessments, training schedules, and direct credentials.
+                {t("Manage profiles, assessments, training schedules, and direct credentials.")}
               </p>
             </div>
             <form
@@ -107,12 +110,12 @@ export function AthletesPanel({
                 setImportMessage(null)
                 try {
                   const result = await importAthletesCsv(new FormData(event.currentTarget))
-                  setImportMessage(result.error ?? `Imported ${result.imported ?? 0} athletes.`)
+                  setImportMessage(result.error ?? t.plural(result.imported ?? 0, "Imported {count} athlete.", "Imported {count} athletes."))
                 } catch (err) {
                   if (isStaleActionError(err)) {
-                    setImportMessage("App was recently updated. Please refresh the page (Ctrl + F5).")
+                    setImportMessage(t("App was recently updated. Please refresh the page (Ctrl + F5)."))
                   } else {
-                    setImportMessage(actionErrorMessage(err, "An error occurred during CSV import."))
+                    setImportMessage(actionErrorMessage(err, t(t("An error occurred during CSV import.")), t))
                   }
                 } finally {
                   setImporting(false)
@@ -122,7 +125,7 @@ export function AthletesPanel({
             >
               <Input type="file" name="file" accept=".csv,text/csv" className="h-8 text-xs max-w-xs" />
               <Button type="submit" variant="outline" size="sm" disabled={importing} className="h-8 text-xs">
-                {importing ? "Importing…" : "Import CSV"}
+                {importing ? t("Importing…") : t("Import CSV")}
               </Button>
             </form>
           </div>
@@ -138,8 +141,8 @@ export function AthletesPanel({
             <div className="relative w-full sm:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
               <Input
-                aria-label="Search athletes"
-                placeholder="Search name, Troy ID, sport…"
+                aria-label={t("Search athletes")}
+                placeholder={t("Search name, Troy ID, sport…")}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 className="pl-9 h-9 text-xs"
@@ -155,7 +158,7 @@ export function AthletesPanel({
                   statusFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
-                All ({athletes.length})
+                {t("All ({athletesCount})", { athletesCount: athletes.length })}
               </button>
               <button
                 type="button"
@@ -164,7 +167,7 @@ export function AthletesPanel({
                   statusFilter === "active" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
-                Active ({athletes.length - pausedCount})
+                {t("Active ({count})", { count: athletes.length - pausedCount })}
               </button>
               {pausedCount > 0 && (
                 <button
@@ -174,7 +177,7 @@ export function AthletesPanel({
                     statusFilter === "paused" ? "bg-amber-600 text-white" : "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20"
                   }`}
                 >
-                  Paused ({pausedCount})
+                  {t("Paused ({pausedCount})", { pausedCount })}
                 </button>
               )}
               {totalPainAthletes > 0 && (
@@ -185,7 +188,7 @@ export function AthletesPanel({
                     statusFilter === "pain" ? "bg-red-600 text-white" : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
                   }`}
                 >
-                  Pain reports ({totalPainAthletes})
+                  {t("Pain reports ({totalPainAthletes})", { totalPainAthletes })}
                 </button>
               )}
               {totalSelfieAthletes > 0 && (
@@ -196,7 +199,7 @@ export function AthletesPanel({
                     statusFilter === "selfies" ? "bg-violet-600 text-white" : "bg-violet-500/10 text-violet-700 hover:bg-violet-500/20"
                   }`}
                 >
-                  Selfies ({totalSelfieAthletes})
+                  {t("Selfies ({totalSelfieAthletes})", { totalSelfieAthletes })}
                 </button>
               )}
             </div>
@@ -207,11 +210,11 @@ export function AthletesPanel({
       <ExcelAthleteImport />
 
       {/* Roster list */}
-      <section aria-label="Athlete roster">
+      <section aria-label={t("Athlete roster")}>
         <div className="divide-y rounded-xl border bg-card overflow-hidden">
           {filtered.map((athlete) => {
             const profile: Partial<AdminAthleteProfile> = athlete.profiles ?? {}
-            const name = profile.full_name ?? athlete.full_name ?? "Unnamed athlete"
+            const name = profile.full_name ?? athlete.full_name ?? t("Unnamed athlete")
             const nameAr = profile.full_name_ar ?? null
             const troyId = profile.troy_id ?? null
             const team = firstRelation(athlete.athlete_teams?.[0]?.teams)
@@ -226,7 +229,7 @@ export function AthletesPanel({
                 type="button"
                 onClick={() => openAthlete(athlete)}
                 className="flex w-full flex-col gap-2 p-4 text-left transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`Open profile for ${name}`}
+                aria-label={t("Open profile for {name}", { name })}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {/* Avatar */}
@@ -245,7 +248,7 @@ export function AthletesPanel({
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                       <span className="font-mono text-primary font-medium">{troyId ?? athlete.auth_email ?? "—"}</span>
-                      {team?.name_en ? ` · ${team.name_en}` : ""}
+                      {team?.name_en ? ` · ${ln(team.name_en, team.name_ar)}` : ""}
                       {athlete.sport ? ` · ${String(athlete.sport).toUpperCase()}` : ""}
                       {athlete.position ? ` (${athlete.position})` : ""}
                     </p>
@@ -256,12 +259,12 @@ export function AthletesPanel({
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 pl-13 sm:pl-0 sm:justify-end">
                   {isPaused && (
                     <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 text-[10px]">
-                      Paused
+                      {t("Paused")}
                     </Badge>
                   )}
                   {isAssignedOnly && (
                     <Badge variant="secondary" className="text-[10px] text-muted-foreground">
-                      Assigned Only
+                      {t("Assigned Only")}
                     </Badge>
                   )}
                   {selfieCount > 0 && (
@@ -271,11 +274,11 @@ export function AthletesPanel({
                   )}
                   {painCount > 0 && (
                     <Badge variant="destructive" className="text-[10px]">
-                      <AlertTriangle className="mr-1 size-3" /> {painCount} pain
+                      <AlertTriangle className="mr-1 size-3" /> {t("{painCount} pain", { painCount })}
                     </Badge>
                   )}
                   <Badge variant="outline" className="text-[10px] capitalize">
-                    {athlete.assessment_status?.replaceAll("_", " ") ?? "Draft"}
+                    {athlete.assessment_status?.replaceAll("_", " ") ?? t("Draft")}
                   </Badge>
                 </div>
               </button>
@@ -284,7 +287,7 @@ export function AthletesPanel({
 
           {!filtered.length && (
             <div className="rounded-xl p-8 text-center text-sm text-muted-foreground">
-              No athletes match this search or filter.
+              {t("No athletes match this search or filter.")}
             </div>
           )}
         </div>
@@ -307,6 +310,8 @@ export function AthletesPanel({
 
 
 export function AthleteStats({ athletes }: { athletes: AdminAthlete[] }) {
+  const t = useT()
+  const ln = useLn()
   const assessed = athletes.filter((a) => a.assessment_status === "approved").length
   const paused = athletes.filter((a) => a.account_status === "paused").length
   return (
@@ -314,25 +319,25 @@ export function AthleteStats({ athletes }: { athletes: AdminAthlete[] }) {
       <Card>
         <CardContent className="p-4">
           <p className="text-2xl font-semibold">{athletes.length}</p>
-          <p className="text-xs text-muted-foreground">Total athletes</p>
+          <p className="text-xs text-muted-foreground">{t("Total athletes")}</p>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4">
           <p className="text-2xl font-semibold">{assessed}</p>
-          <p className="text-xs text-muted-foreground">Assessed</p>
+          <p className="text-xs text-muted-foreground">{t("Assessed")}</p>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4">
           <p className="text-2xl font-semibold">{athletes.length - assessed}</p>
-          <p className="text-xs text-muted-foreground">Pending assessment</p>
+          <p className="text-xs text-muted-foreground">{t("Pending assessment")}</p>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4">
           <p className="text-2xl font-semibold">{paused}</p>
-          <p className="text-xs text-muted-foreground">Paused</p>
+          <p className="text-xs text-muted-foreground">{t("Paused")}</p>
         </CardContent>
       </Card>
     </div>

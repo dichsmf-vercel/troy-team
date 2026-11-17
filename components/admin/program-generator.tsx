@@ -11,6 +11,7 @@ import { generateFourWeekProgram, monthLabel, weekdayLabel } from "@/lib/program
 import { saveGeneratedProgram } from "@/app/admin/actions/programs"
 import type { AdminAthlete, AdminExercise, AdminRule } from "@/lib/admin/types"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
+import { useLanguage } from "@/components/providers/language-provider"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
 
@@ -23,6 +24,7 @@ export function ProgramGenerator({
   exercises: AdminExercise[]
   rules: AdminRule[]
 }) {
+  const { t, locale } = useLanguage()
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [time, setTime] = useState("18:00")
@@ -31,7 +33,7 @@ export function ProgramGenerator({
   const [saveState, setSaveState] = useState<string | null>(null)
 
   const selectedAthlete = athletes.find((athlete) => athlete.id === athleteId)
-  const month = useMemo(() => monthLabel(startDate), [startDate])
+  const month = useMemo(() => monthLabel(startDate, locale), [startDate, locale])
 
   const ruleFilteredExercises = useMemo(() => {
     const values = Object.fromEntries(
@@ -76,12 +78,12 @@ export function ProgramGenerator({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-accent" />
-            Rules & Legacy Generator
+            {t("Rules & Legacy Generator")}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="program-athlete">Athlete</Label>
+            <Label htmlFor="program-athlete">{t("Athlete")}</Label>
             <select
               id="program-athlete"
               value={athleteId}
@@ -101,7 +103,7 @@ export function ProgramGenerator({
             </select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="program-start">Month start</Label>
+            <Label htmlFor="program-start">{t("Month start")}</Label>
             <Input
               id="program-start"
               type="date"
@@ -110,7 +112,7 @@ export function ProgramGenerator({
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="program-time">Training time</Label>
+            <Label htmlFor="program-time">{t("Training time")}</Label>
             <div className="relative">
               <Clock3 className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
               <Input
@@ -123,7 +125,7 @@ export function ProgramGenerator({
             </div>
           </div>
           <fieldset className="grid gap-2">
-            <legend className="text-sm font-medium">Exact training days</legend>
+            <legend className="text-sm font-medium">{t("Exact training days")}</legend>
             <div className="grid grid-cols-4 gap-2">
               {weekdays.map((day) => (
                 <label
@@ -146,7 +148,7 @@ export function ProgramGenerator({
                       )
                     }
                   />
-                  {weekdayLabel(day)}
+                  {t(weekdayLabel(day))}
                 </label>
               ))}
             </div>
@@ -168,7 +170,7 @@ export function ProgramGenerator({
                 setGenerated(nextGenerated)
               }}
             >
-              Preview program
+              {t("Preview program")}
             </Button>
             {generated.length ? (
               <Button
@@ -193,12 +195,12 @@ export function ProgramGenerator({
                     ) {
                       setSaveState("App was recently updated. Please refresh the page (Ctrl+F5).")
                     } else {
-                      setSaveState(actionErrorMessage(err, "Failed to save program."))
+                      setSaveState(actionErrorMessage(err, t("Failed to save program."), t))
                     }
                   }
                 }}
               >
-                {saveState === "Saving..." ? "Saving..." : "Save draft for review"}
+                {saveState === "Saving..." ? t("Saving...") : t("Save draft for review")}
               </Button>
             ) : null}
             {saveState && saveState !== "Saving..." ? (
@@ -208,8 +210,7 @@ export function ProgramGenerator({
             ) : null}
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Structured: Warmup → Mobility → Rubber bands → FMS problems (weeks 1–2 only) → Strength/Power → Cooldown.
-            Split: Upper, Lower, Full if 3 days/week.
+            {t("Structured: Warmup → Mobility → Rubber bands → FMS problems (weeks 1–2 only) → Strength/Power → Cooldown. Split: Upper, Lower, Full if 3 days/week.")}
           </p>
         </CardContent>
       </Card>
@@ -217,7 +218,7 @@ export function ProgramGenerator({
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">
-              {selectedAthlete?.profiles?.full_name ?? "Select an athlete"}
+              {selectedAthlete?.profiles?.full_name ?? t("Select an athlete")}
               {selectedAthlete?.sport ? ` · ${String(selectedAthlete.sport).toUpperCase()}` : ""}
             </p>
             <h2 className="text-2xl font-semibold">{month}</h2>
@@ -227,7 +228,7 @@ export function ProgramGenerator({
         {generated.length === 0 ? (
           <Card>
             <CardContent className="flex min-h-64 items-center justify-center p-6 text-center text-sm text-muted-foreground">
-              Preview the month to see scheduled sessions, structured warmups, mobility, FMS corrections, and progression.
+              {t("Preview the month to see scheduled sessions, structured warmups, mobility, FMS corrections, and progression.")}
             </CardContent>
           </Card>
         ) : (
@@ -237,10 +238,10 @@ export function ProgramGenerator({
                 <CardContent className="grid gap-3 p-4 sm:grid-cols-[140px_1fr_auto] sm:items-center">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Week {session.week} {session.focus ? `· ${session.focus}` : ""}
+                      {t("Week {week}", { week: session.week })} {session.focus ? `· ${session.focus}` : ""}
                     </p>
                     <p className="font-semibold text-sm">
-                      {new Date(`${session.date}T12:00:00`).toLocaleDateString("en", {
+                      {new Date(`${session.date}T12:00:00`).toLocaleDateString(locale, {
                         weekday: "short",
                         month: "short",
                         day: "numeric",
@@ -264,10 +265,10 @@ export function ProgramGenerator({
                   </div>
                   {session.tooFewExercises ? (
                     <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
-                      Too few exercises
+                      {t("Too few exercises")}
                     </span>
                   ) : (
-                    <span className="text-xs text-muted-foreground">Draft</span>
+                    <span className="text-xs text-muted-foreground">{t("Draft")}</span>
                   )}
                 </CardContent>
               </Card>

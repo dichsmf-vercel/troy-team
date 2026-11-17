@@ -9,7 +9,9 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createAthleteAuthUser, deleteAthleteCompletely } from "@/lib/admin/athlete-accounts"
 import { parseCsvObjects, parseCsvRows } from "@/lib/admin/csv"
 import { nameKey, validateImportRows } from "@/lib/admin/athlete-import-validation"
+import { getT } from "@/lib/i18n/get-language"
 import type { ParsedAthleteRow } from "@/lib/excel-import"
+import type { TFunction } from "@/lib/i18n/translate"
 
 const RULES_PROGRAM_NAME = "Coach Ahmed Rules Engine"
 const MAX_CSV_ATHLETES = 500
@@ -17,7 +19,8 @@ const MAX_CSV_ATHLETES = 500
 // ─── Coach Ahmed rules CSV ────────────────────────────────────────────────────
 
 export async function importCoachAhmedRulesFromCsv(formData: FormData) {
-  const auth = await requireAdmin("Only admins can import rules.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can import rules."))
   if (!auth.ok) return { error: auth.error }
 
   const service = createAdminClient()
@@ -59,7 +62,7 @@ export async function importCoachAhmedRulesFromCsv(formData: FormData) {
         is_active: true,
       }
     })
-  if (!rows.length) return { error: "The CSV has no rules." }
+  if (!rows.length) return { error: t("The CSV has no rules.") }
 
   // Replace the old rule set, but restore it if the new one cannot be saved.
   const { data: previous, error: loadError } = await service.from("program_rules").select("*").eq("rule_type", "coach_ahmed_csv")
@@ -93,14 +96,15 @@ async function listAllAuthEmails(service: SupabaseClient): Promise<Map<string, s
 }
 
 export async function importAthletesCsv(formData: FormData) {
-  const auth = await requireAdmin("Only admins can import athletes.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can import athletes."))
   if (!auth.ok) return { error: auth.error }
 
   const file = formData.get("file")
-  if (!(file instanceof File) || !file.size) return { error: "Choose an athletes CSV file." }
+  if (!(file instanceof File) || !file.size) return { error: t("Choose an athletes CSV file.") }
   const rows = parseCsvObjects(await file.text())
-  if (!rows.length) return { error: "The CSV has no athlete rows." }
-  if (rows.length > MAX_CSV_ATHLETES) return { error: `The CSV has more than ${MAX_CSV_ATHLETES} rows. Split it into smaller files.` }
+  if (!rows.length) return { error: t("The CSV has no athlete rows.") }
+  if (rows.length > MAX_CSV_ATHLETES) return { error: t("The CSV has more than {MAX_CSV_ATHLETES} rows. Split it into smaller files.", { MAX_CSV_ATHLETES }) }
 
   const service = createAdminClient()
   const emailToId = await listAllAuthEmails(service)
@@ -113,7 +117,7 @@ export async function importAthletesCsv(formData: FormData) {
   for (const [index, row] of rows.entries()) {
     const email = (row.email || "").toLowerCase()
     const fullName = row.full_name || ""
-    if (!email || !fullName) return { error: `Row ${index + 2} requires full_name and email.`, imported }
+    if (!email || !fullName) return { error: t("Row {row} requires full_name and email.", { row: index + 2 }), imported }
 
     let athleteId = emailToId.get(email)
     if (!athleteId) {
@@ -122,7 +126,7 @@ export async function importAthletesCsv(formData: FormData) {
         email_confirm: false,
         user_metadata: { full_name: fullName, role: "athlete" },
       })
-      if (created.error || !created.data.user) return { error: created.error?.message || `Could not create ${email}.`, imported }
+      if (created.error || !created.data.user) return { error: created.error?.message || t("Could not create {email}.", { email }), imported }
       athleteId = created.data.user.id
       emailToId.set(email, athleteId)
     }
@@ -177,13 +181,14 @@ async function fetchAllRows<T>(
 }
 
 export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promise<ExcelImportResult> {
+  const t = await getT()
   const result: ExcelImportResult = { error: null, imported: 0, credentials: [], skipped: [] }
   const stop = (error: string): ExcelImportResult => ({ ...result, error })
 
-  const auth = await requireAdmin("Only admins can import athletes.")
+  const auth = await requireAdmin(t("Only admins can import athletes."))
   if (!auth.ok) return stop(auth.error)
 
-  const validated = validateImportRows(input)
+  const validated = validateImportRows(input, t)
   if (!validated.ok) return stop(validated.error)
 
   const service = createAdminClient()
@@ -191,7 +196,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
   // Existing athletes → skip duplicates so re-uploading a file never doubles the roster.
   const profiles = await fetchAllRows<{ id: string; full_name: string | null }>(service, "profiles", "id, full_name", { column: "role", value: "athlete" })
   const athletes = await fetchAllRows<{ id: string; birth_year: number | null }>(service, "athletes", "id, birth_year")
-  if (profiles.error || athletes.error) return stop(`Could not check existing athletes: ${profiles.error ?? athletes.error}`)
+  if (profiles.error || athletes.error) return stop(t("Could not check existing athletes: {error}", { error: profiles.error ?? athletes.error }))
   const birthYearById = new Map(athletes.data.map((athlete) => [athlete.id, athlete.birth_year]))
   const seen = new Map<string, (number | null)[]>()
   for (const profile of profiles.data) {
@@ -202,7 +207,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
     (seen.get(nameKey(name)) ?? []).some((existing) => existing == null || birthYear == null || existing === birthYear)
 
   const { data: existingTeams, error: teamsError } = await service.from("teams").select("id,name_en,name_ar")
-  if (teamsError) return stop(`Could not load teams: ${teamsError.message}`)
+  if (teamsError) return stop(t("Could not load teams: {message}", { message: teamsError.message }))
   const teamIdByName = new Map<string, string>()
   for (const team of existingTeams ?? []) {
     for (const name of [team.name_en, team.name_ar]) if (name?.trim()) teamIdByName.set(name.trim().toLocaleLowerCase(), team.id)
@@ -229,19 +234,19 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
           .insert({ name_en: clubName, name_ar: clubName, color_hex: "#2563eb", created_by: auth.ctx.user.id })
           .select("id")
           .single()
-        if (error || !team) return stop(`Row ${row.rowNumber}: could not create team "${clubName}": ${error?.message ?? "no team returned"}`)
+        if (error || !team) return stop(t("Row {row}: could not create team \"{club}\": {error}", { row: row.rowNumber, club: clubName, error: error?.message ?? t("no team returned") }))
         teamId = team.id
         teamIdByName.set(key, team.id)
       }
     }
 
     const created = await createAthleteAuthUser(service, fullName)
-    if (!created.ok) return stop(`Row ${row.rowNumber}: ${created.error}`)
+    if (!created.ok) return stop(t("Row {rowNumber}: {error}", { rowNumber: row.rowNumber, error: created.error }))
     const athleteId = created.id
 
     const rollback = async (message: string) => {
       await deleteAthleteCompletely(service, athleteId)
-      return stop(`Row ${row.rowNumber}: ${message}`)
+      return stop(t("Row {rowNumber}: {message}", { rowNumber: row.rowNumber, message }))
     }
 
     const { error: profileError } = await service.from("profiles").upsert({
@@ -252,7 +257,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
       troy_id: created.troyId,
       password_change_required: true,
     })
-    if (profileError) return rollback(`Profile save failed: ${profileError.message}`)
+    if (profileError) return rollback(t("Profile save failed: {message}", { message: profileError.message }))
 
     const { error: athleteError } = await service.from("athletes").upsert({
       id: athleteId,
@@ -264,14 +269,14 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
       goals: "Standard Program",
       assessment_status: "draft",
     })
-    if (athleteError) return rollback(`Athlete profile save failed: ${athleteError.message}`)
+    if (athleteError) return rollback(t("Athlete profile save failed: {message}", { message: athleteError.message }))
 
     if (teamId) {
       const { error } = await service.from("athlete_teams").insert({ athlete_id: athleteId, team_id: teamId })
-      if (error) return rollback(`Team assignment failed: ${error.message}`)
+      if (error) return rollback(t("Team assignment failed: {message}", { message: error.message }))
     }
 
-    const saved = await saveImportedAssessment(service, athleteId, row)
+    const saved = await saveImportedAssessment(service, athleteId, row, t)
     if (saved.error) return rollback(saved.error)
 
     result.credentials.push({ name: fullName, troyId: created.troyId, temporaryPassword: created.temporaryPassword })
@@ -283,7 +288,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
   return result
 }
 
-async function saveImportedAssessment(service: SupabaseClient, athleteId: string, row: ParsedAthleteRow): Promise<{ error: string | null }> {
+async function saveImportedAssessment(service: SupabaseClient, athleteId: string, row: ParsedAthleteRow, t: TFunction): Promise<{ error: string | null }> {
   const fms = [row.deepSquat, row.hurdleStep, row.inlineLunge, row.shoulderMobility, row.activeStraightLegRaise, row.trunkStability, row.rotaryStability]
   const fmsTotal = fms.every((score) => typeof score === "number") ? fms.reduce<number>((total, score) => total + (score ?? 0), 0) : null
 
@@ -298,7 +303,7 @@ async function saveImportedAssessment(service: SupabaseClient, athleteId: string
     .insert({ athlete_id: athleteId, status: "draft", version: 1, coach_notes: notes, injury_flags: [], goals: [], submitted_at: submittedAt })
     .select("id")
     .single()
-  if (error || !assessment) return { error: `Assessment save failed: ${error?.message ?? "no assessment returned"}` }
+  if (error || !assessment) return { error: t("Assessment save failed: {error}", { error: error?.message ?? t("no assessment returned") }) }
 
   const values: [string, number | null | undefined][] = [
     ["deep_squat", row.deepSquat],
@@ -327,7 +332,7 @@ async function saveImportedAssessment(service: SupabaseClient, athleteId: string
 
   if (answers.length) {
     const { error: answersError } = await service.from("athlete_assessment_answers").insert(answers)
-    if (answersError) return { error: `Assessment measurements save failed: ${answersError.message}` }
+    if (answersError) return { error: t("Assessment measurements save failed: {message}", { message: answersError.message }) }
   }
   return { error: null }
 }

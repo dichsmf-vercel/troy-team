@@ -3,10 +3,11 @@
 import { useTransition } from "react"
 import { Languages } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useLanguage } from "@/components/providers/language-provider"
+import { useLanguage, useT } from "@/components/providers/language-provider"
 import { setLanguage } from "@/app/actions/language"
 
 export function LanguageSwitchButton({ className }: { className?: string }) {
+  const t = useT()
   const { language } = useLanguage()
   const [isPending, startTransition] = useTransition()
 
@@ -27,7 +28,7 @@ export function LanguageSwitchButton({ className }: { className?: string }) {
       className={className}
     >
       <Languages className="size-4" aria-hidden="true" />
-      {language === "en" ? "العربية" : "English"}
+      {language === "en" ? "العربية" : t("English")}
     </Button>
   )
 }

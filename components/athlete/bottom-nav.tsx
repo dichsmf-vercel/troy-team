@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils"
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { dict } = useLanguage()
+  const { dict, t } = useLanguage()
 
   const items = [
-    { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/program", label: "Program", icon: CalendarDays },
+    { href: "/dashboard", label: t("Home"), icon: Home },
+    { href: "/program", label: t("Program"), icon: CalendarDays },
     { href: "/progress", label: dict.progress.title, icon: TrendingUp },
     { href: "/profile", label: dict.profile.title, icon: User },
   ]

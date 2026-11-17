@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Language } from "@/lib/i18n/dictionaries"
-import { useLanguage } from "@/components/providers/language-provider"
+import { useLanguage, useT } from "@/components/providers/language-provider"
 import {
   startSession,
   toggleExerciseCompletion,
@@ -67,6 +67,7 @@ export function SessionRunner({
   initialCompletions: { session_exercise_id: string; completed: boolean }[]
   initialSelfieUploaded: boolean
 }) {
+  const t = useT()
   const { dict } = useLanguage()
 
   // ─── mount diagnostic ────────────────────────────────────────────────────────
@@ -186,11 +187,11 @@ export function SessionRunner({
           &middot; {safeTime(period, language === "ar" ? "ar" : "en-US")}
         </p>
         <div className="w-full max-w-sm rounded-2xl border border-dashed p-4 text-left">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What to expect</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("What to expect")}</p>
           <ul className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
-            <li>· {exercises.length} exercises to complete</li>
-            <li>· Upload a selfie after each exercise</li>
-            <li>· Report any pain or discomfort as you go</li>
+            <li>{t("· {exercisesCount} exercises to complete", { exercisesCount: exercises.length })}</li>
+            <li>{t("· Upload a selfie after each exercise")}</li>
+            <li>{t("· Report any pain or discomfort as you go")}</li>
           </ul>
         </div>
         {error ? (
@@ -206,7 +207,7 @@ export function SessionRunner({
           disabled={isPending}
         >
           <Play className="size-4" />
-          {isPending ? "Starting…" : dict.session.startSession ?? "Start session"}
+          {isPending ? t("Starting…") : dict.session.startSession ?? t("Start session")}
         </Button>
       </div>
     )
@@ -220,19 +221,19 @@ export function SessionRunner({
         <div className="grid size-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
           <Check className="size-8" />
         </div>
-        <h1 className="text-2xl font-semibold">All exercises done!</h1>
+        <h1 className="text-2xl font-semibold">{t("All exercises done!")}</h1>
         <p className="max-w-xs text-sm text-muted-foreground">
-          Great work. Submit your session summary so your coach can review your feedback.
+          {t("Great work. Submit your session summary so your coach can review your feedback.")}
         </p>
         <Link
           href={`/session/${sessionPostId}/summary?sessionAthleteId=${sessionAthleteId}`}
           className="inline-flex h-14 w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
         >
           <Check className="size-4" />
-          {dict.session.finishSession ?? "Finish session"}
+          {dict.session.finishSession ?? t("Finish session")}
         </Link>
         <Link href="/dashboard" className="text-sm text-muted-foreground underline underline-offset-4">
-          Back to dashboard
+          {t("Back to dashboard")}
         </Link>
       </div>
     )
@@ -276,7 +277,7 @@ export function SessionRunner({
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
-              aria-label={`Exercise ${idx + 1}${done ? " (completed)" : ""}`}
+              aria-label={done ? t("Exercise {number} (completed)", { number: idx + 1 }) : t("Exercise {number}", { number: idx + 1 })}
             >
               {done ? <Check className="size-3" /> : idx + 1}
             </button>
@@ -308,7 +309,7 @@ export function SessionRunner({
             </div>
           ) : (
             <div className="flex aspect-video items-center justify-center bg-muted text-xs text-muted-foreground">
-              No photo
+              {t("No photo")}
             </div>
           )}
 
@@ -321,7 +322,7 @@ export function SessionRunner({
                 </span>
                 {isCompleted && (
                   <Badge className="gap-1 bg-emerald-500/15 text-emerald-600">
-                    <Check className="size-3" /> Done
+                    <Check className="size-3" /> {t("Done")}
                   </Badge>
                 )}
               </div>
@@ -348,14 +349,14 @@ export function SessionRunner({
                   className="w-full"
                   onClick={() => setShowVideo((v) => !v)}
                 >
-                  {showVideo ? "Hide video" : dict.session.watchDemo}
+                  {showVideo ? t("Hide video") : dict.session.watchDemo}
                 </Button>
                 {showVideo ? (
                   <div className="aspect-video overflow-hidden rounded-xl bg-muted">
                     <iframe
                       className="size-full"
                       src={active.videoUrl.replace("watch?v=", "embed/")}
-                      title={`${active.name} demo`}
+                      title={t("{name} demo", { name: active.name })}
                       loading="lazy"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
@@ -372,21 +373,21 @@ export function SessionRunner({
                   <Camera className="size-4 text-muted-foreground" />
                   <p className="text-sm font-medium">
                     {selfieState === "done"
-                      ? "Selfie uploaded ✓"
-                      : "Upload a selfie to complete this exercise"}
+                      ? t("Selfie uploaded ✓")
+                      : t("Upload a selfie to complete this exercise")}
                   </p>
                 </div>
                 {selfieState !== "done" ? (
                   <>
                     <p className="text-xs text-muted-foreground">
-                      Take a photo showing you completed the exercise. Coach Ahmed can review it from your athlete profile.
+                      {t("Take a photo showing you completed the exercise. Coach Ahmed can review it from your athlete profile.")}
                     </p>
                     <label className="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/30 p-5 transition-colors hover:bg-muted/50">
                       <Camera className="size-6 text-muted-foreground" />
                       <span className="text-sm font-medium">
-                        {selfieState === "uploading" ? "Uploading…" : "Tap to choose or capture photo"}
+                        {selfieState === "uploading" ? t("Uploading…") : t("Tap to choose or capture photo")}
                       </span>
-                      <span className="text-xs text-muted-foreground">Max 8 MB · JPG, PNG, WebP</span>
+                      <span className="text-xs text-muted-foreground">{t("Max 8 MB · JPG, PNG, WebP")}</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -402,7 +403,7 @@ export function SessionRunner({
                   </>
                 ) : (
                   <p className="text-xs text-emerald-600">
-                    Selfie saved. You can now mark this exercise as complete.
+                    {t("Selfie saved. You can now mark this exercise as complete.")}
                   </p>
                 )}
                 {selfieError ? (
@@ -422,12 +423,12 @@ export function SessionRunner({
                 className="gap-2"
               >
                 <Check className="size-4" />
-                {activeIndex === exercises.length - 1 ? "Complete final exercise" : "Complete exercise"}
+                {activeIndex === exercises.length - 1 ? t("Complete final exercise") : t("Complete exercise")}
               </Button>
             ) : (
               <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 p-3 text-sm text-emerald-700">
                 <Check className="size-4 shrink-0" />
-                Exercise completed
+                {t("Exercise completed")}
               </div>
             )}
 

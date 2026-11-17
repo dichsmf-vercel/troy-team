@@ -5,6 +5,7 @@ import { requireAdmin, requireStaff } from "@/lib/auth/guards"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createAthleteAuthUser, deleteAthleteCompletely, generateTemporaryPassword } from "@/lib/admin/athlete-accounts"
 import { formDays, formNumber, formString } from "@/lib/admin/forms"
+import { getT } from "@/lib/i18n/get-language"
 import { getSiteUrl } from "@/lib/site-url"
 
 const FMS_KEYS = [
@@ -26,11 +27,12 @@ const ASSESSMENT_FIELDS = [
 const NO_PROGRAM_GOAL = "Assigned exercises only (No monthly program assigned)"
 
 export async function createAthleteAccount(form: FormData) {
-  const auth = await requireAdmin("Only admins can create athletes.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can create athletes."))
   if (!auth.ok) return { error: auth.error }
 
   const fullName = formString(form, "full_name")
-  if (!fullName) return { error: "Full name is required." }
+  if (!fullName) return { error: t("Full name is required.") }
 
   const service = createAdminClient()
   const created = await createAthleteAuthUser(service, fullName)
@@ -76,7 +78,7 @@ export async function createAthleteAccount(form: FormData) {
   const teamId = formString(form, "team_id")
   if (teamId) {
     const { error } = await service.from("athlete_teams").insert({ athlete_id: id, team_id: teamId })
-    if (error) return fail(`Team assignment failed: ${error.message}`)
+    if (error) return fail(t("Team assignment failed: {message}", { message: error.message }))
   }
 
   const bmi = height && weight ? Number((weight / (height / 100) ** 2).toFixed(2)) : null
@@ -92,7 +94,7 @@ export async function createAthleteAccount(form: FormData) {
     })
     .select("id")
     .single()
-  if (assessmentError || !assessment) return fail(assessmentError?.message ?? "Assessment save failed.")
+  if (assessmentError || !assessment) return fail(assessmentError?.message ?? t("Assessment save failed."))
 
   const fmsTotal = FMS_KEYS.reduce((total, key) => total + (formNumber(form, key) ?? 0), 0)
   const answers = ASSESSMENT_FIELDS.map((key) => ({
@@ -101,7 +103,7 @@ export async function createAthleteAccount(form: FormData) {
     answer_json: { value: key === "bmi" ? bmi : key === "fms_total" ? fmsTotal : form.get(key) ? Number(form.get(key)) : null },
   }))
   const { error: answersError } = await service.from("athlete_assessment_answers").insert(answers)
-  if (answersError) return fail(`Assessment answers save failed: ${answersError.message}`)
+  if (answersError) return fail(t("Assessment answers save failed: {message}", { message: answersError.message }))
 
   if (height || weight) {
     const { error } = await service.from("measurements").insert({
@@ -112,7 +114,7 @@ export async function createAthleteAccount(form: FormData) {
       body_fat_pct: formNumber(form, "body_fat_pct"),
       notes: "Admin assessment creation",
     })
-    if (error) return fail(`Measurement save failed: ${error.message}`)
+    if (error) return fail(t("Measurement save failed: {message}", { message: error.message }))
   }
   if (height || weight || bmi) {
     const { error } = await service.from("inbody_records").insert({
@@ -124,7 +126,7 @@ export async function createAthleteAccount(form: FormData) {
       body_fat_pct: formNumber(form, "body_fat_pct"),
       recorded_at: new Date().toISOString(),
     })
-    if (error) return fail(`InBody save failed: ${error.message}`)
+    if (error) return fail(t("InBody save failed: {message}", { message: error.message }))
   }
 
   revalidatePath("/admin")
@@ -144,7 +146,8 @@ export type AthleteAccountValues = {
 }
 
 export async function updateAthleteAccount(id: string, values: AthleteAccountValues) {
-  const auth = await requireAdmin("Only admins can edit athletes.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can edit athletes."))
   if (!auth.ok) return { error: auth.error }
   const { supabase } = auth.ctx
 
@@ -190,11 +193,12 @@ export async function updateAthleteAccountFromForm(form: FormData) {
 }
 
 export async function updateAthleteSettings(form: FormData) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
 
   const athleteId = formString(form, "athlete_id")
-  if (!athleteId) return { error: "Missing athlete ID." }
+  if (!athleteId) return { error: t("Missing athlete ID.") }
 
   const birthYear = Number(form.get("birth_year"))
   const hasProgram = form.get("has_program") === "true"
@@ -217,9 +221,10 @@ export async function updateAthleteSettings(form: FormData) {
 }
 
 export async function toggleAthleteAccountStatus(athleteId: string, status: "active" | "paused") {
-  const auth = await requireAdmin("Only admins can pause athlete accounts.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can pause athlete accounts."))
   if (!auth.ok) return { error: auth.error }
-  if (status !== "active" && status !== "paused") return { error: "Invalid status." }
+  if (status !== "active" && status !== "paused") return { error: t("Invalid status.") }
 
   const service = createAdminClient()
   const { error } = await service.from("athletes").update({ account_status: status }).eq("id", athleteId)
@@ -235,7 +240,8 @@ export async function toggleAthleteAccountStatus(athleteId: string, status: "act
 }
 
 export async function generateTemporaryAthletePassword(athleteId: string) {
-  const auth = await requireAdmin("Only admins can reset athlete passwords.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can reset athlete passwords."))
   if (!auth.ok) return { error: auth.error }
 
   const service = createAdminClient()
@@ -249,18 +255,19 @@ export async function generateTemporaryAthletePassword(athleteId: string) {
 }
 
 export async function sendAthleteInvitation(athleteId: string) {
-  const auth = await requireAdmin("Only admins can send invitations.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can send invitations."))
   if (!auth.ok) return { error: auth.error }
 
   const siteUrl = getSiteUrl()
   if (!siteUrl) {
-    return { error: "Site URL is not configured. Set NEXT_PUBLIC_SITE_URL to your production URL in Vercel and redeploy." }
+    return { error: t("Site URL is not configured. Set NEXT_PUBLIC_SITE_URL to your production URL in Vercel and redeploy.") }
   }
 
   const service = createAdminClient()
   const { data: athleteUser } = await service.auth.admin.getUserById(athleteId)
   const email = athleteUser.user?.email
-  if (!email) return { error: "Athlete email not found." }
+  if (!email) return { error: t("Athlete email not found.") }
 
   const { error } = await service.auth.admin.inviteUserByEmail(email, {
     data: { role: "athlete" },
@@ -273,13 +280,14 @@ export async function sendAthleteInvitation(athleteId: string) {
 }
 
 export async function permanentlyDeleteAthlete(athleteId: string) {
-  const auth = await requireAdmin("Only admins can permanently delete athletes.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can permanently delete athletes."))
   if (!auth.ok) return { error: auth.error }
-  if (!athleteId || athleteId === auth.ctx.user.id) return { error: "Invalid athlete." }
+  if (!athleteId || athleteId === auth.ctx.user.id) return { error: t("Invalid athlete.") }
 
   const service = createAdminClient()
   const { data: target } = await service.from("profiles").select("role").eq("id", athleteId).maybeSingle()
-  if (!target || target.role !== "athlete") return { error: "Only athlete accounts can be deleted here." }
+  if (!target || target.role !== "athlete") return { error: t("Only athlete accounts can be deleted here.") }
 
   const result = await deleteAthleteCompletely(service, athleteId)
   if (result.error) return { error: result.error }

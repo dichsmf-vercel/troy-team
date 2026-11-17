@@ -1,4 +1,7 @@
 import type { CatalogExercise, GeminiExercise, GeminiProgramOutput, GeminiSession } from "@/lib/gemini-types"
+import { englishT, type TFunction } from "@/lib/i18n/translate"
+
+const english = englishT
 
 /**
  * Validates and sanitises AI output against OUR exercise catalog.
@@ -49,6 +52,8 @@ export type ValidationOptions = {
   weekdays: number[]
   /** Program length in days. Default: 28 (4 weeks). */
   windowDays?: number
+  /** Translator for messages shown to coaches. Defaults to English. */
+  t?: TFunction
 }
 
 export type ValidationResult = {
@@ -58,9 +63,10 @@ export type ValidationResult = {
 }
 
 export function validateProgram(raw: unknown, catalog: CatalogExercise[], options: ValidationOptions): ValidationResult {
+  const t = options.t ?? english
   const root = asRecord(raw)
-  if (!root) return { program: null, warnings: [], error: "The AI response was not a JSON object." }
-  if (!Array.isArray(root.sessions)) return { program: null, warnings: [], error: "The AI response has no sessions array." }
+  if (!root) return { program: null, warnings: [], error: t("The AI response was not a JSON object.") }
+  if (!Array.isArray(root.sessions)) return { program: null, warnings: [], error: t("The AI response has no sessions array.") }
 
   const byId = new Map(catalog.map((exercise) => [exercise.id, exercise]))
   const byName = new Map(catalog.map((exercise) => [exercise.name_en.trim().toLowerCase(), exercise]))
@@ -138,16 +144,16 @@ export function validateProgram(raw: unknown, catalog: CatalogExercise[], option
     return {
       program: null,
       warnings,
-      error: "The AI program contained no valid sessions after checking it against the exercise catalog.",
+      error: t("The AI program contained no valid sessions after checking it against the exercise catalog."),
     }
   }
 
   sessions.sort((a, b) => a.date.localeCompare(b.date))
 
-  if (droppedExercises) warnings.push(`${droppedExercises} exercise(s) suggested by the AI were not in your catalog and were removed.`)
-  if (rescuedByName) warnings.push(`${rescuedByName} exercise(s) had a wrong id and were matched by name.`)
-  if (droppedSessions) warnings.push(`${droppedSessions} session(s) were removed (invalid date, outside the 4-week window, or no valid exercises).`)
-  if (offScheduleSessions) warnings.push(`${offScheduleSessions} session(s) fall on days that were not selected as training days.`)
+  if (droppedExercises) warnings.push(t("{count} exercise(s) suggested by the AI were not in your catalog and were removed.", { count: droppedExercises }))
+  if (rescuedByName) warnings.push(t("{count} exercise(s) had a wrong id and were matched by name.", { count: rescuedByName }))
+  if (droppedSessions) warnings.push(t("{count} session(s) were removed (invalid date, outside the 4-week window, or no valid exercises).", { count: droppedSessions }))
+  if (offScheduleSessions) warnings.push(t("{count} session(s) fall on days that were not selected as training days.", { count: offScheduleSessions }))
 
   const aiWarnings = Array.isArray(root.warnings)
     ? root.warnings.map((warning) => cleanText(warning, 300)).filter((warning): warning is string => !!warning)

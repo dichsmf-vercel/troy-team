@@ -5,16 +5,18 @@ import { requireAdmin, requireStaff } from "@/lib/auth/guards"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getActiveCoachPrompt, proposeCoachPrompt, type CoachPrompt } from "@/lib/admin/coach-prompts"
 import { validateProgram } from "@/lib/gemini-validate"
+import { getT } from "@/lib/i18n/get-language"
 import type { CatalogExercise, GeminiProgramOutput } from "@/lib/gemini-types"
+import type { TFunction } from "@/lib/i18n/translate"
 
 type Schedule = { athleteId: string; startDate: string; time: string; weekdays: number[] }
 
-function validateSchedule(input: Schedule): string | null {
-  if (!input?.athleteId || typeof input.athleteId !== "string") return "Choose an athlete."
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate ?? "")) return "Choose a valid start date."
-  if (!/^\d{2}:\d{2}$/.test(input.time ?? "")) return "Choose a valid session time."
+function validateSchedule(input: Schedule, t: TFunction): string | null {
+  if (!input?.athleteId || typeof input.athleteId !== "string") return t("Choose an athlete.")
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startDate ?? "")) return t("Choose a valid start date.")
+  if (!/^\d{2}:\d{2}$/.test(input.time ?? "")) return t("Choose a valid session time.")
   if (!Array.isArray(input.weekdays) || !input.weekdays.length || input.weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
-    return "Choose at least one training day."
+    return t("Choose at least one training day.")
   }
   return null
 }
@@ -29,11 +31,11 @@ function countExercises(program: GeminiProgramOutput): number {
 }
 
 /** Re-validates a program coming back from the browser. Never trust the client copy. */
-function checkProgramFromClient(program: GeminiProgramOutput, catalog: CatalogExercise[], schedule: Schedule) {
-  const validated = validateProgram(program, catalog, { startDate: schedule.startDate, weekdays: schedule.weekdays })
-  if (validated.error || !validated.program) return { program: null, error: validated.error ?? "Invalid program." }
+function checkProgramFromClient(program: GeminiProgramOutput, catalog: CatalogExercise[], schedule: Schedule, t: TFunction) {
+  const validated = validateProgram(program, catalog, { startDate: schedule.startDate, weekdays: schedule.weekdays, t })
+  if (validated.error || !validated.program) return { program: null, error: validated.error ?? t("Invalid program.") }
   if (validated.program.sessions.length !== program.sessions.length || countExercises(validated.program) !== countExercises(program)) {
-    return { program: null, error: "The program contains exercises or dates that are not valid. Reload and try again." }
+    return { program: null, error: t("The program contains exercises or dates that are not valid. Reload and try again.") }
   }
   return { program: validated.program, error: null }
 }
@@ -41,9 +43,10 @@ function checkProgramFromClient(program: GeminiProgramOutput, catalog: CatalogEx
 // ─── AI generation ────────────────────────────────────────────────────────────
 
 export async function generateProgramWithAI(input: Schedule) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error, data: null, rawText: "" }
-  const invalid = validateSchedule(input)
+  const invalid = validateSchedule(input, t)
   if (invalid) return { error: invalid, data: null, rawText: "" }
 
   const service = createAdminClient()
@@ -61,8 +64,8 @@ export async function generateProgramWithAI(input: Schedule) {
     loadCatalog(),
     getActiveCoachPrompt(service),
   ])
-  if (!athlete) return { error: "Athlete not found.", data: null, rawText: "" }
-  if (!exercises.length) return { error: "No exercises available in the catalog.", data: null, rawText: "" }
+  if (!athlete) return { error: t("Athlete not found."), data: null, rawText: "" }
+  if (!exercises.length) return { error: t("No exercises available in the catalog."), data: null, rawText: "" }
 
   const answers: Record<string, number | null> = {}
   for (const answer of (assessment?.athlete_assessment_answers ?? []) as { question_key: string; answer_json: { value?: number | null } | null }[]) {
@@ -86,6 +89,7 @@ export async function generateProgramWithAI(input: Schedule) {
     time: input.time,
     weekdays: input.weekdays,
     coachSystemPrompt: activePrompt?.prompt_text ?? null,
+    t,
   })
 
   if (result.error || !result.data) {
@@ -100,18 +104,19 @@ export async function generateProgramWithAI(input: Schedule) {
         () => null,
         () => null,
       )
-    return { error: result.error ?? "Generation failed", data: null, rawText: result.rawText }
+    return { error: result.error ?? t("Generation failed"), data: null, rawText: result.rawText }
   }
   return { error: null, data: result.data, rawText: result.rawText }
 }
 
 export async function saveAIGeneratedProgram(input: Schedule & { program: GeminiProgramOutput }) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error, id: null }
-  const invalid = validateSchedule(input)
+  const invalid = validateSchedule(input, t)
   if (invalid) return { error: invalid, id: null }
 
-  const checked = checkProgramFromClient(input.program, await loadCatalog(), input)
+  const checked = checkProgramFromClient(input.program, await loadCatalog(), input, t)
   if (checked.error || !checked.program) return { error: checked.error, id: null }
 
   const start = new Date(`${input.startDate}T12:00:00`)
@@ -136,7 +141,7 @@ export async function saveAIGeneratedProgram(input: Schedule & { program: Gemini
     })
     .select("id")
     .single()
-  if (error || !data) return { error: error?.message ?? "Unable to save program.", id: null }
+  if (error || !data) return { error: error?.message ?? t("Unable to save program."), id: null }
 
   revalidatePath("/admin")
   revalidatePath("/program")
@@ -153,6 +158,7 @@ export async function saveAdminEditsAndLearn(input: {
   originalProgram: GeminiProgramOutput
   adminReason: string
 }) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error, summary: null }
   const { user } = auth.ctx
@@ -163,11 +169,11 @@ export async function saveAdminEditsAndLearn(input: {
     .select("generation_reason, month_start")
     .eq("id", input.programId)
     .single()
-  if (!program) return { error: "Program not found.", summary: null }
+  if (!program) return { error: t("Program not found."), summary: null }
 
   const reason = (program.generation_reason ?? {}) as { schedule?: { weekdays?: number[] } } & Record<string, unknown>
   const schedule = { startDate: String(program.month_start), weekdays: reason.schedule?.weekdays ?? [] }
-  const checked = checkProgramFromClient(input.editedProgram, await loadCatalog(), { athleteId: "-", time: "00:00", ...schedule })
+  const checked = checkProgramFromClient(input.editedProgram, await loadCatalog(), { athleteId: "-", time: "00:00", ...schedule }, t)
   if (checked.error || !checked.program) return { error: checked.error, summary: null }
 
   const { error: updateError } = await service
@@ -188,7 +194,7 @@ export async function saveAdminEditsAndLearn(input: {
     adminReason: input.adminReason,
     currentPromptText: activePrompt?.prompt_text ?? "",
   })
-  if (learned.error || !learned.newPromptText) return { error: learned.error ?? "No prompt proposal was produced.", summary: null }
+  if (learned.error || !learned.newPromptText) return { error: learned.error ?? t("No prompt proposal was produced."), summary: null }
 
   const proposal = await proposeCoachPrompt(service, { promptText: learned.newPromptText, summary: learned.summary ?? input.adminReason, userId: user.id })
   if (proposal.error) return { error: proposal.error, summary: learned.summary }
@@ -201,7 +207,8 @@ export async function saveAdminEditsAndLearn(input: {
 export type PromptProposal = Pick<CoachPrompt, "id" | "version" | "prompt_text" | "change_summary" | "created_at">
 
 export async function getPendingPromptProposals(): Promise<{ error: string | null; proposals: PromptProposal[]; currentPrompt: string }> {
-  const auth = await requireAdmin("Only admins can review prompt proposals.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can review prompt proposals."))
   if (!auth.ok) return { error: auth.error, proposals: [], currentPrompt: "" }
 
   const service = createAdminClient()
@@ -218,9 +225,10 @@ export async function getPendingPromptProposals(): Promise<{ error: string | nul
 }
 
 export async function reviewPromptProposal(id: string, decision: "approve" | "reject") {
-  const auth = await requireAdmin("Only admins can review prompt proposals.")
+  const t = await getT()
+  const auth = await requireAdmin(t("Only admins can review prompt proposals."))
   if (!auth.ok) return { error: auth.error }
-  if (decision !== "approve" && decision !== "reject") return { error: "Invalid decision." }
+  if (decision !== "approve" && decision !== "reject") return { error: t("Invalid decision.") }
 
   const { error } = await createAdminClient()
     .from("coach_system_prompts")
@@ -240,9 +248,10 @@ export async function reviewPromptProposal(id: string, decision: "approve" | "re
 // ─── Rules-based fallback ─────────────────────────────────────────────────────
 
 export async function generateLegacyFallbackProgram(input: Schedule) {
+  const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
-  const invalid = validateSchedule(input)
+  const invalid = validateSchedule(input, t)
   if (invalid) return { error: invalid }
 
   const service = createAdminClient()
@@ -250,7 +259,7 @@ export async function generateLegacyFallbackProgram(input: Schedule) {
     service.from("exercises").select("*"),
     service.from("athletes").select("birth_year,sport,injury_notes").eq("id", input.athleteId).maybeSingle(),
   ])
-  if (!exercises?.length) return { error: "No exercises available in catalog." }
+  if (!exercises?.length) return { error: t("No exercises available in catalog.") }
 
   const { generateFourWeekProgram } = await import("@/lib/program-engine")
   const sessions = generateFourWeekProgram({

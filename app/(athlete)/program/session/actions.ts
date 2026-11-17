@@ -3,23 +3,26 @@
 import { revalidatePath } from "next/cache"
 import { requireUser } from "@/lib/auth/guards"
 import { ownsProgram } from "@/lib/auth/ownership"
+import type { TFunction } from "@/lib/i18n/translate"
+import { getT } from "@/lib/i18n/get-language"
 
 const MAX_SELFIE_BYTES = 5 * 1024 * 1024
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 const CONFLICT_KEY = "athlete_id,athlete_program_id,session_date"
 const isRating = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 5
 
-async function authorizeProgram(programId: string, date: string) {
+async function authorizeProgram(programId: string, date: string, t: TFunction) {
   const auth = await requireUser()
-  if (!auth.ok) return { error: "Not authenticated" } as const
-  if (!ISO_DATE.test(date)) return { error: "Invalid date." } as const
-  if (!(await ownsProgram(auth.ctx.supabase, auth.ctx.user.id, programId))) return { error: "Program not found." } as const
+  if (!auth.ok) return { error: t("Not authenticated") } as const
+  if (!ISO_DATE.test(date)) return { error: t("Invalid date.") } as const
+  if (!(await ownsProgram(auth.ctx.supabase, auth.ctx.user.id, programId))) return { error: t("Program not found.") } as const
   return { supabase: auth.ctx.supabase, user: auth.ctx.user } as const
 }
 
 export async function completeProgramSession(input: { programId: string; date: string; difficulty: number; painNotes: string; enjoyment: number }) {
-  if (!isRating(input.difficulty) || !isRating(input.enjoyment)) return { error: "Ratings must be between 0 and 5." }
-  const ctx = await authorizeProgram(input.programId, input.date)
+  const t = await getT()
+  if (!isRating(input.difficulty) || !isRating(input.enjoyment)) return { error: t("Ratings must be between 0 and 5.") }
+  const ctx = await authorizeProgram(input.programId, input.date, t)
   if ("error" in ctx) return { error: ctx.error }
   const { supabase, user } = ctx
   const now = new Date().toISOString()
@@ -57,12 +60,13 @@ export async function completeProgramSession(input: { programId: string; date: s
 }
 
 export async function uploadProgramExerciseSelfie(input: { programId: string; date: string; exerciseIndex: number; file: File }) {
+  const t = await getT()
   if (!input.file || input.file.size === 0 || input.file.size > MAX_SELFIE_BYTES || !input.file.type.startsWith("image/")) {
-    return { error: "Choose an image smaller than 5 MB." }
+    return { error: t("Choose an image smaller than 5 MB.") }
   }
-  if (!Number.isInteger(input.exerciseIndex) || input.exerciseIndex < 0 || input.exerciseIndex > 200) return { error: "Invalid exercise." }
+  if (!Number.isInteger(input.exerciseIndex) || input.exerciseIndex < 0 || input.exerciseIndex > 200) return { error: t("Invalid exercise.") }
 
-  const ctx = await authorizeProgram(input.programId, input.date)
+  const ctx = await authorizeProgram(input.programId, input.date, t)
   if ("error" in ctx) return { error: ctx.error }
   const { supabase, user } = ctx
 
@@ -103,9 +107,10 @@ export async function saveProgramExerciseFeedback(input: {
   painNotes: string
   enjoyment: number
 }) {
-  if (!isRating(input.difficulty)) return { error: "Difficulty must be between 0 and 5." }
-  if (!isRating(input.enjoyment)) return { error: "Enjoyment must be between 0 and 5." }
-  const ctx = await authorizeProgram(input.programId, input.date)
+  const t = await getT()
+  if (!isRating(input.difficulty)) return { error: t("Difficulty must be between 0 and 5.") }
+  if (!isRating(input.enjoyment)) return { error: t("Enjoyment must be between 0 and 5.") }
+  const ctx = await authorizeProgram(input.programId, input.date, t)
   if ("error" in ctx) return { error: ctx.error }
 
   const { error } = await ctx.supabase.from("program_session_feedback").upsert(
