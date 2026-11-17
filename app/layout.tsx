@@ -1,6 +1,6 @@
 import { Analytics } from "@vercel/analytics/next"
 import type { Metadata, Viewport } from "next"
-import { Fraunces, IBM_Plex_Sans, Cairo } from "next/font/google"
+import { Fraunces, Plus_Jakarta_Sans, Cairo } from "next/font/google"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { LanguageProvider } from "@/components/providers/language-provider"
 import { Toaster } from "@/components/ui/sonner"
@@ -15,10 +15,12 @@ const fraunces = Fraunces({
   display: "swap",
 })
 
-const ibmPlexSans = IBM_Plex_Sans({
+// Main UI font (Latin): a modern geometric sans. It replaces IBM Plex Sans.
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-ibm-plex-sans",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-jakarta",
+  display: "swap",
 })
 
 // Arabic UI font. Cairo is a modern, well-balanced face with matching Latin glyphs; it replaces IBM Plex Sans Arabic.
@@ -66,7 +68,7 @@ export default async function RootLayout({
     <html
       lang={language}
       dir={dir}
-      className={`${fraunces.variable} ${ibmPlexSans.variable} ${cairo.variable} bg-background`}
+      className={`${fraunces.variable} ${jakarta.variable} ${cairo.variable} bg-background`}
       suppressHydrationWarning
     >
       <body className="antialiased font-sans">

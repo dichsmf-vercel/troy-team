@@ -31,6 +31,7 @@ const METRIC_KEYS = [
   "plankSec",
   "beepTestLevel",
   "rowMachineResult",
+  "rowMachineWatts",
 ] as const
 
 /** Normalises a name so "أحمد  هاني" / "احمد هاني" / "AHMED" compare equal. */

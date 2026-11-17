@@ -102,7 +102,8 @@ const PERF_METRICS: { key: string; label: string; unit: string; ragEnabled?: boo
   { key: "push_ups", label: tx("Push-ups"), unit: "reps", ragEnabled: false },
   { key: "pull_ups", label: tx("Pull-ups"), unit: "reps", ragEnabled: false },
   { key: "plank_seconds", label: tx("Plank Hold"), unit: "sec", ragEnabled: false },
-  { key: "row_machine_result", label: tx("Row Machine"), unit: "", ragEnabled: false },
+  { key: "row_machine_result", label: tx("Row Machine (M)"), unit: "m", ragEnabled: false },
+  { key: "row_machine_watts", label: tx("Row Machine (Watts)"), unit: "W", ragEnabled: false },
 ]
 
 const STRENGTH_METRICS = [

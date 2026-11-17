@@ -11,6 +11,7 @@ import { parseCsvObjects, parseCsvRows } from "@/lib/admin/csv"
 import { nameKey, validateImportRows } from "@/lib/admin/athlete-import-validation"
 import { getT } from "@/lib/i18n/get-language"
 import type { ParsedAthleteRow } from "@/lib/excel-import"
+import { clubKey } from "@/lib/import-dictionary"
 import type { TFunction } from "@/lib/i18n/translate"
 
 const RULES_PROGRAM_NAME = "Coach Ahmed Rules Engine"
@@ -194,30 +195,34 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
   const service = createAdminClient()
 
   // Existing athletes → skip duplicates so re-uploading a file never doubles the roster.
-  const profiles = await fetchAllRows<{ id: string; full_name: string | null }>(service, "profiles", "id, full_name", { column: "role", value: "athlete" })
+  const profiles = await fetchAllRows<{ id: string; full_name: string | null; full_name_ar: string | null }>(service, "profiles", "id, full_name, full_name_ar", { column: "role", value: "athlete" })
   const athletes = await fetchAllRows<{ id: string; birth_year: number | null }>(service, "athletes", "id, birth_year")
   if (profiles.error || athletes.error) return stop(t("Could not check existing athletes: {error}", { error: profiles.error ?? athletes.error }))
   const birthYearById = new Map(athletes.data.map((athlete) => [athlete.id, athlete.birth_year]))
   const seen = new Map<string, (number | null)[]>()
-  for (const profile of profiles.data) {
-    const key = nameKey(profile.full_name ?? "")
-    if (key) seen.set(key, [...(seen.get(key) ?? []), birthYearById.get(profile.id) ?? null])
+  const remember = (names: (string | null | undefined)[], birthYear: number | null) => {
+    for (const name of names) {
+      const key = nameKey(name ?? "")
+      if (key) seen.set(key, [...(seen.get(key) ?? []), birthYear])
+    }
   }
-  const isDuplicate = (name: string, birthYear: number | null) =>
-    (seen.get(nameKey(name)) ?? []).some((existing) => existing == null || birthYear == null || existing === birthYear)
+  for (const profile of profiles.data) remember([profile.full_name, profile.full_name_ar], birthYearById.get(profile.id) ?? null)
+  // The same player may be stored in English (transliterated) or Arabic, so every spelling is checked.
+  const isDuplicate = (names: (string | null | undefined)[], birthYear: number | null) =>
+    names.some((name) => (seen.get(nameKey(name ?? "")) ?? []).some((existing) => existing == null || birthYear == null || existing === birthYear))
 
   const { data: existingTeams, error: teamsError } = await service.from("teams").select("id,name_en,name_ar")
   if (teamsError) return stop(t("Could not load teams: {message}", { message: teamsError.message }))
   const teamIdByName = new Map<string, string>()
   for (const team of existingTeams ?? []) {
-    for (const name of [team.name_en, team.name_ar]) if (name?.trim()) teamIdByName.set(name.trim().toLocaleLowerCase(), team.id)
+    for (const name of [team.name_en, team.name_ar]) if (name?.trim()) teamIdByName.set(clubKey(name), team.id)
   }
 
   for (const row of validated.rows) {
     const fullName = row.fullName.trim()
     const birthYear = row.birthYear ?? null
 
-    if (isDuplicate(fullName, birthYear)) {
+    if (isDuplicate([row.fullName, row.fullNameAr], birthYear)) {
       result.skipped.push({ rowNumber: row.rowNumber, name: fullName, reason: "An athlete with this name already exists." })
       continue
     }
@@ -226,12 +231,13 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
     let teamId: string | null = null
     const clubName = row.clubName?.trim()
     if (clubName && clubName.toLocaleLowerCase() !== "not set") {
-      const key = clubName.toLocaleLowerCase()
+      // "الطيران", "طيران " and "Al Tayaran" are the same club.
+      const key = clubKey(row.clubNameAr ?? clubName)
       teamId = teamIdByName.get(key) ?? null
       if (!teamId) {
         const { data: team, error } = await service
           .from("teams")
-          .insert({ name_en: clubName, name_ar: clubName, color_hex: "#2563eb", created_by: auth.ctx.user.id })
+          .insert({ name_en: clubName, name_ar: row.clubNameAr ?? clubName, color_hex: "#2563eb", created_by: auth.ctx.user.id })
           .select("id")
           .single()
         if (error || !team) return stop(t("Row {row}: could not create team \"{club}\": {error}", { row: row.rowNumber, club: clubName, error: error?.message ?? t("no team returned") }))
@@ -252,7 +258,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
     const { error: profileError } = await service.from("profiles").upsert({
       id: athleteId,
       full_name: fullName,
-      full_name_ar: /[؀-ۿ]/.test(fullName) ? fullName : null,
+      full_name_ar: row.fullNameAr ?? (/[\u0600-\u06ff]/.test(fullName) ? fullName : null),
       role: "athlete",
       troy_id: created.troyId,
       password_change_required: true,
@@ -281,7 +287,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
 
     result.credentials.push({ name: fullName, troyId: created.troyId, temporaryPassword: created.temporaryPassword })
     result.imported++
-    seen.set(nameKey(fullName), [...(seen.get(nameKey(fullName)) ?? []), birthYear])
+    remember([row.fullName, row.fullNameAr], birthYear)
   }
 
   revalidatePath("/admin")
@@ -325,6 +331,7 @@ async function saveImportedAssessment(service: SupabaseClient, athleteId: string
     ["plank_seconds", row.plankSec],
     ["beep_test_level", row.beepTestLevel],
     ["row_machine_result", row.rowMachineResult],
+    ["row_machine_watts", row.rowMachineWatts],
   ]
   const answers = values
     .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]))

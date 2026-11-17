@@ -265,7 +265,7 @@ export function ExcelAthleteImport() {
                     {rows.map((row) => (
                       <tr key={row.rowNumber} className="border-t">
                         <td className="p-2 text-muted-foreground">{row.rowNumber}</td>
-                        <td className="p-2">{row.fullName}</td>
+                        <td className="p-2">{row.fullName}{row.fullNameAr && row.fullNameAr !== row.fullName ? <span dir="rtl" className="block text-muted-foreground">{row.fullNameAr}</span> : null}</td>
                         <td className="p-2">{row.clubName ?? "—"}</td>
                         <td className="p-2">{row.sport ?? "—"}</td>
                         <td className="p-2">{row.position ?? "—"}</td>

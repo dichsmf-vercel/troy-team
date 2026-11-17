@@ -21,6 +21,9 @@ See PROJECT_MAP.md section 3 for the full map. Key rules: server actions live in
 - For module-level constants use `tx("English text")` and render with `t(label)`.
 - Add the Arabic in `lib/i18n/ar/part*.ts`. `pnpm test` fails if any `t("…")` / `tx("…")` string has no Arabic or its placeholders differ. Bilingual DB fields: `useLn()(row.name_en, row.name_ar)`.
 
+## Import dictionary
+Roster imports map Arabic words to English in `lib/import-dictionary.ts` (sports, positions, clubs, first names/surnames). When a real sheet has an unknown word, add it there and extend `tests/excel-import.test.ts`.
+
 ## Environment variables (never commit; `.env*.local` is gitignored)
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `NEXT_PUBLIC_SITE_URL`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `GEMINI_MODEL` (optional).

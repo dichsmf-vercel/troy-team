@@ -5,9 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: var(--font-ibm-plex-sans), var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-fraunces), Georgia, serif;
-  --font-arabic: var(--font-cairo), var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: var(--font-cairo), var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --color-team-national: var(--team-national);
   --color-team-academy: var(--team-academy);
   --color-team-reserve: var(--team-reserve);
@@ -96,7 +96,7 @@
   --ring: oklch(0.68 0.14 190);
   --border: oklch(0.82 0.04 225);
   --radius: 0.75rem;
-  --font-sans: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 [data-theme="mono"] {
@@ -152,9 +152,10 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-ibm-plex-sans), var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
-    font-weight: 300;
-    letter-spacing: -0.01em;
+    font-family: var(--font-jakarta), var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 400;
+    letter-spacing: -0.011em;
+    font-feature-settings: "cv11", "ss01";
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-fraunces), Georgia, serif;
@@ -166,7 +167,7 @@
     font-family: inherit;
   }
   [dir='rtl'] h1, [dir='rtl'] h2, [dir='rtl'] h3, [dir='rtl'] h4, [dir='rtl'] h5, [dir='rtl'] h6 {
-    font-family: var(--font-cairo), var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-cairo), var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
     font-weight: 700;
     letter-spacing: 0;
   }
