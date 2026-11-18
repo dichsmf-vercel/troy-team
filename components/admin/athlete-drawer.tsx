@@ -44,6 +44,7 @@ import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/ad
 import type { AdminAthlete, AdminAthleteProfile } from "@/lib/admin/types"
 import { useLn, useLanguage } from "@/components/providers/language-provider"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
+import { sportLabel, statusLabel } from "@/lib/i18n/labels"
 import { tx } from "@/lib/i18n/translate"
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -160,7 +161,8 @@ export function AthleteDrawer({
   const height = athlete.height_cm ?? athlete.latest_measurement?.height_cm
   const weight = athlete.weight_kg ?? athlete.latest_measurement?.weight_kg
   const bmi = height && weight ? (weight / ((height / 100) ** 2)).toFixed(1) : null
-  const isPaused = athlete.account_status === "paused"
+  const [statusOverride, setStatusOverride] = useState<string | null>(null)
+  const isPaused = (statusOverride ?? athlete.account_status) === "paused"
   const hasProgramSetting = !athlete.goals?.includes("Assigned exercises only")
 
   // Assessment answers map
@@ -212,7 +214,8 @@ export function AthleteDrawer({
     startTransition(async () => {
       try {
         const result = await toggleAthleteAccountStatus(athlete.id, next)
-        setMsg(result.error ?? t("Account {next}.", { next }))
+        if (!result.error) setStatusOverride(next)
+        setMsg(result.error ?? (next === "paused" ? t("Account paused.") : t("Account active.")))
       } catch (err) {
         console.error("[Athlete-Drawer] Unexpected error in handleTogglePause:", err)
         setMsg(isStaleActionError(err) ? t("App was updated. Please refresh the page.") : t("Failed to update account status."))
@@ -280,7 +283,7 @@ export function AthleteDrawer({
               </SheetTitle>
               <SheetDescription className="truncate text-xs font-mono">
                 {troyId ?? athlete.auth_email ?? "—"}
-                {athlete.sport ? ` · ${String(athlete.sport).toUpperCase()}` : ""}
+                {athlete.sport ? ` · ${sportLabel(t, athlete.sport).toLocaleUpperCase()}` : ""}
                 {athlete.position ? ` · ${athlete.position}` : ""}
               </SheetDescription>
             </div>
@@ -334,7 +337,7 @@ export function AthleteDrawer({
             <div className="rounded-lg bg-card p-2.5 border">
               <p className="text-[11px] text-muted-foreground">{t("Assessment")}</p>
               <p className="mt-0.5 text-xs font-semibold capitalize truncate">
-                {athlete.assessment_status?.replaceAll("_", " ") ?? t("Draft")}
+                {statusLabel(t, athlete.assessment_status)}
               </p>
             </div>
             <div className="rounded-lg bg-card p-2.5 border">

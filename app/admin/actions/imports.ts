@@ -237,7 +237,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
       if (!teamId) {
         const { data: team, error } = await service
           .from("teams")
-          .insert({ name_en: clubName, name_ar: row.clubNameAr ?? clubName, color_hex: "#2563eb", created_by: auth.ctx.user.id })
+          .insert({ name_en: clubName, name_ar: row.clubNameAr ?? clubName, color_hex: "#2563eb" })
           .select("id")
           .single()
         if (error || !team) return stop(t("Row {row}: could not create team \"{club}\": {error}", { row: row.rowNumber, club: clubName, error: error?.message ?? t("no team returned") }))

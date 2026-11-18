@@ -13,6 +13,7 @@ import { AthleteDrawer } from "@/components/admin/athlete-drawer"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 import type { AdminAthlete, AdminAthleteProfile, AdminSelfie } from "@/lib/admin/types"
+import { sportLabel, statusLabel } from "@/lib/i18n/labels"
 import { useT, useLn } from "@/components/providers/language-provider"
 
 // ─── props ────────────────────────────────────────────────────────────────────
@@ -249,7 +250,7 @@ export function AthletesPanel({
                     <p className="truncate text-xs text-muted-foreground">
                       <span className="font-mono text-primary font-medium">{troyId ?? athlete.auth_email ?? "—"}</span>
                       {team?.name_en ? ` · ${ln(team.name_en, team.name_ar)}` : ""}
-                      {athlete.sport ? ` · ${String(athlete.sport).toUpperCase()}` : ""}
+                      {athlete.sport ? ` · ${sportLabel(t, athlete.sport).toLocaleUpperCase()}` : ""}
                       {athlete.position ? ` (${athlete.position})` : ""}
                     </p>
                   </div>
@@ -278,7 +279,7 @@ export function AthletesPanel({
                     </Badge>
                   )}
                   <Badge variant="outline" className="text-[10px] capitalize">
-                    {athlete.assessment_status?.replaceAll("_", " ") ?? t("Draft")}
+                    {statusLabel(t, athlete.assessment_status)}
                   </Badge>
                 </div>
               </button>

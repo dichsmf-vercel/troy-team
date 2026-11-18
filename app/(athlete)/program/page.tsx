@@ -192,12 +192,12 @@ export default async function AthleteProgramPage() {
 
                       {/* Sections */}
                       <div className="space-y-3">
-                        {["warm-up", "mobility", "power", "strength", "accessory", "conditioning", "cooldown"].map((section) => {
+                        {[tx("warm-up"), tx("mobility"), tx("power"), tx("strength"), tx("accessory"), tx("conditioning"), tx("cooldown")].map((section) => {
                           const sectionExercises = (session.exercises ?? []).filter((e) => String(e.section).toLowerCase().includes(section))
                           if (sectionExercises.length === 0) return null
                           return (
                             <div key={section}>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{section}</p>
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{t(section)}</p>
                               <div className="space-y-1.5">
                                 {sectionExercises.map((exercise, exIdx) => (
                                   <div key={exIdx} className="rounded-lg bg-muted/50 p-2 flex items-center justify-between gap-2 text-xs">

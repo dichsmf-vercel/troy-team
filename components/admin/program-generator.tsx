@@ -11,6 +11,7 @@ import { generateFourWeekProgram, monthLabel, weekdayLabel } from "@/lib/program
 import { saveGeneratedProgram } from "@/app/admin/actions/programs"
 import type { AdminAthlete, AdminExercise, AdminRule } from "@/lib/admin/types"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
+import { sportLabel } from "@/lib/i18n/labels"
 import { useLanguage } from "@/components/providers/language-provider"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
@@ -219,7 +220,7 @@ export function ProgramGenerator({
           <div>
             <p className="text-sm text-muted-foreground">
               {selectedAthlete?.profiles?.full_name ?? t("Select an athlete")}
-              {selectedAthlete?.sport ? ` · ${String(selectedAthlete.sport).toUpperCase()}` : ""}
+              {selectedAthlete?.sport ? ` · ${sportLabel(t, selectedAthlete.sport).toLocaleUpperCase()}` : ""}
             </p>
             <h2 className="text-2xl font-semibold">{month}</h2>
           </div>
@@ -238,7 +239,7 @@ export function ProgramGenerator({
                 <CardContent className="grid gap-3 p-4 sm:grid-cols-[140px_1fr_auto] sm:items-center">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {t("Week {week}", { week: session.week })} {session.focus ? `· ${session.focus}` : ""}
+                      {t("Week {week}", { week: session.week })} {session.focus ? `· ${t(session.focus)}` : ""}
                     </p>
                     <p className="font-semibold text-sm">
                       {new Date(`${session.date}T12:00:00`).toLocaleDateString(locale, {
@@ -249,7 +250,7 @@ export function ProgramGenerator({
                     </p>
                     <p className="text-xs text-muted-foreground">{session.time}</p>
                     {session.seasonPeriod && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{session.seasonPeriod}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{t(session.seasonPeriod)}</p>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -258,7 +259,7 @@ export function ProgramGenerator({
                         key={`${session.date}-${exercise.id}-${exIdx}`}
                         className="rounded-full bg-muted px-2.5 py-1 text-xs"
                       >
-                        <strong className="text-foreground">{exercise.section}:</strong> {exercise.name_en}
+                        <strong className="text-foreground">{t(exercise.section)}:</strong> {exercise.name_en}
                         <span className="text-muted-foreground ml-1">({exercise.sets}×{exercise.reps}{exercise.loadPercentage ? ` @ ${exercise.loadPercentage}%` : ""})</span>
                       </span>
                     ))}

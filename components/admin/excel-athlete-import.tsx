@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { IMPORT_CHUNK_SIZE, findRowProblems } from "@/lib/admin/athlete-import-validation"
-import { useT } from "@/components/providers/language-provider"
+import { useT, useLanguage } from "@/components/providers/language-provider"
 import {
   IMPORT_COLUMNS,
   generateAthleteImportTemplate,
@@ -33,6 +33,7 @@ function download(data: BlobPart, filename: string, type: string) {
 const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`
 
 export function ExcelAthleteImport() {
+  const { language } = useLanguage()
   const t = useT()
   const fileInput = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
@@ -204,8 +205,7 @@ export function ExcelAthleteImport() {
                         </td>
                         <td className="p-2">{column.required ? t("Yes") : t("No")}</td>
                         <td className="p-2">
-                          {column.hint}
-                          <span dir="rtl" className="block text-muted-foreground">{column.hintAr}</span>
+                          {language === "ar" ? <span dir="rtl">{column.hintAr}</span> : column.hint}
                         </td>
                         <td className="p-2 font-mono">{String(column.example1) || "—"}</td>
                       </tr>

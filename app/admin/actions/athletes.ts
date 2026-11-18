@@ -200,7 +200,8 @@ export async function updateAthleteSettings(form: FormData) {
   const athleteId = formString(form, "athlete_id")
   if (!athleteId) return { error: t("Missing athlete ID.") }
 
-  const birthYear = Number(form.get("birth_year"))
+  // Only touch fields the form actually sent: the drawer has no birth-year input.
+  const birthYear = form.has("birth_year") ? Number(form.get("birth_year")) : undefined
   const hasProgram = form.get("has_program") === "true"
 
   const { error } = await createAdminClient()
@@ -210,7 +211,7 @@ export async function updateAthleteSettings(form: FormData) {
       show_exercise_recap: form.get("show_exercise_recap") === "true",
       sport: formString(form, "sport") || null,
       position: formString(form, "position") || null,
-      birth_year: Number.isInteger(birthYear) && birthYear > 1900 ? birthYear : null,
+      ...(birthYear === undefined ? {} : { birth_year: Number.isInteger(birthYear) && birthYear > 1900 ? birthYear : null }),
       goals: hasProgram ? "Standard Program" : NO_PROGRAM_GOAL,
     })
     .eq("id", athleteId)

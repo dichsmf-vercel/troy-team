@@ -162,7 +162,7 @@ export function ProgramSessionRunner({
                     </span>
                     {ex.section && (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                        {ex.section}
+                        {t(ex.section)}
                       </span>
                     )}
                   </div>
@@ -303,7 +303,7 @@ export function ProgramSessionRunner({
       <Card className="grid gap-4 p-5">
         <div>
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary uppercase tracking-wide">
-            {active.section ?? t("Training")}
+            {active.section ? t(active.section) : t("Training")}
           </span>
           <h2 className="mt-2 text-xl font-bold">{active.name_en ?? active.name ?? t("Exercise")}</h2>
           <p className="mt-1 text-xs font-medium text-muted-foreground">

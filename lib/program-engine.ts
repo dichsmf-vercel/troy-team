@@ -1,3 +1,4 @@
+import { tx } from "@/lib/i18n/translate"
 export type ProgramExercise = {
   id: string
   name_en: string
@@ -60,7 +61,7 @@ export function getEgyptianSeason(sport: string | null, date: Date): {
   if (month >= 4 && month <= 6) {
     return {
       period: "off-season",
-      label: "Off-season (Endurance & Capacity Focus)",
+      label: tx("Off-season (Endurance & Capacity Focus)"),
       loadModifier: 0.9,
       addEndurance: true,
     }
@@ -69,7 +70,7 @@ export function getEgyptianSeason(sport: string | null, date: Date): {
   if (month === 7) {
     return {
       period: "pre-season",
-      label: "Pre-season (Power & Speed Preparation)",
+      label: tx("Pre-season (Power & Speed Preparation)"),
       loadModifier: 1.0,
       addEndurance: false,
     }
@@ -77,7 +78,7 @@ export function getEgyptianSeason(sport: string | null, date: Date): {
 
   return {
     period: "in-season",
-    label: "In-season (Match Readiness & Freshness)",
+    label: tx("In-season (Match Readiness & Freshness)"),
     loadModifier: 0.85,
     addEndurance: false,
   }
@@ -143,12 +144,12 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
     const season = getEgyptianSeason(input.sport ?? null, date)
 
     // Determine 3-day split focus or general balanced focus
-    let splitFocus = "General Full Body"
+    let splitFocus = tx("General Full Body")
     if (isThreeDaySplit) {
       const splitIdx = dayInCycle % 3
-      if (splitIdx === 0) splitFocus = "Upper Body Focus"
-      else if (splitIdx === 1) splitFocus = "Lower Body Focus"
-      else splitFocus = "Full Body & Power Focus"
+      if (splitIdx === 0) splitFocus = tx("Upper Body Focus")
+      else if (splitIdx === 1) splitFocus = tx("Lower Body Focus")
+      else splitFocus = tx("Full Body & Power Focus")
     }
 
     const picked: ProgramExercise[] = []
@@ -166,7 +167,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
           name_en: ex.name_en,
           category: ex.category,
           movement_pattern: ex.movement_pattern,
-          section: "Warm-up",
+          section: tx("Warm-up"),
           sets: 2,
           reps: "8–10",
           loadPercentage: null,
@@ -188,7 +189,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
           name_en: ex.name_en,
           category: ex.category,
           movement_pattern: ex.movement_pattern,
-          section: "Mobility",
+          section: tx("Mobility"),
           sets: 2,
           reps: "10 reps / 30s",
           loadPercentage: null,
@@ -209,7 +210,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
           name_en: ex.name_en,
           category: ex.category,
           movement_pattern: ex.movement_pattern,
-          section: "Rubber Bands",
+          section: tx("Rubber Bands"),
           sets: 2,
           reps: "12–15",
           loadPercentage: null,
@@ -231,7 +232,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
             name_en: ex.name_en,
             category: ex.category,
             movement_pattern: ex.movement_pattern,
-            section: "FMS Correction (W1–2)",
+            section: tx("FMS Correction (W1–2)"),
             sets: 3,
             reps: "8–10",
             loadPercentage: null,
@@ -276,7 +277,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
           name_en: ex.name_en,
           category: ex.category,
           movement_pattern: ex.movement_pattern,
-          section: isYouth ? "Motor Skills & Agility" : "Strength / Power",
+          section: isYouth ? tx("Motor Skills & Agility") : tx("Strength / Power"),
           sets: isYouth ? 3 : 3 + (week > 2 ? 1 : 0),
           reps: isYouth ? "10–12" : "6–8",
           loadPercentage: isYouth ? null : loadPercentage,
@@ -297,7 +298,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
           name_en: ex.name_en,
           category: ex.category,
           movement_pattern: ex.movement_pattern,
-          section: "Off-Season Endurance",
+          section: tx("Off-Season Endurance"),
           sets: 3,
           reps: "45 sec / circuit",
           loadPercentage: null,
@@ -318,7 +319,7 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
         name_en: coolEx.name_en,
         category: coolEx.category,
         movement_pattern: coolEx.movement_pattern,
-        section: "Cooldown",
+        section: tx("Cooldown"),
         sets: 1,
         reps: "3–5 min",
         loadPercentage: null,

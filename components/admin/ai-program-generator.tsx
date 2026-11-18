@@ -503,7 +503,7 @@ function ExerciseRow({
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
         <div className="min-w-0">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{exercise.section} · </span>
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t(exercise.section)} · </span>
           <span className="font-medium">{exercise.name_en}</span>
           {exercise.notes && <p className="mt-0.5 text-xs text-muted-foreground">{exercise.notes}</p>}
         </div>
@@ -519,7 +519,7 @@ function ExerciseRow({
   // Edit mode
   return (
     <div className="grid gap-2 rounded-lg border p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{exercise.section}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t(exercise.section)}</p>
       <Input
         value={exercise.name_en}
         onChange={(e) => onEdit("name_en", e.target.value)}

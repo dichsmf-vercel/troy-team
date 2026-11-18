@@ -9,7 +9,7 @@ export async function createTeam(form: FormData) {
   const t = await getT()
   const auth = await requireStaff()
   if (!auth.ok) return { error: auth.error }
-  const { supabase, user } = auth.ctx
+  const { supabase } = auth.ctx
 
   const nameEn = formString(form, "name_en")
   if (!nameEn) return { error: t("Team name is required.") }
@@ -19,7 +19,7 @@ export async function createTeam(form: FormData) {
     name_ar: formString(form, "name_ar") || nameEn,
     color_hex: formString(form, "color_hex") || "#2563eb",
     image_url: formString(form, "image_url") || null,
-    created_by: user.id,
+    is_national_team: form.get("is_national_team") === "true",
   })
   revalidatePath("/admin")
   return { error: error?.message ?? null }
