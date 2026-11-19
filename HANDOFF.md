@@ -177,10 +177,11 @@ Last verified 2026-11-18 (see PROJECT_MAP.md for how to re-run):
 
 ## 🔮 Future Work & Backlog
 
-### 0. NEXT: Exercise videos and images (choose the approach together)
-- Every exercise gets a demo video and/or image; programs, the session runner and admin previews show them embedded.
-- Start by comparing all options (YouTube embeds, self-hosted clips in Supabase Storage, Mux/Cloudflare Stream, GIF/WebP loops, licensed exercise libraries, coach-recorded content) and pick one with the owner.
-- Today none of the ~100 catalog exercises has a photo or video.
+> The current task list lives in `PROJECT_MAP.md` §5 (owner/outside-access items) and §5b (full QA problem list with status). The items below are older product ideas.
+
+### 0. DONE: Exercise videos and images
+- Built-in library (`lib/exercise-library.ts`): all 101 catalogue exercises have a checked, embeddable YouTube demo and an Arabic name; 77 have start/end photos (public domain, `public/exercises/media`).
+- Shown embedded in both session runners and as thumbnails on the athlete program page. A photo/video the coach sets in the Exercises tab overrides the built-in one.
 
 ### 1. Admin System & Settings Tab
 - **System Management Workspace**: Add a dedicated "Settings" tab in `/admin` so Coach Ahmed never needs to touch the codebase.
