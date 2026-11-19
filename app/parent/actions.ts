@@ -23,9 +23,15 @@ export type ParentViewData = {
  */
 export async function redeemParentCode(code: string): Promise<{ error: string | null; data?: ParentViewData }> {
   const t = await getT()
-  const invalid = { error: t("That access code is invalid or expired.") }
+  const startedAt = Date.now()
+  // Every failure takes at least ~1.2 s, so guessing codes (12 hex chars = 2^48 options) is impractically slow.
+  const invalid = async () => {
+    const wait = 1200 - (Date.now() - startedAt)
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+    return { error: t("That access code is invalid or expired.") }
+  }
   const value = typeof code === "string" ? code.trim() : ""
-  if (!CODE.test(value)) return invalid
+  if (!CODE.test(value)) return invalid()
 
   const service = createAdminClient()
   const { data: athleteByCode } = await service.from("athletes").select("id,account_status").eq("parent_link_code", value).maybeSingle()
@@ -34,13 +40,13 @@ export async function redeemParentCode(code: string): Promise<{ error: string | 
     const { data: link } = await service.from("parent_links").select("athlete_id").eq("link_code", value).eq("status", "active").maybeSingle()
     athleteId = (link?.athlete_id as string | undefined) ?? undefined
   }
-  if (!athleteId) return invalid
+  if (!athleteId) return invalid()
 
   const [{ data: profile }, activity] = await Promise.all([
     service.from("profiles").select("full_name,role").eq("id", athleteId).maybeSingle(),
     loadAthleteActivity(service, athleteId, { programSession: t("Program session"), trainingSession: t("Training session") }),
   ])
-  if (profile?.role && profile.role !== "athlete") return invalid
+  if (profile?.role && profile.role !== "athlete") return invalid()
 
   const latestRpe = activity.rpe.at(-1)?.rpe ?? null
   return {

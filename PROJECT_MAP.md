@@ -60,14 +60,14 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 
 ## 5. Open items — need the owner or outside access (code work is done, see 5b)
 1. **Merge/deploy** the pending work (PR + Vercel preview), then re-test on production: athlete flows, Parent View with a profile code, bulk import duplicate rule, rules tab resolving codes.
-2. **CI workflow**: `.github/workflows/ci.yml` is ready but untracked; pushing it needs `gh auth refresh -h github.com -s workflow` (owner).
+2. ~~CI workflow~~ — added in PR #18 (runs once merged).
 3. **Schema + RLS dump** to `supabase/schema.sql` (needs DB access; commands in `supabase/README.md`). Then review RLS for `teams/programs/exercises` writes (defence in depth) and remove the legacy fallback in `deleteAthleteCompletely` (migration 202611180001 is live).
 4. **Public repo** exposes coaching IP (`public/CoachAhmedRules.csv`, prompts): owner decides whether to make it private.
 5. **Native Arabic proofread** (UI strings in `lib/i18n/ar/*`, exercise names in `lib/exercise-library.ts`), plus an RTL visual pass. DB data still English: team names without `name_ar`, old test sessions.
 6. **Exercise media gaps**: 24 exercises have a video but no photo (list in 5b); Coach Ahmed can upload photos or swap any video in the Exercises tab (his media overrides the built-in ones).
-7. **Parent View hardening**: the code endpoint is public by design; consider rate limiting (e.g. Vercel firewall rule on `/parent` POSTs) if codes get shared widely.
+7. Parent View hardening: done in code (every failed code takes ≥1.2 s; codes are 12 hex chars). Optional extra: a Vercel firewall rate-limit rule on `/parent` (dashboard setting).
 8. **QA data cleanup before launch**: Claude QA Tester (TROY-YLHLLU6), QA Team (Claude), QA Exercise (Claude), QA Session (Claude), the QA program + its completion/selfie/feedback.
-9. Low priority: dense single-line JSX in `session-panel`, `rules-panel`, `programs-panel`, `program-review-panel` (reformat when touched); admin generators still use the browser date for "start".
+9. Low priority: dense single-line JSX in `session-panel`, `rules-panel`, `programs-panel`, `program-review-panel`, `parent-view`: reformat with Prettier (`--no-semi --print-width 130`) once it is added as a dev dependency. (Generators now default to the Cairo date.)
 
 ## 5b. Future work — full problem list (from QA 2026-11-18/19, details in `docs/qa/results-2026-11-18.md`)
 Status: [ ] open · [~] in progress · [x] done
