@@ -39,12 +39,13 @@ describe("exercise library", () => {
     expect(coach.images).toEqual(["https://x.test/a.jpg"])
     expect(coach.videoUrl).toBe("https://youtu.be/JO7D6GJ98wY")
     const fallback = resolveExerciseMedia({ name: "Goblet Squat" })
-    expect(fallback.images[0]).toBe("/exercises/media/E003-0.jpg")
+    expect(fallback.images).toEqual([]) // E003's stock photos were removed (modesty review)
+    expect(resolveExerciseMedia({ name: "Ab Wheel Rollout" }).images[0]).toBe("/exercises/media/E031-0.jpg")
     expect(fallback.videoUrl).toContain("youtube.com/watch?v=")
   })
   it("ignores the fake hex video links seeded in the database", () => {
     const seeded = resolveExerciseMedia({ name: "Cat-Cow", code: "E099", video_youtube_url: "https://www.youtube.com/watch?v=3fc6797e7ab" })
-    expect(seeded.videoUrl).toBe("https://www.youtube.com/watch?v=Fa4ZMS5M7xA")
+    expect(seeded.videoUrl).toBe("https://www.youtube.com/watch?v=TK6tM059e8o")
     // Without a library video there is nothing better, so the stored link is kept.
     const unknown = resolveExerciseMedia({ name: "Unknown move", video_youtube_url: "https://www.youtube.com/watch?v=3fc6797e7ab" })
     expect(unknown.videoUrl).toBe("https://www.youtube.com/watch?v=3fc6797e7ab")

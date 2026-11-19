@@ -111,9 +111,15 @@ Status: [ ] open · [~] in progress · [x] done
 
 **AI program test on production (2026-11-19, QA athlete)**: generate → save → approve → athlete session with photos/videos all work.
 - [x] Gemini put a session on an unchosen day (Sat) while all chosen days within ±3 were taken; the validator now searches the whole window (PR #19).
-- [ ] Athlete picker: after a search narrows the list, the previously selected athlete stays selected; auto-select the single match (`components/admin/athlete-picker.tsx`).
-- [ ] Approving a new program leaves the athlete's older program "approved" too (athletes see only the newest by `month_start`); consider archiving the older one on approve.
-- [ ] Opening `/program/session/<date>` for a rest day gives a bare 404; show a friendly "no session that day" card.
+- [x] Athlete picker: a search that no longer matches the selected athlete selects the first match.
+- [x] Approving a program archives the athlete's other approved/active programs.
+- [x] `/program/session/<date>` on a rest day (or with no program) shows a card instead of a 404.
+
+**Modest exercise media (2026-11-19, owner request: men only, not shirtless, nothing above the knee)**
+- Reviewed every library photo and video by sampled frames (start, 25/50/75%). Photos kept only where they comply: E004 E005 E021 E025 E031 E035 E038 E056 E067 E077 E080 E091 E093; all other stock photos were deleted.
+- 48 videos replaced with compliant demos (library + production `exercises.video_youtube_url`, updated by code); ~16 current videos already complied and were kept.
+- [ ] 37 exercises still have a video that does not clearly comply (no compliant replacement found in search): E001 E002 E005 E006 E007 E009 E014 E016 E019 E021 E026 E035 E037 E040 E042 E043 E044 E048 E049 E051 E052 E055 E063 E065 E066 E067 E077 E079 E082 E084 E085 E086 E087 E092 E095 E096 E101. Best fix: Coach Ahmed records short clips himself or picks videos in the Exercises tab (his link overrides). E095 Swimming cannot meet the rule with standard swimwear.
+- Frame sampling can miss a few seconds of a video; a full watch-through is still advisable.
 
 ## 6. Done well — leave alone
 Auth core (`getUser()`, secure cookies, forced password change, Troy-ID generation), role guards + ownership checks, selfie upload hygiene, tolerant JSON extraction + catalog validation of AI output, human approval gates (program review, prompt proposals), security headers, no secrets in repo/history, strict TypeScript.
