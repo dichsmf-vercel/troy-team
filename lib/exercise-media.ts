@@ -74,6 +74,16 @@ export function youtubeEmbedUrl(url: string | null | undefined): string | null {
   return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1` : null
 }
 
+/**
+ * The catalogue rows in the database were seeded with fake video links (`watch?v=` + 11 lowercase
+ * hex chars, e.g. 3fc6797e7ab) that YouTube reports as unavailable. Real ids use the full
+ * base64url alphabet, so an all-lowercase-hex id is almost certainly one of those placeholders.
+ */
+export function isPlaceholderVideo(url: string | null | undefined): boolean {
+  const id = youtubeId(url)
+  return !!id && /^[0-9a-f]{11}$/.test(id)
+}
+
 export type ExerciseMedia = { images: string[]; videoUrl: string | null }
 
 /**
@@ -90,8 +100,9 @@ export function resolveExerciseMedia(exercise: {
   const coachImage = exercise.image_url?.trim()
   const images = coachImage ? [coachImage] : entry?.images ?? []
   const coachVideo = exercise.video_youtube_url?.trim()
-  const videoUrl = coachVideo && youtubeId(coachVideo)
-    ? coachVideo
+  const coachVideoUsable = !!coachVideo && !!youtubeId(coachVideo) && !(entry?.youtubeId && isPlaceholderVideo(coachVideo))
+  const videoUrl = coachVideoUsable
+    ? coachVideo!
     : entry?.youtubeId
       ? `https://www.youtube.com/watch?v=${entry.youtubeId}`
       : null
