@@ -4,14 +4,29 @@ import { AthleteHeader } from "@/components/athlete/athlete-header"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { readProgramSessions, readProgramSource } from "@/lib/program-data"
-import { getLocale, getT } from "@/lib/i18n/get-language"
+import { readProgramSessions, readProgramSource, type StoredProgramExercise } from "@/lib/program-data"
+import { exerciseDisplayName, resolveExerciseMedia } from "@/lib/exercise-media"
+import { getLanguage, getLocale, getT } from "@/lib/i18n/get-language"
 import { Calendar, AlertCircle, CheckCircle2, XCircle, Dumbbell, ArrowRight } from "lucide-react"
 import { tx } from "@/lib/i18n/translate"
+import { todayInAppZone, addDaysIso } from "@/lib/dates"
+
+/** Keeps the program's own section order and names ("Strength/Power" was listed twice and "FMS Correction" was dropped before). */
+function groupBySection(exercises: StoredProgramExercise[]) {
+  const groups: { section: string; exercises: StoredProgramExercise[] }[] = []
+  for (const exercise of exercises) {
+    const section = String(exercise.section ?? "").trim() || "Training"
+    const group = groups.find((item) => item.section.toLowerCase() === section.toLowerCase())
+    if (group) group.exercises.push(exercise)
+    else groups.push({ section, exercises: [exercise] })
+  }
+  return groups
+}
 
 export default async function AthleteProgramPage() {
   const t = await getT()
   const locale = await getLocale()
+  const language = await getLanguage()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
@@ -35,7 +50,7 @@ export default async function AthleteProgramPage() {
   const isAssignedOnly = athlete?.goals?.includes("Assigned exercises only")
   const monthStart = assignment?.month_start ? new Date(`${assignment.month_start}T12:00:00`) : new Date()
   const programSessions = readProgramSessions(assignment?.generation_reason)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayInAppZone()
 
   const { data: completionRows } = assignment
     ? await supabase
@@ -46,19 +61,15 @@ export default async function AthleteProgramPage() {
     : { data: [] }
 
   const completionByDate = new Map((completionRows ?? []).map((row: { session_date: string; status: string; completed_at: string | null }) => [row.session_date, row]))
-  const visibleSessions = programSessions.filter((session) => session.date <= today)
+  // Every session is listed: past ones show attended/missed, upcoming ones are a read-only preview.
+  const visibleSessions = [...programSessions].sort((a, b) => a.date.localeCompare(b.date))
   const sessionDates = new Set(programSessions.map((session) => session.date))
 
   const monthTitle = monthStart.toLocaleDateString(locale, { month: "long", year: "numeric" })
+  const startIso = assignment?.month_start ?? today
   const days = Array.from({ length: 28 }, (_, index) => {
-    const date = new Date(monthStart)
-    date.setDate(monthStart.getDate() + index)
-    return {
-      day: date.getDate(),
-      weekday: date.toLocaleDateString(locale, { weekday: "short" }),
-      date: date.toISOString().slice(0, 10),
-      hasSession: sessionDates.has(date.toISOString().slice(0, 10)),
-    }
+    const iso = addDaysIso(startIso, index)
+    return { day: Number(iso.slice(8, 10)), date: iso, hasSession: sessionDates.has(iso) }
   })
 
   return (
@@ -102,6 +113,10 @@ export default async function AthleteProgramPage() {
                   <span key={day} className="py-2 font-medium text-muted-foreground">
                     {t(day)}
                   </span>
+                ))}
+                {/* The grid starts on the program's first day, so pad to line it up under the right weekday. */}
+                {Array.from({ length: monthStart.getDay() }, (_, index) => (
+                  <span key={`pad-${index}`} aria-hidden="true" />
                 ))}
                 {days.map((item) => (
                   <div
@@ -153,14 +168,21 @@ export default async function AthleteProgramPage() {
                             <><CheckCircle2 className="size-4" aria-hidden="true" /> {t("Attended")}</>
                           ) : session.date < today ? (
                             <><XCircle className="size-4" aria-hidden="true" /> {t("Missed")}</>
-                          ) : (
+                          ) : session.date === today ? (
                             t("Available today")
+                          ) : (
+                            t("Upcoming")
                           )}
                         </span>
                         {completionByDate.get(session.date)?.status === "completed" ? (
                           <CheckCircle2 className="size-5 text-emerald-500" aria-label={t("Attended")} />
                         ) : session.date < today ? (
-                          <XCircle className="size-5 text-red-500" aria-label={t("Missed")} />
+                          <Link
+                            href={`/program/session/${session.date}`}
+                            className="rounded-lg border border-red-500/40 px-3 py-2 text-xs font-semibold text-red-500"
+                          >
+                            {t("Catch up")}
+                          </Link>
                         ) : session.date === today ? (
                           <Link
                             href={`/program/session/${session.date}`}
@@ -192,16 +214,25 @@ export default async function AthleteProgramPage() {
 
                       {/* Sections */}
                       <div className="space-y-3">
-                        {[tx("warm-up"), tx("mobility"), tx("power"), tx("strength"), tx("accessory"), tx("conditioning"), tx("cooldown")].map((section) => {
-                          const sectionExercises = (session.exercises ?? []).filter((e) => String(e.section).toLowerCase().includes(section))
-                          if (sectionExercises.length === 0) return null
+                        {groupBySection(session.exercises ?? []).map(({ section, exercises: sectionExercises }) => {
                           return (
                             <div key={section}>
                               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{t(section)}</p>
                               <div className="space-y-1.5">
                                 {sectionExercises.map((exercise, exIdx) => (
                                   <div key={exIdx} className="rounded-lg bg-muted/50 p-2 flex items-center justify-between gap-2 text-xs">
-                                    <span className="font-medium truncate">{exercise.name_en ?? exercise.name}</span>
+                                    <span className="flex min-w-0 items-center gap-2">
+                                      {resolveExerciseMedia({ name: exercise.name_en ?? exercise.name, image_url: exercise.image_url }).images[0] ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- small static thumbnail
+                                        <img
+                                          src={resolveExerciseMedia({ name: exercise.name_en ?? exercise.name, image_url: exercise.image_url }).images[0]}
+                                          alt=""
+                                          className="size-9 shrink-0 rounded-md object-cover"
+                                          loading="lazy"
+                                        />
+                                      ) : null}
+                                      <span className="font-medium truncate">{exerciseDisplayName(exercise.name_en ?? exercise.name, null, language)}</span>
+                                    </span>
                                     <span className="text-muted-foreground text-nowrap">
                                       {exercise.sets}×{exercise.reps}
                                       {exercise.loadPercentage ? ` @ ${exercise.loadPercentage}%` : ""}

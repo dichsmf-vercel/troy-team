@@ -16,6 +16,8 @@ export type StoredProgramExercise = {
   notes?: string | null
   video_youtube_url?: string | null
   image_url?: string | null
+  /** Filled in at render time from the exercise row + built-in library (never stored). */
+  media?: { images: string[]; videoUrl: string | null }
 }
 
 export type StoredProgramSession = {

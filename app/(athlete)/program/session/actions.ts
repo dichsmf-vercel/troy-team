@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/guards"
 import { ownsProgram } from "@/lib/auth/ownership"
 import type { TFunction } from "@/lib/i18n/translate"
 import { getT } from "@/lib/i18n/get-language"
+import { todayInAppZone } from "@/lib/dates"
 
 const MAX_SELFIE_BYTES = 5 * 1024 * 1024
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -15,6 +16,7 @@ async function authorizeProgram(programId: string, date: string, t: TFunction) {
   const auth = await requireUser()
   if (!auth.ok) return { error: t("Not authenticated") } as const
   if (!ISO_DATE.test(date)) return { error: t("Invalid date.") } as const
+  if (date > todayInAppZone()) return { error: t("This session isn't open yet") } as const
   if (!(await ownsProgram(auth.ctx.supabase, auth.ctx.user.id, programId))) return { error: t("Program not found.") } as const
   return { supabase: auth.ctx.supabase, user: auth.ctx.user } as const
 }

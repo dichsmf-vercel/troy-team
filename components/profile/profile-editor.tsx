@@ -1,19 +1,129 @@
 "use client"
-import { useState } from "react"
-import { Copy } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useLanguage, useT } from "@/components/providers/language-provider"
+import { ensureParentCode, updateOwnName } from "@/app/(athlete)/profile/actions"
 
-type Props = { userId: string; email: string; profile: { full_name: string | null; profile_picture_url: string | null; language_preference: string } | null; athlete: { display_id: string | null; parent_link_code: string | null } | null; parentLink: { link_code: string; status: string } | null }
-export function ProfileEditor({ userId, email, profile, athlete, parentLink }: Props) {
+type Props = {
+  troyId: string | null
+  /** Real e-mail only; internal troy-…@troy.internal addresses are never shown. */
+  email: string | null
+  profile: { full_name: string | null } | null
+  parentCode: string | null
+}
+
+export function ProfileEditor({ troyId, email, profile, parentCode: initialParentCode }: Props) {
   const t = useT()
- const { dict } = useLanguage(); const [copied, setCopied] = useState(false); const [name, setName] = useState(profile?.full_name ?? ""); const [saving, setSaving] = useState(false); const [saved, setSaved] = useState(false)
- async function save() { setSaving(true); setSaved(false); const supabase = createClient(); await supabase.from("profiles").update({ full_name: name, updated_at: new Date().toISOString() }).eq("id", userId); setSaving(false); setSaved(true) }
- const [copiedKey, setCopiedKey] = useState<string | null>(null)
- async function copyValue(key: string, value: string) { await navigator.clipboard.writeText(value); setCopiedKey(key); window.setTimeout(() => setCopiedKey(null), 2000) }
- return <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 pb-24 md:px-8"><header><p className="text-sm text-muted-foreground">{dict.common.profile}</p><h1 className="text-3xl font-bold">{dict.profile.title}</h1></header><Card><CardHeader><CardTitle>{t("Athlete identity")}</CardTitle></CardHeader><CardContent className="grid gap-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">{t("Athlete ID")}</p><p className="font-mono font-semibold tabular-nums">{athlete?.display_id ?? "—"}</p></div><Button type="button" variant="outline" onClick={() => athlete?.display_id && copyValue("athlete", athlete.display_id)} disabled={!athlete?.display_id}>{copiedKey === "athlete" ? t("Copied ✓") : t("Copy")}</Button></div><div className="border-t pt-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">{t("Parent Access Code")}</p><p className="font-mono font-semibold tabular-nums">{athlete?.parent_link_code ?? parentLink?.link_code ?? "—"}</p></div><Button type="button" variant="outline" onClick={() => { const value = athlete?.parent_link_code ?? parentLink?.link_code; if (value) copyValue("parent", value) }} disabled={!athlete?.parent_link_code && !parentLink?.link_code}>{copiedKey === "parent" ? t("Copied ✓") : t("Copy")}</Button></div><p className="mt-2 text-sm text-muted-foreground">{t("Share this code with a parent for read-only schedule and attendance access.")}</p></div></CardContent></Card><Card><CardHeader><CardTitle>{dict.profile.personalInfo}</CardTitle></CardHeader><CardContent className="flex flex-col gap-5"><div className="flex items-center gap-4"><div className="flex size-20 items-center justify-center rounded-full bg-secondary text-2xl font-bold">{name.slice(0, 1).toUpperCase() || "A"}</div><div><p className="font-semibold">{name || dict.profile.athlete}</p><p className="text-sm text-muted-foreground">{email}</p></div></div><div className="flex flex-col gap-2"><Label htmlFor="name">{dict.profile.fullName}</Label><Input id="name" value={name} onChange={e => setName(e.target.value)} /></div><Button onClick={save} disabled={saving}>{saving ? dict.common.saving : dict.common.save}</Button>{saved && <p className="text-sm text-team-reserve">{dict.common.saved}</p>}</CardContent></Card><Card><CardHeader><CardTitle>{t("Parent access ID")}</CardTitle></CardHeader><CardContent className="flex flex-col gap-3"><p className="text-sm text-muted-foreground">{t("Share this ID with your parent so they can view your training progress.")}</p>{parentLink ? <div className="flex items-center gap-2"><Input readOnly value={parentLink.link_code} aria-label={t("Parent access ID")} /><Button type="button" variant="outline" onClick={async () => { await navigator.clipboard.writeText(parentLink.link_code); setCopied(true) }}><Copy className="size-4" />{copied ? t("Copied") : t("Copy")}</Button></div> : <p className="text-sm text-muted-foreground">{t("No active parent access ID has been created yet.")}</p>}</CardContent></Card></main>
+  const { dict } = useLanguage()
+  const [name, setName] = useState(profile?.full_name ?? "")
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
+  const [parentCode, setParentCode] = useState(initialParentCode)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  async function copyValue(key: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedKey(key)
+      window.setTimeout(() => setCopiedKey(null), 2000)
+    } catch {
+      setCopiedKey(null)
+    }
+  }
+
+  function save() {
+    startTransition(async () => {
+      const result = await updateOwnName(name)
+      setMessage(result.error ? { text: result.error, error: true } : { text: dict.common.saved, error: false })
+    })
+  }
+
+  function createParentCode() {
+    startTransition(async () => {
+      const result = await ensureParentCode()
+      if (result.error) setMessage({ text: result.error, error: true })
+      else if (result.code) setParentCode(result.code)
+    })
+  }
+
+  return (
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 pb-24 md:px-8">
+      <header>
+        <p className="text-sm text-muted-foreground">{dict.common.profile}</p>
+        <h1 className="text-3xl font-bold">{dict.profile.title}</h1>
+      </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("Athlete identity")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">{t("Troy ID")}</p>
+              <p className="font-mono font-semibold tabular-nums">{troyId ?? "—"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("Use this ID to sign in.")}</p>
+            </div>
+            <Button type="button" variant="outline" onClick={() => troyId && copyValue("troy", troyId)} disabled={!troyId}>
+              {copiedKey === "troy" ? t("Copied ✓") : t("Copy")}
+            </Button>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">{t("Parent Access Code")}</p>
+                <p className="font-mono font-semibold tabular-nums">{parentCode ?? "—"}</p>
+              </div>
+              {parentCode ? (
+                <Button type="button" variant="outline" onClick={() => copyValue("parent", parentCode)}>
+                  {copiedKey === "parent" ? t("Copied ✓") : t("Copy")}
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" onClick={createParentCode} disabled={pending}>
+                  {t("Create code")}
+                </Button>
+              )}
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("Share this code with a parent. They enter it on the Parent View page (link on the sign-in screen) to see your schedule and attendance. They cannot change anything.")}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{dict.profile.personalInfo}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <div className="flex items-center gap-4">
+            <div className="flex size-20 items-center justify-center rounded-full bg-secondary text-2xl font-bold">
+              {name.slice(0, 1).toUpperCase() || "A"}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold">{name || dict.profile.athlete}</p>
+              {email ? <p className="truncate text-sm text-muted-foreground">{email}</p> : null}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="name">{dict.profile.fullName}</Label>
+            <Input id="name" value={name} onChange={(event) => setName(event.target.value)} />
+          </div>
+          <Button type="button" onClick={save} disabled={pending}>
+            {pending ? dict.common.saving : dict.common.save}
+          </Button>
+          {message ? (
+            <p role="status" className={`text-sm ${message.error ? "text-destructive" : "text-team-reserve"}`}>
+              {message.text}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+    </main>
+  )
 }

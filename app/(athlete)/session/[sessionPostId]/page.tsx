@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getLanguage, getT } from "@/lib/i18n/get-language"
 import { SessionRunner } from "@/components/session/session-runner"
+import { exerciseDisplayName, resolveExerciseMedia } from "@/lib/exercise-media"
 
 export default async function SessionPage({
   params,
@@ -75,13 +76,15 @@ export default async function SessionPage({
       exercises={(exercises ?? []).flatMap((se) => {
         const related = Array.isArray(se.exercises) ? se.exercises[0] : se.exercises
         if (!related?.id) return []
+        const media = resolveExerciseMedia({ name: related.name_en, image_url: related.image_url, video_youtube_url: related.video_youtube_url })
         return [{
           sessionExerciseId: se.id,
           exerciseId: related.id,
-          name: language === "ar" ? related.name_ar : related.name_en,
+          name: exerciseDisplayName(related.name_en, related.name_ar, language),
           description: language === "ar" ? related.description_ar : related.description_en,
-          imageUrl: related.image_url,
-          videoUrl: related.video_youtube_url,
+          imageUrl: media.images[0] ?? null,
+          images: media.images,
+          videoUrl: media.videoUrl,
           sets: se.sets,
           reps: se.reps,
         }]
