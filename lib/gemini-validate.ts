@@ -148,11 +148,36 @@ export function validateProgram(raw: unknown, catalog: CatalogExercise[], option
     }
   }
 
+  // The AI sometimes ignores the chosen weekdays: move those sessions to the nearest free chosen day in the window.
+  let movedSessions = 0
+  if (options.weekdays.length && startMs !== null) {
+    const used = new Set(sessions.map((session) => session.date))
+    const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+    const endMs = startMs + (windowDays - 1) * DAY_MS
+    for (const session of sessions) {
+      const ms = parseIsoDate(session.date)
+      if (ms === null || options.weekdays.includes(new Date(ms).getUTCDay())) continue
+      for (const offset of [1, -1, 2, -2, 3, -3]) {
+        const candidate = ms + offset * DAY_MS
+        if (candidate < startMs || candidate > endMs) continue
+        if (!options.weekdays.includes(new Date(candidate).getUTCDay()) || used.has(iso(candidate))) continue
+        used.delete(session.date)
+        session.date = iso(candidate)
+        session.week = Math.floor((candidate - startMs) / DAY_MS / 7) + 1
+        used.add(session.date)
+        movedSessions++
+        offScheduleSessions--
+        break
+      }
+    }
+  }
+
   sessions.sort((a, b) => a.date.localeCompare(b.date))
 
   if (droppedExercises) warnings.push(t("{count} exercise(s) suggested by the AI were not in your catalog and were removed.", { count: droppedExercises }))
   if (rescuedByName) warnings.push(t("{count} exercise(s) had a wrong id and were matched by name.", { count: rescuedByName }))
   if (droppedSessions) warnings.push(t("{count} session(s) were removed (invalid date, outside the 4-week window, or no valid exercises).", { count: droppedSessions }))
+  if (movedSessions) warnings.push(t("{count} session(s) were moved to your chosen training days.", { count: movedSessions }))
   if (offScheduleSessions) warnings.push(t("{count} session(s) fall on days that were not selected as training days.", { count: offScheduleSessions }))
 
   const aiWarnings = Array.isArray(root.warnings)

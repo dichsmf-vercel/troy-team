@@ -180,9 +180,19 @@ export function transliterateName(raw: string | null | undefined): { en: string 
   const words = original.split(" ")
   const translated: string[] = []
   for (const word of words) {
-    const english = NAMES[normalizeArabic(word)]
+    const english = NAMES[normalizeArabic(word)] ?? splitJoinedNames(word)
     if (!english) return { en: null, ar: original }
     translated.push(english)
   }
   return { en: translated.join(" "), ar: original }
+}
+
+/** Two known names typed without a space ("لارااسامه" → "Lara Osama"). */
+function splitJoinedNames(word: string): string | null {
+  for (let cut = 2; cut <= word.length - 2; cut++) {
+    const first = NAMES[normalizeArabic(word.slice(0, cut))]
+    const second = NAMES[normalizeArabic(word.slice(cut))]
+    if (first && second) return `${first} ${second}`
+  }
+  return null
 }

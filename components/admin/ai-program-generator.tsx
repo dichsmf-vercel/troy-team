@@ -23,6 +23,8 @@ import { generateProgramWithAI, saveAIGeneratedProgram, saveAdminEditsAndLearn, 
 import type { GeminiProgramOutput, GeminiSession, GeminiExercise } from "@/lib/gemini-types"
 import { weekdayLabel, monthLabel } from "@/lib/program-engine"
 import { useLanguage } from "@/components/providers/language-provider"
+import { AthletePicker, defaultTrainingDays, type PickableAthlete } from "@/components/admin/athlete-picker"
+import { todayInAppZone } from "@/lib/dates"
 import { actionErrorMessage } from "@/lib/client-errors"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
@@ -37,19 +39,17 @@ type EditState = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export type AthleteOption = {
-  id: string
+export type AthleteOption = PickableAthlete & {
   latest_assessment?: unknown
-  profiles?: { full_name?: string | null } | null
 }
 
 
 export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) {
   const { t, locale } = useLanguage()
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "")
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [startDate, setStartDate] = useState(todayInAppZone())
   const [time, setTime] = useState("18:00")
-  const [days, setDays] = useState<number[]>([1, 3, 5])
+  const [days, setDays] = useState<number[]>(() => defaultTrainingDays(athletes[0]))
 
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
@@ -196,18 +196,17 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="ai-athlete">{t("Athlete")}</Label>
-            <select
+            <AthletePicker
               id="ai-athlete"
+              athletes={athletes}
               value={athleteId}
-              onChange={(e) => { setAthleteId(e.target.value); setProgram(null); setGenError(null) }}
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-            >
-              {athletes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.profiles?.full_name ?? a.id}
-                </option>
-              ))}
-            </select>
+              onChange={(nextId) => {
+                setAthleteId(nextId)
+                setProgram(null)
+                setGenError(null)
+                setDays(defaultTrainingDays(athletes.find((athlete) => athlete.id === nextId)))
+              }}
+            />
           </div>
 
           <div className="grid gap-2">

@@ -13,7 +13,7 @@ import { AthleteDrawer } from "@/components/admin/athlete-drawer"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 import type { AdminAthlete, AdminAthleteProfile, AdminSelfie } from "@/lib/admin/types"
-import { sportLabel, statusLabel } from "@/lib/i18n/labels"
+import { fieldValue, sportLabel, statusLabel } from "@/lib/i18n/labels"
 import { useT, useLn } from "@/components/providers/language-provider"
 
 // ─── props ────────────────────────────────────────────────────────────────────
@@ -250,8 +250,8 @@ export function AthletesPanel({
                     <p className="truncate text-xs text-muted-foreground">
                       <span className="font-mono text-primary font-medium">{troyId ?? athlete.auth_email ?? "—"}</span>
                       {team?.name_en ? ` · ${ln(team.name_en, team.name_ar)}` : ""}
-                      {athlete.sport ? ` · ${sportLabel(t, athlete.sport).toLocaleUpperCase()}` : ""}
-                      {athlete.position ? ` (${athlete.position})` : ""}
+                      {sportLabel(t, athlete.sport) ? ` · ${sportLabel(t, athlete.sport).toLocaleUpperCase()}` : ""}
+                      {fieldValue(athlete.position) ? ` (${fieldValue(athlete.position)})` : ""}
                     </p>
                   </div>
                 </div>
@@ -313,7 +313,11 @@ export function AthletesPanel({
 export function AthleteStats({ athletes }: { athletes: AdminAthlete[] }) {
   const t = useT()
   const ln = useLn()
-  const assessed = athletes.filter((a) => a.assessment_status === "approved").length
+  // "Assessed" = the coach has recorded test results (creation form / import / drawer), or the assessment was
+  // submitted/approved. Counting only "approved" showed 0 because nothing sets that status today.
+  const hasResults = (a: AdminAthlete) =>
+    (a.assessment_answers ?? []).some((answer) => answer.question_key !== "bmi" && answer.question_key !== "fms_total" && answer.answer_json?.value != null && answer.answer_json.value !== "")
+  const assessed = athletes.filter((a) => a.assessment_status === "approved" || a.assessment_status === "submitted" || hasResults(a)).length
   const paused = athletes.filter((a) => a.account_status === "paused").length
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

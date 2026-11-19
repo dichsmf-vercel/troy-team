@@ -92,6 +92,12 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Hook-safe translated label (DialogFooter is used outside the provider in a few places). */
+function CloseLabel() {
+  const t = useT()
+  return <>{t("Close")}</>
+}
+
 function DialogFooter({
   className,
   showCloseButton = false,
@@ -112,7 +118,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close render={<Button variant="outline" />}>
-          Close
+          <CloseLabel />
         </DialogPrimitive.Close>
       )}
     </div>

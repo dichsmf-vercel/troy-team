@@ -12,6 +12,7 @@ import { nameKey, validateImportRows } from "@/lib/admin/athlete-import-validati
 import { getT } from "@/lib/i18n/get-language"
 import type { ParsedAthleteRow } from "@/lib/excel-import"
 import { clubKey } from "@/lib/import-dictionary"
+import { fieldValue } from "@/lib/i18n/labels"
 import type { TFunction } from "@/lib/i18n/translate"
 
 const RULES_PROGRAM_NAME = "Coach Ahmed Rules Engine"
@@ -198,18 +199,32 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
   const profiles = await fetchAllRows<{ id: string; full_name: string | null; full_name_ar: string | null }>(service, "profiles", "id, full_name, full_name_ar", { column: "role", value: "athlete" })
   const athletes = await fetchAllRows<{ id: string; birth_year: number | null }>(service, "athletes", "id, birth_year")
   if (profiles.error || athletes.error) return stop(t("Could not check existing athletes: {error}", { error: profiles.error ?? athletes.error }))
+  const memberships = await fetchAllRows<{ athlete_id: string; team_id: string }>(service, "athlete_teams", "athlete_id, team_id")
+  if (memberships.error) return stop(t("Could not check existing athletes: {error}", { error: memberships.error }))
   const birthYearById = new Map(athletes.data.map((athlete) => [athlete.id, athlete.birth_year]))
-  const seen = new Map<string, (number | null)[]>()
-  const remember = (names: (string | null | undefined)[], birthYear: number | null) => {
+  const teamsByAthlete = new Map<string, Set<string>>()
+  for (const row of memberships.data) teamsByAthlete.set(row.athlete_id, (teamsByAthlete.get(row.athlete_id) ?? new Set()).add(row.team_id))
+  type Known = { birthYear: number | null; teamIds: Set<string> }
+  const seen = new Map<string, Known[]>()
+  const remember = (names: (string | null | undefined)[], known: Known) => {
     for (const name of names) {
       const key = nameKey(name ?? "")
-      if (key) seen.set(key, [...(seen.get(key) ?? []), birthYear])
+      if (key) seen.set(key, [...(seen.get(key) ?? []), known])
     }
   }
-  for (const profile of profiles.data) remember([profile.full_name, profile.full_name_ar], birthYearById.get(profile.id) ?? null)
-  // The same player may be stored in English (transliterated) or Arabic, so every spelling is checked.
-  const isDuplicate = (names: (string | null | undefined)[], birthYear: number | null) =>
-    names.some((name) => (seen.get(nameKey(name ?? "")) ?? []).some((existing) => existing == null || birthYear == null || existing === birthYear))
+  for (const profile of profiles.data) {
+    remember([profile.full_name, profile.full_name_ar], { birthYear: birthYearById.get(profile.id) ?? null, teamIds: teamsByAthlete.get(profile.id) ?? new Set() })
+  }
+  // Same player = same name (English or Arabic spelling) AND
+  //  - same birth year when both are known, otherwise
+  //  - same club when either birth year is missing ("Mohamed Ahmed" is a common name: a name alone is not enough).
+  const sameAthlete = (existing: Known, birthYear: number | null, teamId: string | null) => {
+    if (existing.birthYear != null && birthYear != null) return existing.birthYear === birthYear
+    if (teamId && existing.teamIds.size) return existing.teamIds.has(teamId)
+    return existing.birthYear == null && birthYear == null && !teamId && !existing.teamIds.size
+  }
+  const isDuplicate = (names: (string | null | undefined)[], birthYear: number | null, teamId: string | null) =>
+    names.some((name) => (seen.get(nameKey(name ?? "")) ?? []).some((existing) => sameAthlete(existing, birthYear, teamId)))
 
   const { data: existingTeams, error: teamsError } = await service.from("teams").select("id,name_en,name_ar")
   if (teamsError) return stop(t("Could not load teams: {message}", { message: teamsError.message }))
@@ -222,7 +237,9 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
     const fullName = row.fullName.trim()
     const birthYear = row.birthYear ?? null
 
-    if (isDuplicate([row.fullName, row.fullNameAr], birthYear)) {
+    const club = row.clubName?.trim()
+    const knownTeamId = club && club.toLocaleLowerCase() !== "not set" ? teamIdByName.get(clubKey(row.clubNameAr ?? club)) ?? null : null
+    if (isDuplicate([row.fullName, row.fullNameAr], birthYear, knownTeamId)) {
       result.skipped.push({ rowNumber: row.rowNumber, name: fullName, reason: "An athlete with this name already exists." })
       continue
     }
@@ -267,8 +284,8 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
 
     const { error: athleteError } = await service.from("athletes").upsert({
       id: athleteId,
-      sport: row.sport || "Not Set",
-      position: row.position || "Not Set",
+      sport: fieldValue(row.sport) || null,
+      position: fieldValue(row.position) || null,
       birth_year: birthYear,
       free_training_days: [0, 1, 2, 3, 4, 5, 6],
       show_exercise_recap: true,
@@ -287,7 +304,7 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
 
     result.credentials.push({ name: fullName, troyId: created.troyId, temporaryPassword: created.temporaryPassword })
     result.imported++
-    remember([row.fullName, row.fullNameAr], birthYear)
+    remember([row.fullName, row.fullNameAr], { birthYear, teamIds: new Set(teamId ? [teamId] : []) })
   }
 
   revalidatePath("/admin")

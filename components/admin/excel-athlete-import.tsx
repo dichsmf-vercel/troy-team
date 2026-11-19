@@ -167,7 +167,10 @@ export function ExcelAthleteImport() {
             <DialogDescription>
               {step === "template" && t("Your file must look like this template. Download it, fill it in, then choose it below.")}
               {step === "review" && `${fileName} — ${t.plural(rows.length, "{count} athlete found.", "{count} athletes found.")}`}
-              {step === "done" && t("Save the login details below. Temporary passwords are only shown once.")}
+              {step === "done" &&
+                (credentials.length
+                  ? t("Save the login details below. Temporary passwords are only shown once.")
+                  : t("No new accounts were created."))}
             </DialogDescription>
           </DialogHeader>
 
@@ -178,7 +181,7 @@ export function ExcelAthleteImport() {
                   {t("Download the template and fill the first sheet, “Athletes”, one player per row under the header.")}
                 </li>
                 <li>
-                  {t("Only the name is required. Empty cells are saved as “Not Set”.")}
+                  {t("Only the name is required. Empty cells are simply left empty.")}
                 </li>
                 <li>{t("Do not change, move or delete the header row. The “Example” sheet shows three filled-in players.")}</li>
                 <li>{t("Players that already exist (same name and birth year) are skipped, so re-uploading is safe.")}</li>

@@ -157,6 +157,8 @@ describe("Arabic → English dictionary", () => {
     expect(transliterateName("يوسف مصطفي")).toEqual({ en: "Youssef Mostafa", ar: "يوسف مصطفي" })
     expect(transliterateName("احمد  محمد ")).toEqual({ en: "Ahmed Mohamed", ar: "احمد محمد" })
     expect(transliterateName("يوسف كلمةغريبة")).toEqual({ en: null, ar: "يوسف كلمةغريبة" })
+    // Real sheet: two names typed without a space.
+    expect(transliterateName("لارااسامه")).toEqual({ en: "Lara Osama", ar: "لارااسامه" })
     expect(transliterateName("John Smith")).toEqual({ en: "John Smith", ar: null })
     expect(normalizeArabic("أحمد")).toBe(normalizeArabic("احمد"))
   })
