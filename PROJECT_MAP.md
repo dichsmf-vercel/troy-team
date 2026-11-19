@@ -109,6 +109,12 @@ Status: [ ] open · [~] in progress · [x] done
 - [x] Coach now sees monthly-program session feedback and pain notes in the Feedback tab (were never shown).
 - [ ] Schema/RLS dump, CI workflow push, repo privacy: see section 5.
 
+**AI program test on production (2026-11-19, QA athlete)**: generate → save → approve → athlete session with photos/videos all work.
+- [x] Gemini put a session on an unchosen day (Sat) while all chosen days within ±3 were taken; the validator now searches the whole window (PR #19).
+- [ ] Athlete picker: after a search narrows the list, the previously selected athlete stays selected; auto-select the single match (`components/admin/athlete-picker.tsx`).
+- [ ] Approving a new program leaves the athlete's older program "approved" too (athletes see only the newest by `month_start`); consider archiving the older one on approve.
+- [ ] Opening `/program/session/<date>` for a rest day gives a bare 404; show a friendly "no session that day" card.
+
 ## 6. Done well — leave alone
 Auth core (`getUser()`, secure cookies, forced password change, Troy-ID generation), role guards + ownership checks, selfie upload hygiene, tolerant JSON extraction + catalog validation of AI output, human approval gates (program review, prompt proposals), security headers, no secrets in repo/history, strict TypeScript.
 
