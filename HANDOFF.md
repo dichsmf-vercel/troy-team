@@ -177,6 +177,11 @@ Last verified 2026-11-18 (see PROJECT_MAP.md for how to re-run):
 
 ## 🔮 Future Work & Backlog
 
+### 0. NEXT: Exercise videos and images (choose the approach together)
+- Every exercise gets a demo video and/or image; programs, the session runner and admin previews show them embedded.
+- Start by comparing all options (YouTube embeds, self-hosted clips in Supabase Storage, Mux/Cloudflare Stream, GIF/WebP loops, licensed exercise libraries, coach-recorded content) and pick one with the owner.
+- Today none of the ~100 catalog exercises has a photo or video.
+
 ### 1. Admin System & Settings Tab
 - **System Management Workspace**: Add a dedicated "Settings" tab in `/admin` so Coach Ahmed never needs to touch the codebase.
 - **Prompt Manager**: View active Gemini prompts, historical versions from `coach_system_prompts`, and manually adjust or rollback prompting instructions.

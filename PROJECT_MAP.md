@@ -59,6 +59,7 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 - **Selfies**: buckets `exercise-selfies`, `session-selfies`; server actions body limit raised to 10 MB in `next.config.mjs`.
 
 ## 5. Open items (priority order)
+0. **NEXT (decide together): exercise media.** Add a video and/or image to every exercise and show them embedded inside programs and sessions (athlete runner, program page, admin previews). First step: present all realistic options (YouTube embeds vs. uploaded clips in Supabase Storage vs. Mux/Cloudflare Stream, GIF/WebP loops, licensed libraries, AI-generated or coach-recorded media), compare cost/effort/quality, then pick one with the owner.
 1. **Upgrade `next` to >=16.3.8 (critical RCE advisories)**, move `shadcn` to devDependencies, replace/patch `xlsx`. Re-run build + tests.
 2. Run the 2 migrations, set `NEXT_PUBLIC_SITE_URL`, then deploy via PR + Vercel preview.
 3. Dump the base schema + RLS to `supabase/schema.sql` (needs DB access; commands in `supabase/README.md`).
