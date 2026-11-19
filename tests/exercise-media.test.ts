@@ -27,6 +27,8 @@ describe("exercise library", () => {
     // (modesty review: some exercises are photo-only).
     expect(EXERCISE_LIBRARY.every((entry) => !entry.youtubeId || /^[A-Za-z0-9_-]{11}$/.test(entry.youtubeId))).toBe(true)
     expect(EXERCISE_LIBRARY.filter((entry) => !entry.youtubeId && !entry.images.length)).toEqual([])
+    // Every exercise has start/end images (modest photos or the generated illustrations).
+    expect(EXERCISE_LIBRARY.filter((entry) => entry.images.length < 2).map((entry) => entry.code)).toEqual([])
     expect(resolveExerciseMedia({ name: "Box Squat" })).toEqual({ images: ["/exercises/media/E005-0.jpg", "/exercises/media/E005-1.jpg"], videoUrl: null })
   })
   it("every listed photo exists in public/", () => {
@@ -43,7 +45,7 @@ describe("exercise library", () => {
     expect(coach.images).toEqual(["https://x.test/a.jpg"])
     expect(coach.videoUrl).toBe("https://youtu.be/JO7D6GJ98wY")
     const fallback = resolveExerciseMedia({ name: "Goblet Squat" })
-    expect(fallback.images).toEqual([]) // E003's stock photos were removed (modesty review)
+    expect(fallback.images).toEqual(["/exercises/illustrations/E003-0.svg", "/exercises/illustrations/E003-1.svg"])
     expect(resolveExerciseMedia({ name: "Ab Wheel Rollout" }).images[0]).toBe("/exercises/media/E031-0.jpg")
     expect(fallback.videoUrl).toContain("youtube.com/watch?v=")
   })
