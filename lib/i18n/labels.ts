@@ -12,6 +12,7 @@ const STATUS_LABELS: Record<string, string> = {
   active: tx("Active"),
   paused: tx("Paused"),
   completed: tx("Completed"),
+  archived: tx("Archived"),
 }
 
 export function statusLabel(t: TFunction, status: string | null | undefined, fallback = "Draft"): string {

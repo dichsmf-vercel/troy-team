@@ -47,12 +47,23 @@ export function AthletePicker({
       .sort((a, b) => a.label.localeCompare(b.label, locale))
   }, [athletes, ln, locale])
 
-  const needle = query.trim().toLowerCase()
-  const visible = needle
-    ? sorted.filter(({ athlete, label }) =>
-        [label, athlete.profiles?.full_name, athlete.profiles?.full_name_ar, athlete.profiles?.troy_id].some((text) => String(text ?? "").toLowerCase().includes(needle)),
-      )
-    : sorted
+  const matching = (search: string) => {
+    const needle = search.trim().toLowerCase()
+    return needle
+      ? sorted.filter(({ athlete, label }) =>
+          [label, athlete.profiles?.full_name, athlete.profiles?.full_name_ar, athlete.profiles?.troy_id].some((text) => String(text ?? "").toLowerCase().includes(needle)),
+        )
+      : sorted
+  }
+  const needle = query.trim()
+  const visible = matching(query)
+  // Searching selects the first match when the current athlete no longer matches,
+  // so the generator never silently keeps an athlete the coach searched away from.
+  const search = (next: string) => {
+    setQuery(next)
+    const matches = matching(next)
+    if (next.trim() && matches.length && !matches.some((item) => item.athlete.id === value)) onChange(matches[0].athlete.id)
+  }
   // Keep the current choice selectable even when the search hides it.
   const current = sorted.find((item) => item.athlete.id === value)
   const options = current && !visible.includes(current) ? [current, ...visible] : visible
@@ -62,7 +73,7 @@ export function AthletePicker({
       <Input
         type="search"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => search(event.target.value)}
         placeholder={t("Search by name or Troy ID")}
         aria-label={t("Search athletes")}
         className="h-9"
