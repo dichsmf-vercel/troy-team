@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { saveOwnPassword } from "./actions"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -39,29 +39,28 @@ function SetPasswordForm() {
 
     setPending(true)
     setIsError(false)
-    const supabase = createClient()
+    setMessage(null)
 
-    const { error } = await supabase.auth.updateUser({ password })
-    if (error) {
-      setMessage(error.message)
+    let result: { error: string | null }
+    try {
+      result = await saveOwnPassword(password)
+    } catch {
+      result = { error: t.passwordSaveFailed }
+    }
+    if (result.error) {
+      setMessage(result.error)
       setIsError(true)
       setPending(false)
       return
     }
 
-    // Clear the forced password change flag
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase
-        .from("profiles")
-        .update({ password_change_required: false })
-        .eq("id", user.id)
-    }
-
     setMessage(t.passwordSaved)
     setIsError(false)
     setPending(false)
-    setTimeout(() => router.push("/dashboard"), 800)
+    setTimeout(() => {
+      router.replace("/dashboard")
+      router.refresh()
+    }, 800)
   }
 
   return (

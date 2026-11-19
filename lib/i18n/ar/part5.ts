@@ -2,6 +2,7 @@
 export const part5: Record<string, string> = {
   // Admin messages
   "Team created.": "تم إنشاء الفريق.",
+  "Password must be at least 8 characters.": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.",
   "Session saved.": "تم حفظ الحصة.",
   "Account paused.": "تم إيقاف الحساب مؤقتًا.",
   "Account active.": "الحساب نشط.",
