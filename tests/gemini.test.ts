@@ -106,6 +106,17 @@ describe("validateProgram", () => {
     expect(result.program!.warnings.join(" ")).toMatch(/moved to your chosen training days/)
   })
 
+  it("moves an off-day session to a free chosen day further away when the nearby ones are taken", () => {
+    // Tue/Thu from Tue 1 Dec. Sat 5 has Thu 3 and Tue 8 taken nearby; Thu 10 is the nearest free one.
+    const result = validateProgram(
+      { sessions: ["2026-12-01", "2026-12-03", "2026-12-05", "2026-12-08"].map((date) => session(date, [{ id: "ex-plank" }])) },
+      catalog,
+      baseOptions,
+    )
+    expect(result.program!.sessions.map((s) => s.date)).toEqual(["2026-12-01", "2026-12-03", "2026-12-08", "2026-12-10"])
+    expect(result.program!.warnings.join(" ")).not.toMatch(/not selected/)
+  })
+
   it("fails when nothing valid is left", () => {
     expect(validateProgram({ sessions: [session("2026-12-01", [{ id: "nope" }])] }, catalog, baseOptions).error).toMatch(/no valid sessions/)
     expect(validateProgram({}, catalog, baseOptions).error).toMatch(/no sessions/)

@@ -157,7 +157,10 @@ export function validateProgram(raw: unknown, catalog: CatalogExercise[], option
     for (const session of sessions) {
       const ms = parseIsoDate(session.date)
       if (ms === null || options.weekdays.includes(new Date(ms).getUTCDay())) continue
-      for (const offset of [1, -1, 2, -2, 3, -3]) {
+      // Nearest first (±1, ±2, …) across the whole window: when the AI skipped a chosen day elsewhere
+      // (e.g. put a session on Sat 21 and left Tue 15 Dec empty), the session fills that gap.
+      const offsets = Array.from({ length: windowDays - 1 }, (_, i) => i + 1).flatMap((step) => [step, -step])
+      for (const offset of offsets) {
         const candidate = ms + offset * DAY_MS
         if (candidate < startMs || candidate > endMs) continue
         if (!options.weekdays.includes(new Date(candidate).getUTCDay()) || used.has(iso(candidate))) continue
