@@ -118,7 +118,8 @@ Status: [ ] open · [~] in progress · [x] done
 **Modest exercise media (2026-11-19, owner request: men only, not shirtless, nothing above the knee)**
 - Reviewed every library photo and video by sampled frames (start, 25/50/75%). Photos kept only where they comply: E004 E005 E021 E025 E031 E035 E038 E056 E067 E077 E080 E091 E093; all other stock photos were deleted.
 - 48 videos replaced with compliant demos (library + production `exercises.video_youtube_url`, updated by code); ~16 current videos already complied and were kept.
-- [ ] 37 exercises still have a video that does not clearly comply (no compliant replacement found in search): E001 E002 E005 E006 E007 E009 E014 E016 E019 E021 E026 E035 E037 E040 E042 E043 E044 E048 E049 E051 E052 E055 E063 E065 E066 E067 E077 E079 E082 E084 E085 E086 E087 E092 E095 E096 E101. Best fix: Coach Ahmed records short clips himself or picks videos in the Exercises tab (his link overrides). E095 Swimming cannot meet the rule with standard swimwear.
+- [x] E005 E021 E035 E067 E077 are photo-only now (compliant photos kept, video removed in the library and in production).
+- [ ] 32 exercises still have a video that does not clearly comply and no compliant photo: E001 E002 E006 E007 E009 E014 E016 E019 E026 E037 E040 E042 E043 E044 E048 E049 E051 E052 E055 E063 E065 E066 E079 E082 E084 E085 E086 E087 E092 E095 E096 E101. No usable open photo source: free-exercise-db models wear shorts, wger images are shirtless anatomy drawings. Best fix: Coach Ahmed photographs these (start + end position) and uploads them in the Exercises tab, which overrides the built-in media. E095 Swimming cannot meet the rule with standard swimwear.
 - Frame sampling can miss a few seconds of a video; a full watch-through is still advisable.
 
 ## 6. Done well — leave alone

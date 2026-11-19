@@ -21,9 +21,13 @@ describe("youtubeId", () => {
 })
 
 describe("exercise library", () => {
-  it("covers all 101 catalogue codes with a video", () => {
+  it("covers all 101 catalogue codes with a video or photos", () => {
     expect(EXERCISE_LIBRARY).toHaveLength(101)
-    expect(EXERCISE_LIBRARY.every((entry) => entry.youtubeId && /^[A-Za-z0-9_-]{11}$/.test(entry.youtubeId))).toBe(true)
+    // A video id, when present, is a real one; an exercise without a video must have photos instead
+    // (modesty review: some exercises are photo-only).
+    expect(EXERCISE_LIBRARY.every((entry) => !entry.youtubeId || /^[A-Za-z0-9_-]{11}$/.test(entry.youtubeId))).toBe(true)
+    expect(EXERCISE_LIBRARY.filter((entry) => !entry.youtubeId && !entry.images.length)).toEqual([])
+    expect(resolveExerciseMedia({ name: "Box Squat" })).toEqual({ images: ["/exercises/media/E005-0.jpg", "/exercises/media/E005-1.jpg"], videoUrl: null })
   })
   it("every listed photo exists in public/", () => {
     const missing = EXERCISE_LIBRARY.flatMap((entry) => entry.images).filter((src) => !existsSync(join(process.cwd(), "public", src)))
