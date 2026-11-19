@@ -96,12 +96,14 @@ describe("validateProgram", () => {
     expect(result.program!.sessions.map((s) => s.date)).toEqual(["2026-12-01"])
   })
 
-  it("clamps numbers and warns about days that were not selected", () => {
+  it("clamps numbers and moves sessions to the chosen training days", () => {
     const result = validateProgram({ sessions: [session("2026-12-02", [{ id: "ex-plank", sets: 99, load_percentage: 500 }])] }, catalog, baseOptions)
     const exercise = result.program!.sessions[0].exercises[0]
     expect(exercise.sets).toBe(10)
     expect(exercise.load_percentage).toBe(120)
-    expect(result.program!.warnings.join(" ")).toMatch(/not selected as training days/)
+    const moved = result.program!.sessions[0].date
+    expect(baseOptions.weekdays).toContain(new Date(`${moved}T00:00:00Z`).getUTCDay())
+    expect(result.program!.warnings.join(" ")).toMatch(/moved to your chosen training days/)
   })
 
   it("fails when nothing valid is left", () => {

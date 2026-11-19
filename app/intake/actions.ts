@@ -53,7 +53,21 @@ export async function saveIntakeBody(input: IntakeBody) {
     .upsert({ id: userId, weight_kg: input.weight_kg, height_cm: input.height_cm })
   if (error) throw new Error(error.message)
 
-  if (input.weight_kg || input.height_cm) {
+  // Going back and forth through the steps re-saves this step: only log a new
+  // measurement when the values differ from the latest one.
+  const { data: latest } = await supabase
+    .from("measurements")
+    .select("weight_kg, height_cm")
+    .eq("athlete_id", userId)
+    .order("recorded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const unchanged =
+    latest &&
+    Number(latest.weight_kg ?? 0) === Number(input.weight_kg ?? 0) &&
+    Number(latest.height_cm ?? 0) === Number(input.height_cm ?? 0)
+
+  if ((input.weight_kg || input.height_cm) && !unchanged) {
     await supabase.from("measurements").insert({
       athlete_id: userId,
       weight_kg: input.weight_kg,
@@ -68,9 +82,14 @@ export async function saveIntakeBody(input: IntakeBody) {
 export async function saveIntakeHealth(input: IntakeHealth) {
   const { supabase, userId } = await requireUserId()
 
+  // `goals` also carries the coach's program mode ("Assigned exercises only ..."):
+  // an athlete must not be able to switch that off from the intake form.
+  const { data: current } = await supabase.from("athletes").select("goals").eq("id", userId).maybeSingle()
+  const coachLockedGoals = String(current?.goals ?? "").startsWith("Assigned exercises only")
+
   const { error } = await supabase
     .from("athletes")
-    .upsert({ id: userId, injury_notes: input.injury_notes, goals: input.goals })
+    .upsert({ id: userId, injury_notes: input.injury_notes, ...(coachLockedGoals ? {} : { goals: input.goals }) })
   if (error) throw new Error(error.message)
 
   revalidatePath("/intake")

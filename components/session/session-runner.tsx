@@ -1,7 +1,6 @@
 ﻿"use client"
 
 import { useState, useTransition } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { Play, Check, TriangleAlert, ChevronLeft, ChevronRight, Camera, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,6 +21,7 @@ import {
   saveExerciseFeedback,
 } from "@/app/(athlete)/session/[sessionPostId]/actions"
 import { safeDate, safeTime } from "@/lib/formatters"
+import { ExerciseMedia } from "@/components/session/exercise-media"
 
 type Exercise = {
   sessionExerciseId: string
@@ -29,6 +29,7 @@ type Exercise = {
   name: string
   description: string | null
   imageUrl: string | null
+  images?: string[]
   videoUrl: string | null
   sets: number | null
   reps: string | null
@@ -296,23 +297,6 @@ export function SessionRunner({
       {/* Active exercise card */}
       {active ? (
         <Card className="flex flex-col gap-4 overflow-hidden p-0">
-          {/* Exercise image */}
-          {active.imageUrl ? (
-            <div className="relative aspect-video w-full overflow-hidden bg-muted">
-              <Image
-                src={active.imageUrl}
-                alt={active.name}
-                fill
-                className="object-cover"
-                crossOrigin="anonymous"
-              />
-            </div>
-          ) : (
-            <div className="flex aspect-video items-center justify-center bg-muted text-xs text-muted-foreground">
-              {t("No photo")}
-            </div>
-          )}
-
           <div className="flex flex-col gap-4 p-4">
             {/* Exercise info */}
             <div className="flex flex-col gap-1">
@@ -339,32 +323,8 @@ export function SessionRunner({
               ) : null}
             </div>
 
-            {/* Video */}
-            {active.videoUrl ? (
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => setShowVideo((v) => !v)}
-                >
-                  {showVideo ? t("Hide video") : dict.session.watchDemo}
-                </Button>
-                {showVideo ? (
-                  <div className="aspect-video overflow-hidden rounded-xl bg-muted">
-                    <iframe
-                      className="size-full"
-                      src={active.videoUrl.replace("watch?v=", "embed/")}
-                      title={t("{name} demo", { name: active.name })}
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            {/* Photos + demo video */}
+            <ExerciseMedia name={active.name} images={active.images ?? (active.imageUrl ? [active.imageUrl] : [])} videoUrl={active.videoUrl} />
 
             {/* ── Selfie upload ── */}
             {!isCompleted ? (

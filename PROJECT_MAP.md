@@ -58,16 +58,56 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 - **Models** (`lib/gemini.ts`): generation `gemini-3.8-flash` -> `3.6-flash` -> `3.1-flash-lite` (optional `GEMINI_MODEL` goes first); summaries `gemini-3.5-flash-lite` -> `3.1-flash-lite`. Re-check Google's model list before changing.
 - **Selfies**: buckets `exercise-selfies`, `session-selfies`; server actions body limit raised to 10 MB in `next.config.mjs`.
 
-## 5. Open items (priority order)
-0. **NEXT (decide together): exercise media.** Add a video and/or image to every exercise and show them embedded inside programs and sessions (athlete runner, program page, admin previews). First step: present all realistic options (YouTube embeds vs. uploaded clips in Supabase Storage vs. Mux/Cloudflare Stream, GIF/WebP loops, licensed libraries, AI-generated or coach-recorded media), compare cost/effort/quality, then pick one with the owner.
-1. **Upgrade `next` to >=16.3.8 (critical RCE advisories)**, move `shadcn` to devDependencies, replace/patch `xlsx`. Re-run build + tests.
-2. Run the 2 migrations, set `NEXT_PUBLIC_SITE_URL`, then deploy via PR + Vercel preview.
-3. Dump the base schema + RLS to `supabase/schema.sql` (needs DB access; commands in `supabase/README.md`).
-4. Scaling: `app/admin/page.tsx` uses `.in("athlete_id", ids)` with ALL athlete ids (URL length breaks around a few hundred athletes) and `listUsers(perPage:1000)`; page or batch these.
-5. Public repo exposes coaching IP (`public/CoachAhmedRules.csv`, prompts, SQL): decide on making it private.
-6. Arabic is implemented (see 3b); remaining: native proofread, RTL visual pass of admin/athlete screens, metadata/manifest, DB-stored English text.
-7. Review RLS for `teams/programs/exercises` writes now that actions are role-guarded (defence in depth), and remove the legacy fallback in `deleteAthleteCompletely` once migration 202611180001 is live.
-8. Still-dense single-line JSX in `session-panel`, `rules-panel`, `programs-panel`, `program-review-panel`: reformat when next touched.
+## 5. Open items — need the owner or outside access (code work is done, see 5b)
+1. **Merge/deploy** the pending work (PR + Vercel preview), then re-test on production: athlete flows, Parent View with a profile code, bulk import duplicate rule, rules tab resolving codes.
+2. ~~CI workflow~~ — added in PR #18 (runs once merged).
+3. **Schema + RLS dump** to `supabase/schema.sql` (needs DB access; commands in `supabase/README.md`). Then review RLS for `teams/programs/exercises` writes (defence in depth) and remove the legacy fallback in `deleteAthleteCompletely` (migration 202611180001 is live).
+4. **Public repo** exposes coaching IP (`public/CoachAhmedRules.csv`, prompts): owner decides whether to make it private.
+5. **Native Arabic proofread** (UI strings in `lib/i18n/ar/*`, exercise names in `lib/exercise-library.ts`), plus an RTL visual pass. DB data still English: team names without `name_ar`, old test sessions.
+6. **Exercise media gaps**: 24 exercises have a video but no photo (list in 5b); Coach Ahmed can upload photos or swap any video in the Exercises tab (his media overrides the built-in ones). 101 of 102 `exercises.video_youtube_url` values were fake seeded links (`watch?v=` + 11 lowercase hex chars). On 2026-11-19 (owner approved) they were replaced in production with the checked library videos (matched by `exercise_code`); 0 fake links remain. The app still ignores any such link (`isPlaceholderVideo`) as a safety net.
+7. Parent View hardening: done in code (every failed code takes ≥1.2 s; codes are 12 hex chars). Optional extra: a Vercel firewall rate-limit rule on `/parent` (dashboard setting).
+8. **QA data cleanup before launch**: Claude QA Tester (TROY-YLHLLU6), QA Team (Claude), QA Exercise (Claude), QA Session (Claude), the QA program + its completion/selfie/feedback.
+9. Low priority: dense single-line JSX in `session-panel`, `rules-panel`, `programs-panel`, `program-review-panel`, `parent-view`: reformat with Prettier (`--no-semi --print-width 130`) once it is added as a dev dependency. (Generators now default to the Cairo date.)
+
+## 5b. Future work — full problem list (from QA 2026-11-18/19, details in `docs/qa/results-2026-11-18.md`)
+Status: [ ] open · [~] in progress · [x] done
+
+**Athlete side**
+- [x] Parent View: now a guarded-public server action (`app/parent/actions.ts`) that accepts the profile code. Was: the code on the profile (`athletes.parent_link_code`) is rejected; `redeem_parent_link` (dashboard-only SQL) reads `parent_links`, which nothing creates.
+- [x] Profile shows the Troy ID, hides internal e-mails, one parent code with "Create code". Was: profile showed the internal e-mail `troy-…@troy.internal` and a legacy "Athlete ID" (`display_id`) instead of the Troy ID; contradictory parent-code texts.
+- [x] Progress (and parent view) use `lib/athlete-activity.ts`: assigned + program sessions; program difficulty 0–5 shown ×2 on the 0–10 RPE scale. Was: progress ignored program sessions (attendance 0/0, RPE "—" after completing one); RPE shown "/10" but asked 0–5.
+- [x] Future program sessions are locked (page + server action). Was: future program sessions could be opened and completed early (recorded as attended).
+- [x] Program page lists all sessions (upcoming = preview, missed = "Catch up"), grouped by real section with photo thumbnails. Was: program page listed only past sessions; no preview of upcoming ones.
+- [x] Dashboard keeps unfinished coach sessions from the last 14 days, counts program sessions, shows the next session on rest days. Was: missed coach-assigned sessions disappeared from the dashboard.
+- [x] Feedback screen says "All exercises completed" even when some were skipped; sliders have no accessible labels.
+- [x] Athlete pages use `lib/dates.ts` (Africa/Cairo). Admin generators still use UTC. Was: "today" computed in UTC on the server (wrong date 00:00–02:00 Cairo).
+- [x] Calendar weekday misalignment; "1 sets"; intake duplicate measurements; intake overwriting "assigned only" mode; set-password Save never submitted.
+
+**Admin side**
+- [x] Duplicate rule is now name + birth year, or name + club when a birth year is missing (`app/admin/actions/imports.ts`). Was: bulk import duplicate check was name-only: a real player sharing a common name is skipped (row 5 "Mohamed Ahmed"). Use name + birth year (+ club), or let the coach choose.
+- [x] Joined names are split on known names (`splitJoinedNames`). Was: Arabic names without spaces (e.g. "لارااسامه") are not transliterated.
+- [x] Missing `exercise_code` is filled from the CSV mapping by name when the admin page loads (`exerciseCodeForName`), so rules resolve and the rules engine applies ADD/REMOVE. Was: rules tab: all 130 rules "Unresolved" because catalog exercises have no `exercise_code`; `public/exercises/Coach_Ahmed_Exercises.csv` has the E001–E101 → name mapping.
+- [x] Generators start with the athlete's free days (`defaultTrainingDays`); AI sessions on other days are moved to the nearest chosen day (`lib/gemini-validate.ts`). Was: generators started with Mon/Wed/Fri instead of the athlete's available days; AI then schedules days the coach did not pick.
+- [x] Staff accounts are filtered out of the athlete list (`app/admin/page.tsx`). Was: "Coach Ahmed" (admin) appeared as an athlete in roster, generators and pickers.
+- [x] "Assessed" counts athletes with recorded test results or a submitted/approved assessment. Was: "Assessed 0" after FMS + tests are entered at creation (assessment stays `draft`).
+- [x] Engine picks by catalogue category, never repeats an exercise in a session, warms up with agility/mobility (`tests/program-engine.test.ts`). Was: rules-engine program quality: squat on an "upper body" day, same exercise as power and strength, Ab Wheel as warm-up, same exercise in warm-up and cooldown.
+- [x] Searchable, sorted `AthletePicker` (name in both languages + Troy ID) in both generators; session picker sorted and localized; "Not Set" hidden and no longer stored on import. Was: athlete pickers unsorted, no search (87+ athletes); roster shows "NOT SET (Not Set)".
+- [x] Drawer "Settings saved" message far from the button.
+- [x] Import dialog: "Save the login details" shown even when 0 were imported.
+
+**Exercise catalog / media**
+- [x] Exercise media: `lib/exercise-library.ts` maps all 101 catalogue exercises (E001–E101) to a checked, embeddable YouTube demo; 77 have start/end photos in `public/exercises/media` (free-exercise-db, public domain). `resolveExerciseMedia` prefers the coach's own `image_url`/`video_youtube_url`. Shown in both runners (`components/session/exercise-media.tsx`, youtube-nocookie embed) and as thumbnails on the program page. Missing photos (24): landmine presses, suitcase carry, bird dog, trap bar jumps, skater jumps/squats, Copenhagen plank, TRX squat, cossack squat, wall ball, dumbbell snatch, pogo/single-leg broad jumps, agility ladder, 5-10-5, downhill runs, swimming, SkiErg, wall slides, 90/90, Brettzel, tempo runs, assault bike → coach uploads.
+- [x] Arabic names for all 101 exercises in `lib/exercise-library.ts` (`exerciseDisplayName`; used by athlete runners/program page and admin lists via `name_ar`). Categories still English in the DB.
+
+**Arabic (code, not data)**
+- [x] Session team picker shows `name_en` (use `useLn`); program generator picker shows English names and raw sport ("handball", "Not Set").
+- [x] Feedback tab "1 session", "RPE 5"; roster "Not Set"; hard-coded "Close" in `components/ui/dialog.tsx` footer.
+
+**Platform**
+- [x] `next` 16.3.8 (RCE advisories), `xlsx` 0.20.3 from the SheetJS CDN (npm's 0.18.5 has known CVEs), `shadcn` moved to devDependencies.
+- [x] Admin page queries chunked (`lib/supabase/batch.ts`), auth users paged: no URL-length failure at a few hundred athletes.
+- [x] Coach now sees monthly-program session feedback and pain notes in the Feedback tab (were never shown).
+- [ ] Schema/RLS dump, CI workflow push, repo privacy: see section 5.
 
 ## 6. Done well — leave alone
 Auth core (`getUser()`, secure cookies, forced password change, Troy-ID generation), role guards + ownership checks, selfie upload hygiene, tolerant JSON extraction + catalog validation of AI output, human approval gates (program review, prompt proposals), security headers, no secrets in repo/history, strict TypeScript.

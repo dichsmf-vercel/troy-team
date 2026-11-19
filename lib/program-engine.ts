@@ -90,18 +90,41 @@ export function getEgyptianSeason(sport: string | null, date: Date): {
 function findMatching(
   pool: EngineExercise[],
   keywords: string[],
-  excludeIds: Set<string> = new Set()
+  excludeIds: Set<string> = new Set(),
+  options: { names?: boolean } = {},
 ): EngineExercise[] {
   const lowerKeywords = keywords.map((k) => k.toLowerCase())
   return pool.filter((item) => {
     if (excludeIds.has(item.id)) return false
     const cat = String(item.category ?? "").toLowerCase()
     const pat = String(item.movement_pattern ?? "").toLowerCase()
-    const name = String(item.name_en ?? "").toLowerCase()
-    return lowerKeywords.some(
-      (kw) => cat.includes(kw) || pat.includes(kw) || name.includes(kw)
-    )
+    const name = options.names ? String(item.name_en ?? "").toLowerCase() : ""
+    return lowerKeywords.some((kw) => cat.includes(kw) || pat.includes(kw) || (name ? name.includes(kw) : false))
   })
+}
+
+/** Exercises whose catalogue category is one of these (Coach Ahmed's categories: Lower Body, Upper Body, Core, Power, Agility, Conditioning, Mobility). */
+function byCategory(pool: EngineExercise[], categories: string[]): EngineExercise[] {
+  const wanted = categories.map((c) => c.toLowerCase())
+  return pool.filter((item) => wanted.includes(String(item.category ?? "").trim().toLowerCase()))
+}
+
+/** First pool that has anything in it. */
+function firstNonEmpty(...pools: EngineExercise[][]): EngineExercise[] {
+  return pools.find((pool) => pool.length) ?? []
+}
+
+/** Up to `count` different exercises from `pool`, rotating with `offset`, never one already used in the session. */
+function pickDistinct(pool: EngineExercise[], offset: number, count: number, used: Set<string>): EngineExercise[] {
+  const picked: EngineExercise[] = []
+  for (let step = 0; step < pool.length && picked.length < count; step++) {
+    const exercise = pool[(offset + step) % pool.length]
+    if (exercise && !used.has(exercise.id)) {
+      used.add(exercise.id)
+      picked.push(exercise)
+    }
+  }
+  return picked
 }
 
 export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[] {
@@ -156,12 +179,14 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
     const usedInSession = new Set<string>()
 
     // 1. WARM-UP (2 exercises)
-    const warmups = findMatching(candidates, ["warm", "activation"])
-    const warmupPool = warmups.length ? warmups : candidates
-    for (let i = 0; i < 2; i++) {
-      const ex = warmupPool[(dayInCycle * 2 + i) % warmupPool.length]
-      if (ex && !usedInSession.has(ex.id)) {
-        usedInSession.add(ex.id)
+    // Never fall back to the whole catalogue here (that put Ab Wheel Rollouts in the warm-up).
+    const warmupPool = firstNonEmpty(
+      findMatching(candidates, ["warm", "activation"]),
+      byCategory(candidates, ["agility"]),
+      byCategory(candidates, ["mobility"]),
+    )
+    for (const ex of pickDistinct(warmupPool, dayInCycle * 2, 2, usedInSession)) {
+      {
         picked.push({
           id: ex.id,
           name_en: ex.name_en,
@@ -178,12 +203,9 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
     }
 
     // 2. MOBILITY (2 exercises — mobility CAN repeat across sessions)
-    const mobilityPool = findMatching(candidates, ["mobility", "stretch", "flexibility"])
-    const mobList = mobilityPool.length ? mobilityPool : candidates
-    for (let i = 0; i < 2; i++) {
-      const ex = mobList[(dayInCycle + i) % mobList.length]
-      if (ex) {
-        usedInSession.add(ex.id)
+    const mobList = firstNonEmpty(byCategory(candidates, ["mobility"]), findMatching(candidates, ["mobility", "stretch", "flexibility"]))
+    for (const ex of pickDistinct(mobList, dayInCycle, 2, usedInSession)) {
+      {
         picked.push({
           id: ex.id,
           name_en: ex.name_en,
@@ -249,29 +271,19 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
     const rawPct = basePercentages[Math.min(week - 1, basePercentages.length - 1)]
     const loadPercentage = Math.round(rawPct * season.loadModifier)
 
-    let strengthPool = candidates.filter(
-      (c) =>
-        !c.category?.toLowerCase().includes("warm") &&
-        !c.category?.toLowerCase().includes("cool")
-    )
-
+    const loadBearing = firstNonEmpty(byCategory(candidates, ["lower body", "upper body", "power"]), candidates.filter(
+      (c) => !c.category?.toLowerCase().includes("warm") && !c.category?.toLowerCase().includes("cool") && !c.category?.toLowerCase().includes("mobility"),
+    ))
+    let strengthPool = loadBearing
     if (isThreeDaySplit) {
       const splitIdx = dayInCycle % 3
-      if (splitIdx === 0) {
-        // Upper
-        const upper = findMatching(strengthPool, ["upper", "push", "pull", "chest", "shoulder", "back"])
-        if (upper.length) strengthPool = upper
-      } else if (splitIdx === 1) {
-        // Lower
-        const lower = findMatching(strengthPool, ["lower", "squat", "lunge", "deadlift", "hip", "quad", "hamstring"])
-        if (lower.length) strengthPool = lower
-      }
+      if (splitIdx === 0) strengthPool = firstNonEmpty(byCategory(candidates, ["upper body"]), loadBearing)
+      else if (splitIdx === 1) strengthPool = firstNonEmpty(byCategory(candidates, ["lower body"]), loadBearing)
+      else strengthPool = firstNonEmpty(byCategory(candidates, ["power", "lower body", "upper body"]), loadBearing)
     }
 
-    for (let i = 0; i < 2; i++) {
-      const ex = strengthPool[(dayInCycle * 2 + i) % Math.max(strengthPool.length, 1)]
-      if (ex && !usedInSession.has(ex.id)) {
-        usedInSession.add(ex.id)
+    for (const ex of pickDistinct(strengthPool, dayInCycle * 2, 2, usedInSession)) {
+      {
         picked.push({
           id: ex.id,
           name_en: ex.name_en,
@@ -290,9 +302,8 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
     // If Off-Season: Add endurance/conditioning block
     if (season.addEndurance) {
       const endurancePool = findMatching(candidates, ["conditioning", "endurance", "cardio", "circuit", "run"])
-      const ex = (endurancePool.length ? endurancePool : candidates)[dayInCycle % Math.max(candidates.length, 1)]
-      if (ex && !usedInSession.has(ex.id)) {
-        usedInSession.add(ex.id)
+      const ex = pickDistinct(firstNonEmpty(byCategory(candidates, ["conditioning"]), endurancePool), dayInCycle, 1, usedInSession)[0]
+      if (ex) {
         picked.push({
           id: ex.id,
           name_en: ex.name_en,
@@ -309,11 +320,12 @@ export function generateFourWeekProgram(input: ProgramInput): GeneratedSession[]
     }
 
     // 6. COOLDOWN (1-2 exercises)
-    const cooldowns = findMatching(candidates, ["cool", "stretch", "foam", "breathing"])
-    const coolPool = cooldowns.length ? cooldowns : candidates
-    const coolEx = coolPool[dayInCycle % coolPool.length]
-    if (coolEx && !usedInSession.has(coolEx.id)) {
-      usedInSession.add(coolEx.id)
+    const coolPool = firstNonEmpty(
+      findMatching(candidates, ["cool", "stretch", "foam", "breathing"], new Set(), { names: true }),
+      byCategory(candidates, ["mobility"]),
+    )
+    const coolEx = pickDistinct(coolPool, dayInCycle, 1, usedInSession)[0]
+    if (coolEx) {
       picked.push({
         id: coolEx.id,
         name_en: coolEx.name_en,

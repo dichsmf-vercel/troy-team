@@ -159,7 +159,7 @@ export function AthleteFeedbackPanel({ athletes, summaries, painReports }: Props
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="hidden sm:flex items-center gap-4 text-sm">
                     <span className="text-muted-foreground">
-                      {athleteSummaries.length} {athleteSummaries.length === 1 ? "session" : "sessions"}
+                      {t.plural(athleteSummaries.length, "{count} session", "{count} sessions")}
                     </span>
                     {avgRpe != null && (
                       <span className={`font-semibold tabular-nums ${rpeColor(avgRpe)}`}>

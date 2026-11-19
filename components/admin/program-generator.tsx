@@ -13,6 +13,8 @@ import type { AdminAthlete, AdminExercise, AdminRule } from "@/lib/admin/types"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 import { sportLabel } from "@/lib/i18n/labels"
 import { useLanguage } from "@/components/providers/language-provider"
+import { AthletePicker, defaultTrainingDays, type PickableAthlete } from "@/components/admin/athlete-picker"
+import { todayInAppZone } from "@/lib/dates"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
 
@@ -27,9 +29,9 @@ export function ProgramGenerator({
 }) {
   const { t, locale } = useLanguage()
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "")
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [startDate, setStartDate] = useState(todayInAppZone())
   const [time, setTime] = useState("18:00")
-  const [days, setDays] = useState<number[]>([1, 3, 5])
+  const [days, setDays] = useState<number[]>(() => defaultTrainingDays(athletes[0]))
   const [generated, setGenerated] = useState<ReturnType<typeof generateFourWeekProgram>>([])
   const [saveState, setSaveState] = useState<string | null>(null)
 
@@ -85,23 +87,17 @@ export function ProgramGenerator({
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="program-athlete">{t("Athlete")}</Label>
-            <select
+            <AthletePicker
               id="program-athlete"
+              athletes={athletes}
               value={athleteId}
-              onChange={(event) => {
+              onChange={(nextId) => {
                 setGenerated([])
                 setSaveState(null)
-                setAthleteId(event.target.value)
+                setAthleteId(nextId)
+                setDays(defaultTrainingDays(athletes.find((athlete) => athlete.id === nextId)))
               }}
-              className="h-10 rounded-md border bg-background px-3 text-sm"
-            >
-              {athletes.map((athlete) => (
-                <option key={athlete.id} value={athlete.id}>
-                  {athlete.profiles?.full_name ?? athlete.full_name ?? athlete.id}
-                  {athlete.sport ? ` (${athlete.sport})` : ""}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="program-start">{t("Month start")}</Label>

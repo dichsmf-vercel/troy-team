@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { completeProgramSession, uploadProgramExerciseSelfie } from "@/app/(athlete)/program/session/actions"
 import type { StoredProgramExercise } from "@/lib/program-data"
-import { useT } from "@/components/providers/language-provider"
+import { useLanguage, useT } from "@/components/providers/language-provider"
+import { ExerciseMedia } from "@/components/session/exercise-media"
+import { exerciseDisplayName } from "@/lib/exercise-media"
 
 type ProgramFeedbackRow = { exercise_index: number; difficulty: number | null; pain_notes: string | null; enjoyment: number | null }
 
@@ -31,6 +33,7 @@ export function ProgramSessionRunner({
   showExerciseRecap?: boolean
 }) {
   const t = useT()
+  const { language } = useLanguage()
   const [activeIndex, setActiveIndex] = useState(0)
   const [completed, setCompleted] = useState<number[]>(
     initialCompleted ? exercises.map((_, index) => index) : []
@@ -158,7 +161,7 @@ export function ProgramSessionRunner({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-foreground truncate">
-                      {ex.name_en ?? ex.name ?? t("Exercise")}
+                      {exerciseDisplayName(ex.name_en ?? ex.name, null, language) || t("Exercise")}
                     </span>
                     {ex.section && (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -167,7 +170,7 @@ export function ProgramSessionRunner({
                     )}
                   </div>
                   <p className="mt-0.5 text-muted-foreground">
-                    {t("{sets} sets × {reps} reps", { sets: ex.sets ?? "-", reps: ex.reps ?? "-" })}
+                    {Number(ex.sets) === 1 ? t("{sets} set × {reps} reps", { sets: 1, reps: ex.reps ?? "-" }) : t("{sets} sets × {reps} reps", { sets: ex.sets ?? "-", reps: ex.reps ?? "-" })}
                     {ex.loadPercentage ? t(" @ {loadPercentage}% load", { loadPercentage: ex.loadPercentage }) : ""}
                   </p>
                 </div>
@@ -220,19 +223,22 @@ export function ProgramSessionRunner({
           </p>
           <h1 className="mt-1 text-xl font-bold">{t("Session Feedback")}</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            {t("All exercises completed. Submit quick feedback to log your recovery and wellness.")}
+            {completed.length >= exercises.length
+              ? t("All exercises completed. Submit quick feedback to log your recovery and wellness.")
+              : t("{done} of {total} exercises completed. Submit quick feedback to log your recovery and wellness.", { done: completed.length, total: exercises.length })}
           </p>
         </div>
 
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
-            <Label className="text-xs font-semibold">{t("How hard was the training session? (RPE 0–5)")}</Label>
+            <Label htmlFor="program-difficulty" className="text-xs font-semibold">{t("How hard was the training session? (RPE 0–5)")}</Label>
             <span className="font-mono text-xs font-bold text-primary">{difficulty} / 5</span>
           </div>
           <input
             type="range"
             min="0"
             max="5"
+            id="program-difficulty"
             value={difficulty}
             onChange={(e) => setDifficulty(Number(e.target.value))}
             className="w-full"
@@ -240,8 +246,9 @@ export function ProgramSessionRunner({
         </div>
 
         <div className="grid gap-1.5">
-          <Label className="text-xs font-semibold">{t("Any unnatural aches or pains?")}</Label>
+          <Label htmlFor="program-pain" className="text-xs font-semibold">{t("Any unnatural aches or pains?")}</Label>
           <Textarea
+            id="program-pain"
             value={painNotes}
             onChange={(e) => setPainNotes(e.target.value)}
             placeholder={t("Describe any sharp discomfort, joint pain, or muscular stiffness...")}
@@ -251,13 +258,14 @@ export function ProgramSessionRunner({
 
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
-            <Label className="text-xs font-semibold">{t("How did the session feel overall? (0–5)")}</Label>
+            <Label htmlFor="program-enjoyment" className="text-xs font-semibold">{t("How did the session feel overall? (0–5)")}</Label>
             <span className="font-mono text-xs font-bold text-primary">{enjoyment} / 5</span>
           </div>
           <input
             type="range"
             min="0"
             max="5"
+            id="program-enjoyment"
             value={enjoyment}
             onChange={(e) => setEnjoyment(Number(e.target.value))}
             className="w-full"
@@ -305,20 +313,18 @@ export function ProgramSessionRunner({
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary uppercase tracking-wide">
             {active.section ? t(active.section) : t("Training")}
           </span>
-          <h2 className="mt-2 text-xl font-bold">{active.name_en ?? active.name ?? t("Exercise")}</h2>
+          <h2 className="mt-2 text-xl font-bold">{exerciseDisplayName(active.name_en ?? active.name, null, language) || t("Exercise")}</h2>
           <p className="mt-1 text-xs font-medium text-muted-foreground">
-            {t("{sets} sets × {reps} reps", { sets: active.sets ?? "-", reps: active.reps ?? "-" })}
+            {Number(active.sets) === 1 ? t("{sets} set × {reps} reps", { sets: 1, reps: active.reps ?? "-" }) : t("{sets} sets × {reps} reps", { sets: active.sets ?? "-", reps: active.reps ?? "-" })}
             {active.loadPercentage ? t(" @ {loadPercentage}% load", { loadPercentage: active.loadPercentage }) : ""}
           </p>
         </div>
 
-        {active.image_url && (
-          <img
-            src={active.image_url}
-            alt={active.name_en ?? t("Exercise")}
-            className="aspect-video w-full rounded-lg object-cover"
-          />
-        )}
+        <ExerciseMedia
+          name={exerciseDisplayName(active.name_en ?? active.name, null, language) || t("Exercise")}
+          images={active.media?.images ?? (active.image_url ? [active.image_url] : [])}
+          videoUrl={active.media?.videoUrl ?? active.video_youtube_url ?? null}
+        />
 
         {/* Selfie upload */}
         <div className="grid gap-2 rounded-lg border border-dashed p-3">
@@ -354,17 +360,6 @@ export function ProgramSessionRunner({
             <p className="text-xs font-semibold text-emerald-600">{t("Selfie saved for coach review.")}</p>
           )}
         </div>
-
-        {active.video_youtube_url && (
-          <a
-            href={active.video_youtube_url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-primary underline"
-          >
-            {t("Watch exercise demonstration video")}
-          </a>
-        )}
 
         <Button onClick={handleExerciseComplete} disabled={pending} className="w-full font-semibold">
           {activeIndex === exercises.length - 1

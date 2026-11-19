@@ -44,7 +44,7 @@ import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/ad
 import type { AdminAthlete, AdminAthleteProfile } from "@/lib/admin/types"
 import { useLn, useLanguage } from "@/components/providers/language-provider"
 import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
-import { sportLabel, statusLabel } from "@/lib/i18n/labels"
+import { fieldValue, sportLabel, statusLabel } from "@/lib/i18n/labels"
 import { tx } from "@/lib/i18n/translate"
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -162,6 +162,8 @@ export function AthleteDrawer({
   const weight = athlete.weight_kg ?? athlete.latest_measurement?.weight_kg
   const bmi = height && weight ? (weight / ((height / 100) ** 2)).toFixed(1) : null
   const [statusOverride, setStatusOverride] = useState<string | null>(null)
+  // Shown right under "Save settings" (the shared message sits at the bottom of the drawer, out of view).
+  const [settingsMsg, setSettingsMsg] = useState<{ text: string; error: boolean } | null>(null)
   const isPaused = (statusOverride ?? athlete.account_status) === "paused"
   const hasProgramSetting = !athlete.goals?.includes("Assigned exercises only")
 
@@ -283,8 +285,8 @@ export function AthleteDrawer({
               </SheetTitle>
               <SheetDescription className="truncate text-xs font-mono">
                 {troyId ?? athlete.auth_email ?? "—"}
-                {athlete.sport ? ` · ${sportLabel(t, athlete.sport).toLocaleUpperCase()}` : ""}
-                {athlete.position ? ` · ${athlete.position}` : ""}
+                {sportLabel(t, athlete.sport) ? ` · ${sportLabel(t, athlete.sport).toLocaleUpperCase()}` : ""}
+                {fieldValue(athlete.position) ? ` · ${fieldValue(athlete.position)}` : ""}
               </SheetDescription>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
@@ -507,7 +509,7 @@ export function AthleteDrawer({
                   const form = new FormData(e.currentTarget)
                   startTransition(async () => {
                     const result = await updateAthleteSettings(form)
-                    setMsg(result.error ?? t("Settings saved successfully."))
+                    setSettingsMsg(result.error ? { text: result.error, error: true } : { text: t("Settings saved successfully."), error: false })
                   })
                 }}
                 className="grid gap-4 border-t p-4"
@@ -589,6 +591,9 @@ export function AthleteDrawer({
                 <Button type="submit" variant="default" disabled={isPending} className="w-full sm:w-auto">
                   {isPending ? t("Saving changes…") : t("Save settings")}
                 </Button>
+                {settingsMsg ? (
+                  <p role="status" className={`text-xs ${settingsMsg.error ? "text-destructive" : "text-emerald-600"}`}>{settingsMsg.text}</p>
+                ) : null}
               </form>
             )}
           </section>

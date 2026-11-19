@@ -9,8 +9,9 @@ import Link from "next/link"
 import { Calendar, Target, AlertCircle } from "lucide-react"
 import { SessionCard, type SessionCardData } from "@/components/dashboard/session-card"
 import { AssignedTrainingDiagnostics } from "@/components/dashboard/assigned-training-diagnostics"
-import { getT } from "@/lib/i18n/get-language"
+import { getLocale, getT } from "@/lib/i18n/get-language"
 import { readProgramSessions } from "@/lib/program-data"
+import { todayInAppZone, addDaysIso } from "@/lib/dates"
 
 type TeamLite = { name_en?: string | null; name_ar?: string | null; color_hex?: string | null; image_url?: string | null; is_national_team?: boolean | null }
 type AssignedPostRow = {
@@ -27,6 +28,7 @@ type AttendanceRow = { id: string; session_post_id: string; attended_at: string 
 
 export default async function DashboardPage() {
   const t = await getT()
+  const locale = await getLocale()
   const supabase = await createClient()
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) redirect("/auth/login")
@@ -38,7 +40,7 @@ export default async function DashboardPage() {
     supabase.from("athlete_teams").select("team_id, teams(id,name_en,name_ar,color_hex,image_url,is_national_team)").eq("athlete_id", userData.user.id),
   ])
   if (athleteProfile?.account_status === "paused") return <main className="grid min-h-screen place-items-center p-6"><Card className="max-w-md"><CardHeader><CardTitle>{t("Account paused")}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{t("Your account is currently paused. Please contact your coach when you are ready to resume training.")}</p></CardContent></Card></main>
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = todayInAppZone()
   const teamIds = (athleteTeams ?? []).map((row: { team_id: string | null }) => row.team_id).filter((id): id is string => !!id)
   const assignedPostQuery = "id,title_en,title_ar,session_date,start_time,team_id,athlete_id,teams(name_en,name_ar,color_hex,image_url,is_national_team)"
   const [directResult, teamResult] = await Promise.all([
@@ -69,13 +71,23 @@ export default async function DashboardPage() {
   const attendanceByPost = new Map(((attendanceRows ?? []) as unknown as AttendanceRow[]).map((row) => [row.session_post_id, row]))
   const assignedSessions: SessionCardData[] = assignedPosts.map((post) => { const attendance = attendanceByPost.get(post.id); const team = firstRelation(post.teams) ?? {}; return { sessionPostId: post.id, sessionAthleteId: attendance?.id ?? "", titleEn: post.title_en, titleAr: post.title_ar, sessionDate: post.session_date, period: post.start_time, exerciseCount: exerciseCountByPost.get(post.id) ?? 0, teamNameEn: team.name_en ?? "", teamNameAr: team.name_ar ?? "", teamImageUrl: team.image_url ?? null, colorHex: team.color_hex ?? "#888888", isNationalTeam: Boolean(team.is_national_team), hasSummary: Boolean(attendance?.session_summaries?.length), attendedAt: attendance?.attended_at ?? null } })
   const assignedToday = assignedSessions.filter((session) => session.sessionDate === todayStr)
-  const assignedUpcoming = assignedSessions.filter((session) => session.sessionDate >= todayStr).slice(0, 5)
-  const completedSessions = ((attendanceRows ?? []) as unknown as AttendanceRow[]).filter((row) => row.completed_at).length
-  const upcomingSessionsCount = assignedUpcoming.length
+  const assignedUpcoming = assignedSessions.filter((session) => session.sessionDate > todayStr).sort((a, b) => a.sessionDate.localeCompare(b.sessionDate)).slice(0, 5)
+  // Coach sessions from the last 14 days that were never finished stay visible (they used to disappear).
+  const missedFrom = addDaysIso(todayStr, -14)
+  const assignedMissed = assignedSessions.filter((session) => session.sessionDate < todayStr && session.sessionDate >= missedFrom && !session.hasSummary)
+  const programSessionsAll = readProgramSessions(athleteProgram?.generation_reason)
+  const { data: programCompletions } = athleteProgram?.id
+    ? await supabase.from("program_session_completions").select("session_date,status").eq("athlete_program_id", athleteProgram.id).eq("athlete_id", userData.user.id)
+    : { data: [] as { session_date: string; status: string }[] }
+  const programCompletedDates = new Set((programCompletions ?? []).filter((row) => row.status === "completed").map((row) => row.session_date))
+  const completedSessions = ((attendanceRows ?? []) as unknown as AttendanceRow[]).filter((row) => row.completed_at).length + programCompletedDates.size
+  const programUpcoming = programSessionsAll.filter((session) => session.date > todayStr)
+  const upcomingSessionsCount = assignedUpcoming.length + programUpcoming.length
+  const nextProgramSession = programUpcoming.sort((a, b) => a.date.localeCompare(b.date))[0]
   const firstName = profile?.full_name?.split(" ")[0] ?? ""
   const programStatus = athleteProgram?.status === "approved" ? t("Ready") : athleteProgram?.status === "active" ? t("Active") : t("Pending")
-  const programSessions = readProgramSessions(athleteProgram?.generation_reason)
-  const programToday = programSessions.find((session) => session.date === todayStr)
+  const programToday = programSessionsAll.find((session) => session.date === todayStr)
+  const programTodayDone = programToday ? programCompletedDates.has(programToday.date) : false
 
   return (
     <div>
@@ -111,13 +123,23 @@ export default async function DashboardPage() {
             <h2 className="text-lg font-bold tracking-tight">{t("Today's training")}</h2>
             {programToday && <Badge variant="secondary" className="text-xs">{t("Ready")}</Badge>}
           </div>
-          {programToday ? <Link href={`/program/session/${programToday.date}`} className="rounded-2xl border border-accent/40 bg-accent/5 p-5 transition-colors hover:bg-accent/10"><p className="text-xs font-semibold uppercase tracking-wide text-accent">{t("Program session")}</p><p className="mt-1 font-semibold">{t("Today's program training")}</p><p className="mt-1 text-xs text-muted-foreground">{programToday.exercises?.length ?? 0} {t("exercises · Start sequential training")}</p></Link> : <div className="rounded-2xl border border-dashed p-5 text-center"><Calendar className="mx-auto size-8 text-muted-foreground" /><p className="mt-2 text-sm font-medium">{t("Rest day")}</p><p className="text-xs text-muted-foreground">{t("No program session scheduled for today")}</p></div>}
+          {programToday ? <Link href={`/program/session/${programToday.date}`} className="rounded-2xl border border-accent/40 bg-accent/5 p-5 transition-colors hover:bg-accent/10"><p className="text-xs font-semibold uppercase tracking-wide text-accent">{t("Program session")}</p><p className="mt-1 font-semibold">{programTodayDone ? t("Today's session is done") : t("Today's program training")}</p><p className="mt-1 text-xs text-muted-foreground">{programToday.exercises?.length ?? 0} {t("exercises · Start sequential training")}</p></Link> : <div className="rounded-2xl border border-dashed p-5 text-center"><Calendar className="mx-auto size-8 text-muted-foreground" /><p className="mt-2 text-sm font-medium">{t("Rest day")}</p><p className="text-xs text-muted-foreground">{t("No program session scheduled for today")}</p>{nextProgramSession ? <p className="mt-2 text-xs font-medium">{t("Next session: {date}", { date: new Date(`${nextProgramSession.date}T12:00:00`).toLocaleDateString(locale, { weekday: "long", month: "short", day: "numeric" }) })}</p> : null}</div>}
         </section>
 
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold tracking-tight">{t("Assigned trainings")}</h2><p className="text-xs text-muted-foreground">{t("Coach-assigned sessions follow the same exercise-by-exercise flow.")}</p></div>{assignedToday.length > 0 && <Badge variant="secondary" className="text-xs">{t("Ready")}</Badge>}</div>
           {assignedToday.length > 0 ? <div className="flex flex-col gap-3">{assignedToday.map((session) => <SessionCard key={session.sessionPostId} session={session} />)}</div> : assignedUpcoming.length > 0 ? <div className="flex flex-col gap-3">{assignedUpcoming.map((session) => <SessionCard key={session.sessionPostId} session={session} />)}</div> : <div className="rounded-2xl border border-dashed p-5 text-center"><p className="text-sm font-medium">{t("No assigned trainings")}</p><p className="text-xs text-muted-foreground">{t("New coach assignments will appear here.")}</p></div>}
         </section>
+
+        {assignedMissed.length > 0 ? (
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-lg font-bold tracking-tight">{t("Not finished yet")}</h2>
+              <p className="text-xs text-muted-foreground">{t("Coach sessions from the last two weeks you haven't completed. You can still do them.")}</p>
+            </div>
+            <div className="flex flex-col gap-3">{assignedMissed.map((session) => <SessionCard key={session.sessionPostId} session={session} />)}</div>
+          </section>
+        ) : null}
 
         {/* Program alert */}
         {athleteProgram?.status === "pending_review" && (

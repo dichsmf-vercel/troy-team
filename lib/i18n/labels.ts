@@ -30,9 +30,20 @@ const SPORT_LABELS: Record<string, string> = {
   other: tx("Other"),
 }
 
+/** "Not Set" / "none" / "" mean the coach left the field empty. */
+export function isUnset(value: string | null | undefined): boolean {
+  const key = String(value ?? "").trim().toLowerCase()
+  return !key || key === "not set" || key === "none" || key === "-"
+}
+
+/** Free-text value or "" when unset (never shows "Not Set"). */
+export function fieldValue(value: string | null | undefined): string {
+  return isUnset(value) ? "" : String(value).trim()
+}
+
 /** "handball" → "Handball" / "كرة اليد". */
 export function sportLabel(t: TFunction, sport: string | null | undefined): string {
   const key = String(sport ?? "").trim().toLowerCase()
-  if (!key) return ""
+  if (isUnset(key)) return ""
   return SPORT_LABELS[key] ? t(SPORT_LABELS[key]) : String(sport)
 }
