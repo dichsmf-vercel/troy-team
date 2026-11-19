@@ -115,7 +115,8 @@ function SetPasswordForm() {
               </p>
             )}
 
-            <Button disabled={pending}>
+            {/* The Base UI button defaults to type="button", so a form submit must be explicit. */}
+            <Button type="submit" disabled={pending}>
               {pending ? t.saving : t.savePassword}
             </Button>
           </form>
