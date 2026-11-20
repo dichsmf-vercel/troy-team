@@ -13,6 +13,8 @@ export const part5: Record<string, string> = {
   "No monthly program yet": "لا يوجد برنامج شهري بعد",
   "Your coach hasn't assigned a monthly program. Check your dashboard for today's sessions.": "لم يحدد لك المدرب برنامجًا شهريًا بعد. راجع الصفحة الرئيسية لمعرفة حصص اليوم.",
   "No session on this day": "لا توجد حصة في هذا اليوم",
+  "Show what the athlete sees": "اعرض ما يراه اللاعب",
+  "Hide what the athlete sees": "إخفاء ما يراه اللاعب",
   "{date} is a rest day in your program.": "{date} يوم راحة في برنامجك.",
   "It opens on {date}. You can preview the exercises on your program page.": "تُفتح يوم {date}. يمكنك معاينة التمارين في صفحة برنامجك.",
   "Use this ID to sign in.": "استخدم هذا المعرّف لتسجيل الدخول.",

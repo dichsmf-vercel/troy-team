@@ -72,6 +72,13 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 ## 5b. Future work — full problem list (from QA 2026-11-18/19, details in `docs/qa/results-2026-11-18.md`)
 Status: [ ] open · [~] in progress · [x] done
 
+**Owner requests 2026-11-20 (not started)**
+- [ ] **First-run walkthrough**: a skippable guided tour shown on a user's first 5 visits, explaining the main buttons and features — separate tours for the admin side and the athlete side. Remember "skipped/finished" per user.
+- [ ] **Selfie requirement toggle**: per athlete (or per session), whether submitting a selfie is required. Re-test selfie upload on the athlete side and viewing/reviewing it on the admin side.
+- [ ] **Re-import**: re-run the roster import end to end on real sheets (duplicates, updates to existing athletes, new athletes) and fix what it finds.
+- [ ] **Hide upcoming exercises toggle**: on the athlete Program tab, athletes should not see the full exercise list of future sessions; make it a coach toggle (per athlete or global).
+- [ ] **AI generation learns from coach edits**: when the coach edits a generated program (add/remove/reorder/replace exercises, any position), store the change and feed it into the prompt for future generations. Coach Ahmed's standing feedback to include: 5 exercises per session and a single strength exercise are too few. Test it for real (generate → edit → generate again and check the new prompt/output); if it cannot be observed directly, add console logging and read it in the browser console (in-app browser, or Chrome if needed).
+
 **Athlete side**
 - [x] Parent View: now a guarded-public server action (`app/parent/actions.ts`) that accepts the profile code. Was: the code on the profile (`athletes.parent_link_code`) is rejected; `redeem_parent_link` (dashboard-only SQL) reads `parent_links`, which nothing creates.
 - [x] Profile shows the Troy ID, hides internal e-mails, one parent code with "Create code". Was: profile showed the internal e-mail `troy-…@troy.internal` and a legacy "Athlete ID" (`display_id`) instead of the Troy ID; contradictory parent-code texts.

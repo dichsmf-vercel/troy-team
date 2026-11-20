@@ -26,6 +26,8 @@ import { useLanguage } from "@/components/providers/language-provider"
 import { AthletePicker, defaultTrainingDays, type PickableAthlete } from "@/components/admin/athlete-picker"
 import { todayInAppZone } from "@/lib/dates"
 import { actionErrorMessage } from "@/lib/client-errors"
+import { ExerciseMediaPreview } from "@/components/admin/exercise-media-preview"
+import type { AdminExercise } from "@/lib/admin/types"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
 
@@ -44,7 +46,7 @@ export type AthleteOption = PickableAthlete & {
 }
 
 
-export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) {
+export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: AthleteOption[]; exercises?: AdminExercise[] }) {
   const { t, locale } = useLanguage()
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? "")
   const [startDate, setStartDate] = useState(todayInAppZone())
@@ -386,6 +388,7 @@ export function AIProgramGenerator({ athletes }: { athletes: AthleteOption[] }) 
                   expanded={expandedSession === sIdx}
                   onToggle={() => setExpandedSession(expandedSession === sIdx ? null : sIdx)}
                   onEditExercise={(eIdx, field, value) => updateExercise(sIdx, eIdx, field, value)}
+                  catalog={exercises}
                 />
               ))}
             </div>
@@ -433,6 +436,7 @@ function SessionCard({
   expanded,
   onToggle,
   onEditExercise,
+  catalog,
 }: {
   session: GeminiSession
   sIdx: number
@@ -440,6 +444,7 @@ function SessionCard({
   expanded: boolean
   onToggle: () => void
   onEditExercise: (eIdx: number, field: keyof GeminiExercise, value: unknown) => void
+  catalog: AdminExercise[]
 }) {
   const { t, locale } = useLanguage()
   const dateLabel = new Date(`${session.date}T12:00:00`).toLocaleDateString(locale, {
@@ -476,6 +481,7 @@ function SessionCard({
               eIdx={eIdx}
               editMode={editMode}
               onEdit={(field, value) => onEditExercise(eIdx, field, value)}
+              catalog={catalog}
             />
           ))}
         </div>
@@ -491,11 +497,13 @@ function ExerciseRow({
   eIdx,
   editMode,
   onEdit,
+  catalog,
 }: {
   exercise: GeminiExercise
   eIdx: number
   editMode: boolean
   onEdit: (field: keyof GeminiExercise, value: unknown) => void
+  catalog: AdminExercise[]
 }) {
   const { t, locale } = useLanguage()
   if (!editMode) {
@@ -505,6 +513,7 @@ function ExerciseRow({
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t(exercise.section)} · </span>
           <span className="font-medium">{exercise.name_en}</span>
           {exercise.notes && <p className="mt-0.5 text-xs text-muted-foreground">{exercise.notes}</p>}
+          <div className="mt-1"><ExerciseMediaPreview exercise={exercise} catalog={catalog} /></div>
         </div>
         <div className="shrink-0 text-right text-xs text-muted-foreground">
           <p>{exercise.sets}×{exercise.reps}</p>
@@ -525,6 +534,7 @@ function ExerciseRow({
         className="h-8 text-sm font-medium"
         placeholder={t("Exercise name")}
       />
+      <ExerciseMediaPreview exercise={exercise} catalog={catalog} />
       <div className="grid grid-cols-3 gap-2">
         <div>
           <Label className="text-xs">{t("Sets")}</Label>
