@@ -72,12 +72,16 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 ## 5b. Future work — full problem list (from QA 2026-11-18/19, details in `docs/qa/results-2026-11-18.md`)
 Status: [ ] open · [~] in progress · [x] done
 
-**Owner requests 2026-11-20 (not started)**
-- [ ] **First-run walkthrough**: a skippable guided tour shown on a user's first 5 visits, explaining the main buttons and features — separate tours for the admin side and the athlete side. Remember "skipped/finished" per user.
-- [ ] **Selfie requirement toggle**: per athlete (or per session), whether submitting a selfie is required. Re-test selfie upload on the athlete side and viewing/reviewing it on the admin side.
-- [ ] **Re-import**: re-run the roster import end to end on real sheets (duplicates, updates to existing athletes, new athletes) and fix what it finds.
-- [ ] **Hide upcoming exercises toggle**: on the athlete Program tab, athletes should not see the full exercise list of future sessions; make it a coach toggle (per athlete or global).
-- [ ] **AI generation learns from coach edits**: when the coach edits a generated program (add/remove/reorder/replace exercises, any position), store the change and feed it into the prompt for future generations. Coach Ahmed's standing feedback to include: 5 exercises per session and a single strength exercise are too few. Test it for real (generate → edit → generate again and check the new prompt/output); if it cannot be observed directly, add console logging and read it in the browser console (in-app browser, or Chrome if needed).
+**Owner requests 2026-11-20 — status after shipping PR #19 + #20 (live 2026-11-20, migration 202611200001 run)**
+- [x] **First-run walkthrough**: `components/shared/guided-tour.tsx`; auto-opens on a user's first 5 visits until finished/skipped, "?" in the top bar replays it. Tested on preview (all 9 admin steps). Not yet tested: athlete side, Arabic.
+- [~] **Selfie required toggle** (athlete drawer): built + migration run. Not yet tested live: turn it on for the QA athlete, check both runners block completion until a selfie is uploaded, then view the selfie in the admin drawer; turn it off again.
+- [~] **Show upcoming exercises toggle** (athlete drawer, default off = future sessions show date + count only): built, live. Not yet tested on the athlete Program tab.
+- [~] **AI learns from coach edits**: editor add/remove/reorder/replace works live; generation now asks for one week + load_by_week and the app expands it to 4 weeks (34 s instead of timing out); 7+ exercises / 2+ strength rule works (12 sessions × 7). Saving edits creates a prompt proposal (tested live).
+  - [ ] **BUG to fix first**: the proposal REPLACES the whole coach prompt and overfits to one athlete (test proposal said "goalkeeper explosiveness, always Bulgarian split squats"; it was rejected). Cause: `summarizeAdminEdits` gets an empty current prompt when the built-in default is in use, and is asked to rewrite the whole prompt. Fix: pass `DEFAULT_SYSTEM_PROMPT` when there is no active prompt; ask Gemini only for 1-3 GENERAL preference rules (not athlete- or session-specific) and append them to a "Coach preferences" list kept below the default prompt (`lib/gemini.ts`, `app/admin/actions/ai.ts`). Then test: edit → save → proposal shows only added rules → approve → generate again → check the rule is followed. Do not approve QA-derived proposals on production.
+- [ ] **Re-import**: waiting on the owner — does this mean re-testing the existing import, or a new feature where re-importing an updated sheet UPDATES existing athletes (today they are skipped)?
+- [ ] **Roster card (owner request)**: the purple "Selfies" filter chip / selfie badge is unreadable on the dark theme — use another color; remove the "Athlete Roster" card (title, CSV import) but keep the search (and filter chips) in a slim bar right above the athlete list.
+
+**QA leftovers from 2026-11-20 testing (production)**: a pending AI program for Claude QA Tester (2026-11-20) awaiting review — reject or leave; four Gemini test images in `Desktop\Claude Images for Troy` (not used by the app).
 
 **Athlete side**
 - [x] Parent View: now a guarded-public server action (`app/parent/actions.ts`) that accepts the profile code. Was: the code on the profile (`athletes.parent_link_code`) is rejected; `redeem_parent_link` (dashboard-only SQL) reads `parent_links`, which nothing creates.
