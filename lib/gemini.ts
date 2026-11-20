@@ -20,15 +20,15 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 /**
  * Model chains (checked against Google's model list, Nov 2026). Stable (GA) models only, no
- * previews and no guessed names. Max 3 attempts so a failure can't outlive the Vercel function.
+ * previews and no guessed names. Max 3 attempts; the budget below stays under the admin page's maxDuration (120 s).
  * Generation favours quality first, summarisation favours cheap/fast.
  */
 export const GENERATION_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite"] as const
 export const SUMMARY_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"] as const
 
 /** Hard wall-clock budget for one logical Gemini request (all model attempts). */
-const TOTAL_BUDGET_MS = 50_000
-const PER_ATTEMPT_MS = 30_000
+const TOTAL_BUDGET_MS = 110_000
+const PER_ATTEMPT_MS = 80_000
 
 class GeminiAuthError extends Error {}
 

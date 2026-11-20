@@ -83,11 +83,22 @@ export function GuidedTour({ role }: { role: TourRole }) {
         write(storageKey, next)
         try { sessionStorage.setItem(sessionFlag, "1") } catch { /* ignore */ }
       }
-      if (!next.done && next.visits <= AUTO_VISITS && !counted) window.setTimeout(() => setStep(0), 600)
+      // Open once per browser session. "shown" is only set when the tour actually opens, so a page that
+      // mounts twice (e.g. right after sign-in) still shows it.
+      let shown = false
+      try { shown = sessionStorage.getItem(`troy-tour-shown:${storageKey}`) === "1" } catch { /* ignore */ }
+      if (!next.done && next.visits <= AUTO_VISITS && !shown) {
+        timer = window.setTimeout(() => {
+          if (cancelled) return
+          try { sessionStorage.setItem(`troy-tour-shown:${storageKey}`, "1") } catch { /* ignore */ }
+          setStep(0)
+        }, 600)
+      }
     })
+    let timer: number | undefined
     const replay = () => setStep(0)
     window.addEventListener(TOUR_EVENT, replay)
-    return () => { cancelled = true; window.removeEventListener(TOUR_EVENT, replay) }
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); window.removeEventListener(TOUR_EVENT, replay) }
   }, [role])
 
   const measure = useCallback(() => {

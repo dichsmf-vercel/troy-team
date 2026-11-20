@@ -11,7 +11,7 @@ import { getT } from "@/lib/i18n/get-language"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // AI program generation runs as a server action hosted by this page; allow it the full minute.
-export const maxDuration = 60
+export const maxDuration = 120
 
 type ProgramFeedbackRow = { id: string; athlete_id: string; session_date: string; difficulty: number | null; enjoyment: number | null; pain_notes: string | null; created_at: string | null }
 type SessionAthleteRow = { id: string; athlete_id: string; session_post_id: string | null }
