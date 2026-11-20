@@ -1,3 +1,4 @@
+import { loadAthleteToggles } from "@/lib/athlete-settings"
 import { redirect } from "next/navigation"
 import { firstRelation } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/server"
@@ -33,6 +34,7 @@ export default async function SessionPage({
     : { data: null }
 
   const { data: sessionAthlete, error: sessionAthleteError } = await supabase.from("session_athletes").select("id, attended_at").eq("session_post_id", sessionPostId).eq("athlete_id", userData.user.id).maybeSingle()
+  const toggles = await loadAthleteToggles(supabase, userData.user.id)
   // [assigned-session-debug] logs commented out for production
   if (!post) {
     console.error("[assigned-session-debug] Session post missing after navigation", { sessionPostId, athleteId: userData.user.id, postError: postError?.message ?? null })
@@ -93,6 +95,7 @@ export default async function SessionPage({
       initialAttendedAt={sessionAthlete?.attended_at ?? null}
       initialCompletions={completions}
       initialSelfieUploaded={false}
+      selfieRequired={toggles.selfieRequired}
     />
   )
 }

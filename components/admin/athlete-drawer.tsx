@@ -576,6 +576,34 @@ export function AthleteDrawer({
                   </select>
                 </div>
 
+                {/* Selfie required */}
+                <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div>
+                    <p className="text-sm font-medium">{t("Selfie required")}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("When on, the athlete must upload a selfie before each exercise counts as done.")}
+                    </p>
+                  </div>
+                  <select name="selfie_required" defaultValue={String(athlete.selfie_required ?? false)} className="h-9 rounded-md border bg-background px-2 text-xs font-semibold">
+                    <option value="false">{t("Optional (Off)")}</option>
+                    <option value="true">{t("Required (On)")}</option>
+                  </select>
+                </div>
+
+                {/* Show upcoming exercises */}
+                <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div>
+                    <p className="text-sm font-medium">{t("Show upcoming exercises")}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("When off, future program sessions show only the date and number of exercises.")}
+                    </p>
+                  </div>
+                  <select name="show_upcoming_exercises" defaultValue={String(athlete.show_upcoming_exercises ?? false)} className="h-9 rounded-md border bg-background px-2 text-xs font-semibold">
+                    <option value="false">{t("Hidden (Off)")}</option>
+                    <option value="true">{t("Visible (On)")}</option>
+                  </select>
+                </div>
+
                 {/* Sport & Position */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>

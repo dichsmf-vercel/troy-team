@@ -1,5 +1,6 @@
 "use server"
 
+import { loadAthleteToggles } from "@/lib/athlete-settings"
 import { revalidatePath } from "next/cache"
 import { requireUser } from "@/lib/auth/guards"
 import { getOwnedSessionAthlete, sessionHasExercise } from "@/lib/auth/ownership"
@@ -89,6 +90,15 @@ export async function toggleExerciseCompletion(sessionAthleteId: string, session
   const t = await getT()
   const ctx = await authorizeExercise(sessionAthleteId, sessionExerciseId, t)
   if ("error" in ctx) return { error: ctx.error }
+
+  if (completed) {
+    const { data: { user } } = await ctx.supabase.auth.getUser()
+    const toggles = user ? await loadAthleteToggles(ctx.supabase, user.id) : null
+    if (toggles?.selfieRequired) {
+      const { data: selfie } = await ctx.supabase.from("session_exercise_selfies").select("id").eq("session_athlete_id", sessionAthleteId).eq("session_exercise_id", sessionExerciseId).maybeSingle()
+      if (!selfie) return { error: t("Upload a selfie first to mark this exercise complete.") }
+    }
+  }
 
   const { error } = await ctx.supabase.from("exercise_completions").upsert(
     {

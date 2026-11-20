@@ -52,6 +52,7 @@ export function SessionRunner({
   initialAttendedAt,
   initialCompletions,
   initialSelfieUploaded,
+  selfieRequired = false,
 }: {
   language: Language
   sessionPostId: string
@@ -67,6 +68,7 @@ export function SessionRunner({
   initialAttendedAt: string | null
   initialCompletions: { session_exercise_id: string; completed: boolean }[]
   initialSelfieUploaded: boolean
+  selfieRequired?: boolean
 }) {
   const t = useT()
   const { dict } = useLanguage()
@@ -139,8 +141,8 @@ export function SessionRunner({
 
   function handleCompleteExercise(sessionExerciseId: string) {
     if (!sessionAthleteId) return
-    if (selfieStates[sessionExerciseId] !== "done") {
-      setSelfieErrors((prev) => ({ ...prev, [sessionExerciseId]: "Upload a selfie first to mark this exercise complete." }))
+    if (selfieRequired && selfieStates[sessionExerciseId] !== "done") {
+      setSelfieErrors((prev) => ({ ...prev, [sessionExerciseId]: t("Upload a selfie first to mark this exercise complete.") }))
       return
     }
     startTransition(async () => {
@@ -334,7 +336,7 @@ export function SessionRunner({
                   <p className="text-sm font-medium">
                     {selfieState === "done"
                       ? t("Selfie uploaded ✓")
-                      : t("Upload a selfie to complete this exercise")}
+                      : selfieRequired ? t("Upload a selfie to complete this exercise") : t("Proof of completion selfie (optional)")}
                   </p>
                 </div>
                 {selfieState !== "done" ? (

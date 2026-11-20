@@ -1,3 +1,4 @@
+import { loadAthleteToggles } from "@/lib/athlete-settings"
 import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
 import { CalendarClock } from "lucide-react"
@@ -20,7 +21,7 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const [{ data: assignment }, { data: athleteRecord }] = await Promise.all([
+  const [{ data: assignment }, toggles] = await Promise.all([
     supabase
       .from("athlete_programs")
       .select("id,month_start,generation_reason,status")
@@ -29,11 +30,7 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
       .order("month_start", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from("athletes")
-      .select("show_exercise_recap")
-      .eq("id", user.id)
-      .maybeSingle(),
+    loadAthleteToggles(supabase, user.id),
   ])
 
   const notice = (title: string, body: string) => (
@@ -59,7 +56,7 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
 
   // Future sessions can be previewed on the program page but not completed early.
   if (date > todayInAppZone()) {
-    return notice(t("This session isn't open yet"), t("It opens on {date}. You can preview the exercises on your program page.", { date: longDate }))
+    return notice(t("This session isn't open yet"), toggles.showUpcomingExercises ? t("It opens on {date}. You can preview the exercises on your program page.", { date: longDate }) : t("It opens on {date}.", { date: longDate }))
   }
 
   // Attach current media: the coach may have added a photo/video since the program was generated.
@@ -108,7 +105,8 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
           exercises={exercises}
           initialFeedback={feedback ?? []}
           initialCompleted={completion?.status === "completed"}
-          showExerciseRecap={athleteRecord?.show_exercise_recap ?? true}
+          showExerciseRecap={toggles.showExerciseRecap}
+          selfieRequired={toggles.selfieRequired}
         />
       </main>
     </div>
