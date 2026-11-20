@@ -27,6 +27,7 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              data-tour={`nav-${item.href.slice(1)}`}
               className={cn(
                 "flex flex-col items-center gap-1 py-3 text-xs transition-colors",
                 active ? "text-primary" : "text-muted-foreground",

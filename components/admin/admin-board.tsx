@@ -52,9 +52,9 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
       </header>
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="grid h-auto w-full grid-cols-6 gap-1 overflow-hidden p-1">
-          <TabsTrigger value="sessions">{t("Sessions")}</TabsTrigger>
-          <TabsTrigger value="athletes">{t("Athletes")}</TabsTrigger>
-          <TabsTrigger value="feedback">
+          <TabsTrigger value="sessions" data-tour="tab-sessions">{t("Sessions")}</TabsTrigger>
+          <TabsTrigger value="athletes" data-tour="tab-athletes">{t("Athletes")}</TabsTrigger>
+          <TabsTrigger value="feedback" data-tour="tab-feedback">
             {t("Feedback")}
             {feedbackPainReports.length > 0 && (
               <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -62,9 +62,9 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="exercises">{t("Exercises")}</TabsTrigger>
-          <TabsTrigger value="rules">{t("Rules")}</TabsTrigger>
-          <TabsTrigger value="programs">{t("Programs")}</TabsTrigger>
+          <TabsTrigger value="exercises" data-tour="tab-exercises">{t("Exercises")}</TabsTrigger>
+          <TabsTrigger value="rules" data-tour="tab-rules">{t("Rules")}</TabsTrigger>
+          <TabsTrigger value="programs" data-tour="tab-programs">{t("Programs")}</TabsTrigger>
         </TabsList>
         <TabsContent value="sessions" className="mt-6">
           <SessionPanel teams={safeTeams} athletes={safeAthletes} sessions={safeSessions} exercises={safeExercises} />

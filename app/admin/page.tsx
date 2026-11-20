@@ -5,6 +5,7 @@ import { exerciseCodeForName, findLibraryEntry } from "@/lib/exercise-media"
 import { createClient } from "@/lib/supabase/server"
 import { AdminBoard } from "@/components/admin/admin-board"
 import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
+import { GuidedTour } from "@/components/shared/guided-tour"
 import { AdminErrorBoundary } from "@/components/admin/admin-error-boundary"
 import { getT } from "@/lib/i18n/get-language"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -183,6 +184,7 @@ export default async function AdminPage() {
   return (
     <>
       <DashboardTopBar />
+      <GuidedTour role="admin" />
       <AdminErrorBoundary>
         <AdminBoard
           teams={teams ?? []}
