@@ -146,7 +146,7 @@ function ProgramsWorkspace({ athletes, exercises, rules, programs }: { athletes:
         <ProgramGenerator athletes={athletes} exercises={exercises} rules={rules} />
       ) : (
         <>
-          <AIProgramGenerator athletes={athletes} />
+          <AIProgramGenerator athletes={athletes} exercises={exercises} />
           <PromptProposalsPanel />
         </>
       )}

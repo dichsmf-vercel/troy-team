@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { ExerciseMediaPreview } from "@/components/admin/exercise-media-preview"
 import { CalendarDays, Clock3, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -249,15 +250,18 @@ export function ProgramGenerator({
                       <p className="text-[10px] text-muted-foreground mt-0.5">{t(session.seasonPeriod)}</p>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="grid gap-1.5">
                     {session.exercises.map((exercise, exIdx) => (
-                      <span
+                      <div
                         key={`${session.date}-${exercise.id}-${exIdx}`}
-                        className="rounded-full bg-muted px-2.5 py-1 text-xs"
+                        className="grid gap-1 rounded-lg bg-muted px-2.5 py-1.5 text-xs"
                       >
+                        <span>
                         <strong className="text-foreground">{t(exercise.section)}:</strong> {exercise.name_en}
                         <span className="text-muted-foreground ml-1">({exercise.sets}×{exercise.reps}{exercise.loadPercentage ? ` @ ${exercise.loadPercentage}%` : ""})</span>
-                      </span>
+                        </span>
+                        <ExerciseMediaPreview exercise={exercise} catalog={exercises} />
+                      </div>
                     ))}
                   </div>
                   {session.tooFewExercises ? (

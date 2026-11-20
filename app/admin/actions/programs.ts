@@ -147,10 +147,23 @@ export async function reviewAthleteProgram(id: string, status: "approved" | "rej
   if (!id?.trim()) return { error: t("Missing program id") }
   if (status !== "approved" && status !== "rejected") return { error: t("Invalid status.") }
 
-  const { error } = await auth.ctx.supabase
+  const { data: updated, error } = await auth.ctx.supabase
     .from("athlete_programs")
     .update({ status, reviewed_by: auth.ctx.user.id, reviewed_at: new Date().toISOString() })
     .eq("id", id)
+    .select("athlete_id")
+    .maybeSingle()
+  // One live program per athlete: approving a new one archives the athlete's older approved/active ones
+  // (athletes only ever saw the newest, but the review list kept showing all of them as approved).
+  // Their completions and feedback stay, linked to the archived program.
+  if (!error && status === "approved" && updated?.athlete_id) {
+    await auth.ctx.supabase
+      .from("athlete_programs")
+      .update({ status: "archived" })
+      .eq("athlete_id", updated.athlete_id)
+      .in("status", ["approved", "active"])
+      .neq("id", id)
+  }
   revalidatePath("/admin")
   revalidatePath("/program")
   return { error: error?.message ?? null }

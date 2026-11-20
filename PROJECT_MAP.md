@@ -72,6 +72,13 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 ## 5b. Future work — full problem list (from QA 2026-11-18/19, details in `docs/qa/results-2026-11-18.md`)
 Status: [ ] open · [~] in progress · [x] done
 
+**Owner requests 2026-11-20 (not started)**
+- [ ] **First-run walkthrough**: a skippable guided tour shown on a user's first 5 visits, explaining the main buttons and features — separate tours for the admin side and the athlete side. Remember "skipped/finished" per user.
+- [ ] **Selfie requirement toggle**: per athlete (or per session), whether submitting a selfie is required. Re-test selfie upload on the athlete side and viewing/reviewing it on the admin side.
+- [ ] **Re-import**: re-run the roster import end to end on real sheets (duplicates, updates to existing athletes, new athletes) and fix what it finds.
+- [ ] **Hide upcoming exercises toggle**: on the athlete Program tab, athletes should not see the full exercise list of future sessions; make it a coach toggle (per athlete or global).
+- [ ] **AI generation learns from coach edits**: when the coach edits a generated program (add/remove/reorder/replace exercises, any position), store the change and feed it into the prompt for future generations. Coach Ahmed's standing feedback to include: 5 exercises per session and a single strength exercise are too few. Test it for real (generate → edit → generate again and check the new prompt/output); if it cannot be observed directly, add console logging and read it in the browser console (in-app browser, or Chrome if needed).
+
 **Athlete side**
 - [x] Parent View: now a guarded-public server action (`app/parent/actions.ts`) that accepts the profile code. Was: the code on the profile (`athletes.parent_link_code`) is rejected; `redeem_parent_link` (dashboard-only SQL) reads `parent_links`, which nothing creates.
 - [x] Profile shows the Troy ID, hides internal e-mails, one parent code with "Create code". Was: profile showed the internal e-mail `troy-…@troy.internal` and a legacy "Athlete ID" (`display_id`) instead of the Troy ID; contradictory parent-code texts.
@@ -108,6 +115,21 @@ Status: [ ] open · [~] in progress · [x] done
 - [x] Admin page queries chunked (`lib/supabase/batch.ts`), auth users paged: no URL-length failure at a few hundred athletes.
 - [x] Coach now sees monthly-program session feedback and pain notes in the Feedback tab (were never shown).
 - [ ] Schema/RLS dump, CI workflow push, repo privacy: see section 5.
+
+**AI program test on production (2026-11-19, QA athlete)**: generate → save → approve → athlete session with photos/videos all work.
+- [x] Gemini put a session on an unchosen day (Sat) while all chosen days within ±3 were taken; the validator now searches the whole window (PR #19).
+- [x] Athlete picker: a search that no longer matches the selected athlete selects the first match.
+- [x] Approving a program archives the athlete's other approved/active programs.
+- [x] `/program/session/<date>` on a rest day (or with no program) shows a card instead of a 404.
+
+**Modest exercise media (2026-11-19, owner request: men only, not shirtless, nothing above the knee)**
+- Reviewed every library photo and video by sampled frames (start, 25/50/75%). Photos kept only where they comply: E004 E005 E021 E025 E031 E035 E038 E056 E067 E077 E080 E091 E093; all other stock photos were deleted.
+- 48 videos replaced with compliant demos (library + production `exercises.video_youtube_url`, updated by code); ~16 current videos already complied and were kept.
+- [x] E005 E021 E035 E067 E077 are photo-only now (compliant photos kept, video removed in the library and in production).
+- [x] Every exercise now has start/end images: the 13 compliant photo sets, plus generated illustrations (man in long-sleeved shirt and long trousers) for the other 88 in `public/exercises/illustrations` (source: `scripts/exercise-illustrations/`, `node scripts/exercise-illustrations/build.mjs` rebuilds them; poses in `poses.mjs`).
+- [x] The 32 videos below were hidden (library + production) and show illustrations only. A real compliant photo or video from Coach Ahmed in the Exercises tab overrides the illustration.
+- Hidden-video exercises, were: E001 E002 E006 E007 E009 E014 E016 E019 E026 E037 E040 E042 E043 E044 E048 E049 E051 E052 E055 E063 E065 E066 E079 E082 E084 E085 E086 E087 E092 E095 E096 E101. No usable open photo source: free-exercise-db models wear shorts, wger images are shirtless anatomy drawings. Best fix: Coach Ahmed photographs these (start + end position) and uploads them in the Exercises tab, which overrides the built-in media. E095 Swimming cannot meet the rule with standard swimwear.
+- Frame sampling can miss a few seconds of a video; a full watch-through is still advisable.
 
 ## 6. Done well — leave alone
 Auth core (`getUser()`, secure cookies, forced password change, Troy-ID generation), role guards + ownership checks, selfie upload hygiene, tolerant JSON extraction + catalog validation of AI output, human approval gates (program review, prompt proposals), security headers, no secrets in repo/history, strict TypeScript.

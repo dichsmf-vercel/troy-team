@@ -36,27 +36,30 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
       .maybeSingle(),
   ])
 
-  if (!assignment) notFound()
+  const notice = (title: string, body: string) => (
+    <div>
+      <AthleteHeader title={t("Program training")} />
+      <main className="px-4 py-6">
+        <Card className="mx-auto grid max-w-lg gap-3 p-6 text-center">
+          <CalendarClock className="mx-auto size-10 text-muted-foreground" aria-hidden="true" />
+          <h1 className="text-lg font-bold">{title}</h1>
+          <p className="text-sm text-muted-foreground">{body}</p>
+          <Link href="/program" className="text-sm font-semibold text-primary underline underline-offset-4">{t("Back to program")}</Link>
+        </Card>
+      </main>
+    </div>
+  )
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound()
+  const longDate = new Date(`${date}T12:00:00`).toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })
+  if (!assignment) return notice(t("No monthly program yet"), t("Your coach hasn't assigned a monthly program. Check your dashboard for today's sessions."))
   const sessions = readProgramSessions(assignment.generation_reason)
   const session = sessions.find((item) => item.date === date)
-  if (!session) notFound()
+  if (!session) return notice(t("No session on this day"), t("{date} is a rest day in your program.", { date: longDate }))
 
   // Future sessions can be previewed on the program page but not completed early.
   if (date > todayInAppZone()) {
-    const opens = new Date(`${date}T12:00:00`).toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })
-    return (
-      <div>
-        <AthleteHeader title={t("Program training")} />
-        <main className="px-4 py-6">
-          <Card className="mx-auto grid max-w-lg gap-3 p-6 text-center">
-            <CalendarClock className="mx-auto size-10 text-muted-foreground" aria-hidden="true" />
-            <h1 className="text-lg font-bold">{t("This session isn't open yet")}</h1>
-            <p className="text-sm text-muted-foreground">{t("It opens on {date}. You can preview the exercises on your program page.", { date: opens })}</p>
-            <Link href="/program" className="text-sm font-semibold text-primary underline underline-offset-4">{t("Back to program")}</Link>
-          </Card>
-        </main>
-      </div>
-    )
+    return notice(t("This session isn't open yet"), t("It opens on {date}. You can preview the exercises on your program page.", { date: longDate }))
   }
 
   // Attach current media: the coach may have added a photo/video since the program was generated.
