@@ -217,7 +217,16 @@ export async function updateAthleteSettings(form: FormData) {
     .eq("id", athleteId)
   if (error) return { error: error.message }
 
+  if (form.has("selfie_required") || form.has("show_upcoming_exercises")) {
+    const { error: toggleError } = await createAdminClient()
+      .from("athletes")
+      .update({ selfie_required: form.get("selfie_required") === "true", show_upcoming_exercises: form.get("show_upcoming_exercises") === "true" })
+      .eq("id", athleteId)
+    if (toggleError) return { error: t("Settings saved, but the selfie/upcoming toggles need the latest database update ({error}).", { error: toggleError.message }) }
+  }
+
   revalidatePath("/admin")
+  revalidatePath("/program")
   return { error: null }
 }
 

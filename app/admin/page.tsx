@@ -5,12 +5,13 @@ import { exerciseCodeForName, findLibraryEntry } from "@/lib/exercise-media"
 import { createClient } from "@/lib/supabase/server"
 import { AdminBoard } from "@/components/admin/admin-board"
 import { DashboardTopBar } from "@/components/shared/dashboard-top-bar"
+import { GuidedTour } from "@/components/shared/guided-tour"
 import { AdminErrorBoundary } from "@/components/admin/admin-error-boundary"
 import { getT } from "@/lib/i18n/get-language"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // AI program generation runs as a server action hosted by this page; allow it the full minute.
-export const maxDuration = 60
+export const maxDuration = 120
 
 type ProgramFeedbackRow = { id: string; athlete_id: string; session_date: string; difficulty: number | null; enjoyment: number | null; pain_notes: string | null; created_at: string | null }
 type SessionAthleteRow = { id: string; athlete_id: string; session_post_id: string | null }
@@ -102,6 +103,9 @@ export default async function AdminPage() {
   // Athlete enrichment
   // All id lists below are chunked: one .in() with hundreds of UUIDs breaks the request URL.
   const allAthleteIds = (athletes ?? []).map((a) => a.id)
+  // New toggle columns (migration 202611200001); ignored if the migration has not run yet.
+  const { data: toggleRows } = await service.from("athletes").select("id, selfie_required, show_upcoming_exercises")
+  const togglesById = new Map(((toggleRows ?? []) as { id: string; selfie_required: boolean | null; show_upcoming_exercises: boolean | null }[]).map((row) => [row.id, row]))
   const { data: athleteProfiles } = await selectInChunks<AdminAthleteProfile>(allAthleteIds, (ids) =>
     service.from("profiles").select("id,full_name,full_name_ar,role,subscription_tier,renewal_date,coach_private_notes,troy_id,password_change_required").in("id", ids))
   const athleteProfileById = new Map(athleteProfiles.map((p) => [p.id, p]))
@@ -125,7 +129,8 @@ export default async function AdminPage() {
   const { data: assessmentAnswers } = await selectInChunks<{ assessment_id: string; question_key: string; answer_json: { value?: number | string | null } | null }>(latestAssessmentIds, (ids) =>
     service.from("athlete_assessment_answers").select("assessment_id,question_key,answer_json").in("assessment_id", ids))
   const athleteIdSet = new Set(athleteIds)
-  const enrichedAthletes = (athletes ?? []).filter((athlete) => athleteIdSet.has(athlete.id)).map((athlete) => {
+  const enrichedAthletes = (athletes ?? []).filter((athlete) => athleteIdSet.has(athlete.id)).map((rawAthlete) => {
+    const athlete = { ...rawAthlete, selfie_required: togglesById.get(rawAthlete.id)?.selfie_required ?? false, show_upcoming_exercises: togglesById.get(rawAthlete.id)?.show_upcoming_exercises ?? false }
     const latestAssessment = assessments?.find((row) => row.athlete_id === athlete.id)
     return {
       ...athlete,
@@ -179,6 +184,7 @@ export default async function AdminPage() {
   return (
     <>
       <DashboardTopBar />
+      <GuidedTour role="admin" />
       <AdminErrorBoundary>
         <AdminBoard
           teams={teams ?? []}

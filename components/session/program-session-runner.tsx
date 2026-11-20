@@ -23,6 +23,7 @@ export function ProgramSessionRunner({
   initialFeedback,
   initialCompleted = false,
   showExerciseRecap = true,
+  selfieRequired = false,
 }: {
   programId: string
   date: string
@@ -31,6 +32,7 @@ export function ProgramSessionRunner({
   initialFeedback: ProgramFeedbackRow[]
   initialCompleted?: boolean
   showExerciseRecap?: boolean
+  selfieRequired?: boolean
 }) {
   const t = useT()
   const { language } = useLanguage()
@@ -328,7 +330,7 @@ export function ProgramSessionRunner({
 
         {/* Selfie upload */}
         <div className="grid gap-2 rounded-lg border border-dashed p-3">
-          <p className="text-xs font-semibold">{t("Proof of completion selfie (optional)")}</p>
+          <p className="text-xs font-semibold">{selfieRequired ? t("Proof of completion selfie (required)") : t("Proof of completion selfie (optional)")}</p>
           <p className="text-[11px] text-muted-foreground">
             {t("Coach Ahmed can review this selfie directly on your athlete profile.")}
           </p>
@@ -361,7 +363,10 @@ export function ProgramSessionRunner({
           )}
         </div>
 
-        <Button onClick={handleExerciseComplete} disabled={pending} className="w-full font-semibold">
+        {selfieRequired && selfieState[activeIndex] !== "uploaded" && !completed.includes(activeIndex) ? (
+          <p className="text-xs text-muted-foreground">{t("Upload a selfie first to mark this exercise complete.")}</p>
+        ) : null}
+        <Button onClick={handleExerciseComplete} disabled={pending || (selfieRequired && selfieState[activeIndex] !== "uploaded" && !completed.includes(activeIndex))} className="w-full font-semibold">
           {activeIndex === exercises.length - 1
             ? t("Complete Session Exercises")
             : t("Complete Exercise & Continue")}

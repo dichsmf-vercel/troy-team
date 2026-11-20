@@ -1,3 +1,4 @@
+import { loadAthleteToggles } from "@/lib/athlete-settings"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AthleteHeader } from "@/components/athlete/athlete-header"
@@ -48,6 +49,7 @@ export default async function AthleteProgramPage() {
   ])
 
   const isAssignedOnly = athlete?.goals?.includes("Assigned exercises only")
+  const { showUpcomingExercises } = await loadAthleteToggles(supabase, user.id)
   const monthStart = assignment?.month_start ? new Date(`${assignment.month_start}T12:00:00`) : new Date()
   const programSessions = readProgramSessions(assignment?.generation_reason)
   const today = todayInAppZone()
@@ -212,9 +214,14 @@ export default async function AthleteProgramPage() {
                         )}
                       </div>
 
-                      {/* Sections */}
+                      {/* Sections (future sessions stay hidden unless the coach turned on "Show upcoming exercises") */}
+                      {session.date > today && !showUpcomingExercises ? (
+                        <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                          {t.plural((session.exercises ?? []).length, "{count} exercise · revealed on the day", "{count} exercises · revealed on the day")}
+                        </p>
+                      ) : null}
                       <div className="space-y-3">
-                        {groupBySection(session.exercises ?? []).map(({ section, exercises: sectionExercises }) => {
+                        {groupBySection(session.date > today && !showUpcomingExercises ? [] : session.exercises ?? []).map(({ section, exercises: sectionExercises }) => {
                           return (
                             <div key={section}>
                               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{t(section)}</p>

@@ -115,6 +115,8 @@ export type AdminAthlete = {
   birth_year?: number | null
   free_training_days?: number[] | null
   show_exercise_recap?: boolean | null
+  selfie_required?: boolean | null
+  show_upcoming_exercises?: boolean | null
   athlete_teams?: { athlete_id?: string; team_id?: string; teams?: RelationOne<AdminTeam> }[]
   profiles?: AdminAthleteProfile | null
   auth_email?: string

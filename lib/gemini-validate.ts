@@ -1,3 +1,4 @@
+import { MIN_EXERCISES_PER_SESSION, MIN_STRENGTH_PER_SESSION, sessionVolumeWarnings } from "@/lib/program-edits"
 import type { CatalogExercise, GeminiExercise, GeminiProgramOutput, GeminiSession } from "@/lib/gemini-types"
 import { englishT, type TFunction } from "@/lib/i18n/translate"
 
@@ -60,6 +61,47 @@ export type ValidationResult = {
   program: GeminiProgramOutput | null
   warnings: string[]
   error: string | null
+}
+
+/**
+ * The AI designs ONE week ("week_template": one entry per training day, in weekday order) with
+ * per-exercise "load_by_week"/"sets_by_week" for weeks 1–4; this expands it into the dated 4-week
+ * "sessions" list the rest of the app uses. Generating one week keeps the response ~4× smaller, so it
+ * finishes within the request time limit even with 7–9 exercises per session.
+ * Input that already has "sessions" (old format) is returned unchanged.
+ */
+export function expandWeekTemplate(raw: unknown, options: { startDate: string; weekdays: number[]; time: string; windowDays?: number }): unknown {
+  const root = asRecord(raw)
+  if (!root || Array.isArray(root.sessions) || !Array.isArray(root.week_template)) return raw
+  const template = root.week_template.map(asRecord).filter((day): day is Record<string, unknown> => !!day && Array.isArray(day.exercises))
+  const startMs = parseIsoDate(options.startDate)
+  if (!template.length || startMs === null || !options.weekdays.length) return { ...root, sessions: [] }
+
+  const windowDays = options.windowDays ?? 28
+  const sessions: Record<string, unknown>[] = []
+  const perWeek = new Map<number, number>()
+  for (let offset = 0; offset < windowDays; offset++) {
+    const ms = startMs + offset * DAY_MS
+    if (!options.weekdays.includes(new Date(ms).getUTCDay())) continue
+    const week = Math.floor(offset / 7) + 1
+    const index = perWeek.get(week) ?? 0
+    perWeek.set(week, index + 1)
+    const day = template[index % template.length]
+    const pick = (value: unknown) => (Array.isArray(value) && value.length ? value[Math.min(week, value.length) - 1] : undefined)
+    sessions.push({
+      date: new Date(ms).toISOString().slice(0, 10),
+      time: options.time,
+      week,
+      exercises: (day.exercises as unknown[]).map((exercise) => {
+        const item = asRecord(exercise) ?? {}
+        const { load_by_week, sets_by_week, ...rest } = item
+        const load = pick(load_by_week)
+        const sets = pick(sets_by_week)
+        return { ...rest, ...(load !== undefined ? { load_percentage: load } : {}), ...(sets !== undefined ? { sets } : {}) }
+      }),
+    })
+  }
+  return { ...root, sessions }
 }
 
 export function validateProgram(raw: unknown, catalog: CatalogExercise[], options: ValidationOptions): ValidationResult {
@@ -181,6 +223,8 @@ export function validateProgram(raw: unknown, catalog: CatalogExercise[], option
   if (rescuedByName) warnings.push(t("{count} exercise(s) had a wrong id and were matched by name.", { count: rescuedByName }))
   if (droppedSessions) warnings.push(t("{count} session(s) were removed (invalid date, outside the 4-week window, or no valid exercises).", { count: droppedSessions }))
   if (movedSessions) warnings.push(t("{count} session(s) were moved to your chosen training days.", { count: movedSessions }))
+  const thin = sessionVolumeWarnings({ sessions })
+  if (thin.length) warnings.push(t("{count} session(s) have fewer than {minTotal} exercises or fewer than {minStrength} strength exercises.", { count: thin.length, minTotal: MIN_EXERCISES_PER_SESSION, minStrength: MIN_STRENGTH_PER_SESSION }))
   if (offScheduleSessions) warnings.push(t("{count} session(s) fall on days that were not selected as training days.", { count: offScheduleSessions }))
 
   const aiWarnings = Array.isArray(root.warnings)

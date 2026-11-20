@@ -8,8 +8,12 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  ArrowDown,
+  ArrowUp,
   Edit3,
   Loader2,
+  Plus,
+  Trash2,
   Sparkles,
   TriangleAlert,
 } from "lucide-react"
@@ -28,15 +32,20 @@ import { todayInAppZone } from "@/lib/dates"
 import { actionErrorMessage } from "@/lib/client-errors"
 import { ExerciseMediaPreview } from "@/components/admin/exercise-media-preview"
 import type { AdminExercise } from "@/lib/admin/types"
+import { PROGRAM_SECTIONS } from "@/lib/gemini-validate"
+import { sessionVolumeWarnings } from "@/lib/program-edits"
 
 const weekdays = [0, 1, 2, 3, 4, 5, 6]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EditState = {
-  [sessionIdx: number]: {
-    [exIdx: number]: Partial<GeminiExercise>
-  }
+/** Edits the coach can make to one session's exercise list (any position). */
+type SessionEditor = {
+  update: (eIdx: number, field: keyof GeminiExercise, value: unknown) => void
+  replace: (eIdx: number, exerciseId: string) => void
+  move: (eIdx: number, direction: -1 | 1) => void
+  remove: (eIdx: number) => void
+  add: (exerciseId: string, section: string) => void
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -59,7 +68,6 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
   const [originalProgram, setOriginalProgram] = useState<GeminiProgramOutput | null>(null)
 
   // Editing
-  const [edits, setEdits] = useState<EditState>({})
   const [editMode, setEditMode] = useState(false)
   const [adminReason, setAdminReason] = useState("")
   const [expandedSession, setExpandedSession] = useState<number | null>(0)
@@ -72,24 +80,15 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
   const selectedAthlete = athletes.find((a) => a.id === athleteId)
   const month = monthLabel(startDate, locale)
 
-  // Merge edits into program
-  const displayProgram: GeminiProgramOutput | null = program
-    ? {
-        ...program,
-        sessions: program.sessions.map((session, sIdx) => ({
-          ...session,
-          exercises: session.exercises.map((ex, eIdx) => ({
-            ...ex,
-            ...(edits[sIdx]?.[eIdx] ?? {}),
-          })),
-        })),
-      }
-    : null
+  // Edits are applied straight to the program; originalProgram keeps the AI's version for the learning step.
+  const displayProgram = program
+  const programChanged = !!program && !!originalProgram && JSON.stringify(program) !== JSON.stringify(originalProgram)
+  const thinSessions = program ? sessionVolumeWarnings(program) : []
 
   function resetForNewProgram() {
     setProgram(null)
     setOriginalProgram(null)
-    setEdits({})
+    setAdminReason("")
     setEditMode(false)
     setSaveMsg(null)
     setExpandedSession(0)
@@ -149,12 +148,13 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
 
       // 2. If the coach edited it and explained why, ask the AI to PROPOSE a prompt improvement.
       //    The proposal is not applied until an admin approves it.
-      if (editMode && originalProgram && adminReason.trim()) {
+      // Every saved edit teaches the next generation (the typed reason is optional extra context).
+      if (programChanged && originalProgram) {
         const learned = await saveAdminEditsAndLearn({
           programId: saved.id,
           editedProgram: displayProgram,
           originalProgram,
-          adminReason,
+          adminReason: adminReason.trim() || "No reason given; infer the coach's preference from the changes.",
         })
         setSaveMsg(
           learned.error
@@ -172,14 +172,39 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
     }
   }
 
-  function updateExercise(sIdx: number, eIdx: number, field: keyof GeminiExercise, value: unknown) {
-    setEdits((prev) => ({
-      ...prev,
-      [sIdx]: {
-        ...prev[sIdx],
-        [eIdx]: { ...prev[sIdx]?.[eIdx], [field]: value },
+  function editSession(sIdx: number, change: (exercises: GeminiExercise[]) => GeminiExercise[]) {
+    setProgram((current) =>
+      current
+        ? { ...current, sessions: current.sessions.map((session, i) => (i === sIdx ? { ...session, exercises: change([...session.exercises]) } : session)) }
+        : current,
+    )
+  }
+
+  const fromCatalog = (exerciseId: string) => exercises.find((exercise) => exercise.id === exerciseId)
+
+  function sessionEditor(sIdx: number): SessionEditor {
+    return {
+      update: (eIdx, field, value) => editSession(sIdx, (list) => list.map((ex, i) => (i === eIdx ? { ...ex, [field]: value } : ex))),
+      replace: (eIdx, exerciseId) => {
+        const picked = fromCatalog(exerciseId)
+        if (!picked) return
+        editSession(sIdx, (list) => list.map((ex, i) => (i === eIdx ? { ...ex, id: picked.id, name_en: picked.name_en, image_url: picked.image_url ?? null } : ex)))
       },
-    }))
+      move: (eIdx, direction) =>
+        editSession(sIdx, (list) => {
+          const to = eIdx + direction
+          if (to < 0 || to >= list.length) return list
+          ;[list[eIdx], list[to]] = [list[to], list[eIdx]]
+          return list
+        }),
+      remove: (eIdx) => editSession(sIdx, (list) => list.filter((_, i) => i !== eIdx)),
+      add: (exerciseId, section) => {
+        const picked = fromCatalog(exerciseId)
+        if (!picked) return
+        const reps = picked.default_reps != null ? String(picked.default_reps) : "10"
+        editSession(sIdx, (list) => [...list, { id: picked.id, name_en: picked.name_en, section, sets: picked.default_sets ?? 3, reps, load_percentage: null, notes: null, image_url: picked.image_url ?? null }])
+      },
+    }
   }
 
   return (
@@ -333,7 +358,7 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
             <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 p-6 text-center">
               <Loader2 className="size-8 animate-spin text-violet-500" />
               <p className="text-sm font-medium">{t("Gemini is designing the program…")}</p>
-              <p className="text-xs text-muted-foreground">{t("This usually takes 10–20 seconds.")}</p>
+              <p className="text-xs text-muted-foreground">{t("This can take up to a minute.")}</p>
             </CardContent>
           </Card>
         )}
@@ -361,6 +386,13 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
               </CardContent>
             </Card>
 
+            {thinSessions.length > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                {t("{count} session(s) have fewer than {minTotal} exercises or fewer than {minStrength} strength exercises.", { count: thinSessions.length, minTotal: 6, minStrength: 2 })}
+              </div>
+            )}
+
             {/* Edit toggle */}
             <div className="flex items-center gap-3">
               <Button
@@ -373,7 +405,7 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
                 {editMode ? t("Editing mode on") : t("Edit program")}
               </Button>
               {editMode && (
-                <p className="text-xs text-muted-foreground">{t("Click any field in a session to edit it.")}</p>
+                <p className="text-xs text-muted-foreground">{t("Change, add, remove or reorder exercises in any session. Your changes teach future programs.")}</p>
               )}
             </div>
 
@@ -387,7 +419,7 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
                   editMode={editMode}
                   expanded={expandedSession === sIdx}
                   onToggle={() => setExpandedSession(expandedSession === sIdx ? null : sIdx)}
-                  onEditExercise={(eIdx, field, value) => updateExercise(sIdx, eIdx, field, value)}
+                  editor={sessionEditor(sIdx)}
                   catalog={exercises}
                 />
               ))}
@@ -396,7 +428,7 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
             {/* Admin edit reason (shown in edit mode) */}
             {editMode && (
               <div className="grid gap-2">
-                <Label htmlFor="admin-reason">{t("Why did you make these changes? (helps Gemini learn)")}</Label>
+                <Label htmlFor="admin-reason">{t("Why did you make these changes? (optional, helps Gemini learn)")}</Label>
                 <Textarea
                   id="admin-reason"
                   value={adminReason}
@@ -435,7 +467,7 @@ function SessionCard({
   editMode,
   expanded,
   onToggle,
-  onEditExercise,
+  editor,
   catalog,
 }: {
   session: GeminiSession
@@ -443,9 +475,11 @@ function SessionCard({
   editMode: boolean
   expanded: boolean
   onToggle: () => void
-  onEditExercise: (eIdx: number, field: keyof GeminiExercise, value: unknown) => void
+  editor: SessionEditor
   catalog: AdminExercise[]
 }) {
+  const [addId, setAddId] = useState("")
+  const [addSection, setAddSection] = useState<string>("Strength/Power")
   const { t, locale } = useLanguage()
   const dateLabel = new Date(`${session.date}T12:00:00`).toLocaleDateString(locale, {
     weekday: "short",
@@ -476,14 +510,29 @@ function SessionCard({
         <div className="border-t px-4 pb-4 pt-3 grid gap-3">
           {session.exercises.map((ex, eIdx) => (
             <ExerciseRow
-              key={`${ex.name_en}-${eIdx}`}
+              key={`${ex.id ?? ex.name_en}-${eIdx}`}
               exercise={ex}
               eIdx={eIdx}
+              count={session.exercises.length}
               editMode={editMode}
-              onEdit={(field, value) => onEditExercise(eIdx, field, value)}
+              editor={editor}
               catalog={catalog}
             />
           ))}
+          {editMode && (
+            <div className="grid gap-2 rounded-lg border border-dashed p-3 sm:grid-cols-[1fr_160px_auto]">
+              <select aria-label={t("Exercise to add")} value={addId} onChange={(e) => setAddId(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm">
+                <option value="">{t("Add an exercise…")}</option>
+                {[...catalog].sort((a, b) => a.name_en.localeCompare(b.name_en)).map((item) => <option key={item.id} value={item.id}>{item.name_en}</option>)}
+              </select>
+              <select aria-label={t("Section")} value={addSection} onChange={(e) => setAddSection(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm">
+                {PROGRAM_SECTIONS.map((section) => <option key={section} value={section}>{t(section)}</option>)}
+              </select>
+              <Button type="button" size="sm" variant="outline" className="gap-1" disabled={!addId} onClick={() => { editor.add(addId, addSection); setAddId("") }}>
+                <Plus className="size-4" />{t("Add")}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </Card>
@@ -495,17 +544,20 @@ function SessionCard({
 function ExerciseRow({
   exercise,
   eIdx,
+  count,
   editMode,
-  onEdit,
+  editor,
   catalog,
 }: {
   exercise: GeminiExercise
   eIdx: number
+  count: number
   editMode: boolean
-  onEdit: (field: keyof GeminiExercise, value: unknown) => void
+  editor: SessionEditor
   catalog: AdminExercise[]
 }) {
-  const { t, locale } = useLanguage()
+  const { t } = useLanguage()
+  const onEdit = (field: keyof GeminiExercise, value: unknown) => editor.update(eIdx, field, value)
   if (!editMode) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
@@ -527,13 +579,20 @@ function ExerciseRow({
   // Edit mode
   return (
     <div className="grid gap-2 rounded-lg border p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t(exercise.section)}</p>
-      <Input
-        value={exercise.name_en}
-        onChange={(e) => onEdit("name_en", e.target.value)}
-        className="h-8 text-sm font-medium"
-        placeholder={t("Exercise name")}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <select aria-label={t("Section")} value={exercise.section} onChange={(e) => onEdit("section", e.target.value)} className="h-8 rounded-md border bg-background px-2 text-xs font-medium uppercase tracking-wide">
+          {PROGRAM_SECTIONS.map((section) => <option key={section} value={section}>{t(section)}</option>)}
+        </select>
+        <div className="flex items-center gap-1">
+          <Button type="button" size="icon" variant="ghost" className="size-8" aria-label={t("Move up")} disabled={eIdx === 0} onClick={() => editor.move(eIdx, -1)}><ArrowUp className="size-4" /></Button>
+          <Button type="button" size="icon" variant="ghost" className="size-8" aria-label={t("Move down")} disabled={eIdx === count - 1} onClick={() => editor.move(eIdx, 1)}><ArrowDown className="size-4" /></Button>
+          <Button type="button" size="icon" variant="ghost" className="size-8 text-destructive" aria-label={t("Remove exercise")} onClick={() => editor.remove(eIdx)}><Trash2 className="size-4" /></Button>
+        </div>
+      </div>
+      <select aria-label={t("Exercise")} value={exercise.id ?? ""} onChange={(e) => editor.replace(eIdx, e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm font-medium">
+        {!exercise.id || !catalog.some((item) => item.id === exercise.id) ? <option value={exercise.id ?? ""}>{exercise.name_en}</option> : null}
+        {[...catalog].sort((a, b) => a.name_en.localeCompare(b.name_en)).map((item) => <option key={item.id} value={item.id}>{item.name_en}</option>)}
+      </select>
       <ExerciseMediaPreview exercise={exercise} catalog={catalog} />
       <div className="grid grid-cols-3 gap-2">
         <div>

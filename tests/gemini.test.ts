@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { buildGenerationPrompt, extractJson, GENERATION_MODELS, resolveModels, SUMMARY_MODELS } from "@/lib/gemini"
-import { validateProgram, validatePromptText } from "@/lib/gemini-validate"
+import { expandWeekTemplate, validateProgram, validatePromptText } from "@/lib/gemini-validate"
 
 const catalog = [
   { id: "ex-squat", name_en: "Back Squat", category: "strength", image_url: "/squat.png" },
@@ -115,6 +115,26 @@ describe("validateProgram", () => {
     )
     expect(result.program!.sessions.map((s) => s.date)).toEqual(["2026-12-01", "2026-12-03", "2026-12-08", "2026-12-10"])
     expect(result.program!.warnings.join(" ")).not.toMatch(/not selected/)
+  })
+
+  it("expands a one-week template into 4 dated weeks with per-week load and sets", () => {
+    const raw = {
+      goal: "g", rationale: "r", warnings: [],
+      week_template: [
+        { day: 1, exercises: [{ id: "ex-plank", section: "Strength/Power", sets: 3, reps: "8", load_by_week: [60, 70, 80, 85], sets_by_week: [3, 3, 4, 4] }] },
+        { day: 2, exercises: [{ id: "ex-plank", section: "Accessory", sets: 2, reps: "10", load_by_week: null }] },
+      ],
+    }
+    const expanded = expandWeekTemplate(raw, { startDate: "2026-12-01", weekdays: [2, 4], time: "18:00" }) as { sessions: { date: string; week: number; exercises: { load_percentage?: number; sets: number; section: string }[] }[] }
+    expect(expanded.sessions.map((s) => s.date)).toEqual(["2026-12-01", "2026-12-03", "2026-12-08", "2026-12-10", "2026-12-15", "2026-12-17", "2026-12-22", "2026-12-24"])
+    expect(expanded.sessions.map((s) => s.week)).toEqual([1, 1, 2, 2, 3, 3, 4, 4])
+    expect(expanded.sessions.filter((s) => s.exercises[0].section === "Strength/Power").map((s) => [s.exercises[0].load_percentage, s.exercises[0].sets])).toEqual([[60, 3], [70, 3], [80, 4], [85, 4]])
+    const result = validateProgram(expanded, catalog, baseOptions)
+    expect(result.error).toBeNull()
+    expect(result.program!.sessions).toHaveLength(8)
+    // Old "sessions" format passes through unchanged.
+    const old = { sessions: [session("2026-12-01", [{ id: "ex-plank" }])] }
+    expect(expandWeekTemplate(old, { startDate: "2026-12-01", weekdays: [2], time: "18:00" })).toBe(old)
   })
 
   it("fails when nothing valid is left", () => {

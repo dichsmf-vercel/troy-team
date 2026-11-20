@@ -1,5 +1,7 @@
 "use server"
 
+import { loadAthleteToggles } from "@/lib/athlete-settings"
+import { readProgramSessions } from "@/lib/program-data"
 import { revalidatePath } from "next/cache"
 import { requireUser } from "@/lib/auth/guards"
 import { ownsProgram } from "@/lib/auth/ownership"
@@ -28,6 +30,16 @@ export async function completeProgramSession(input: { programId: string; date: s
   if ("error" in ctx) return { error: ctx.error }
   const { supabase, user } = ctx
   const now = new Date().toISOString()
+
+  const toggles = await loadAthleteToggles(supabase, user.id)
+  if (toggles.selfieRequired) {
+    const { data: program } = await supabase.from("athlete_programs").select("generation_reason").eq("id", input.programId).maybeSingle()
+    const session = readProgramSessions(program?.generation_reason).find((item) => item.date === input.date)
+    const needed = session?.exercises?.length ?? 0
+    const { data: selfies } = await supabase.from("program_exercise_selfies").select("exercise_index").eq("athlete_program_id", input.programId).eq("athlete_id", user.id).eq("session_date", input.date)
+    const have = new Set((selfies ?? []).map((row: { exercise_index: number }) => row.exercise_index))
+    if (needed && have.size < needed) return { error: t("Your coach asks for a selfie for every exercise. {missing} still missing.", { missing: needed - have.size }) }
+  }
 
   const { error } = await supabase.from("program_session_completions").upsert(
     {
