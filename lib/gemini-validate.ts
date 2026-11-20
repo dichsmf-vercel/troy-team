@@ -1,3 +1,4 @@
+import { MIN_EXERCISES_PER_SESSION, MIN_STRENGTH_PER_SESSION, sessionVolumeWarnings } from "@/lib/program-edits"
 import type { CatalogExercise, GeminiExercise, GeminiProgramOutput, GeminiSession } from "@/lib/gemini-types"
 import { englishT, type TFunction } from "@/lib/i18n/translate"
 
@@ -181,6 +182,8 @@ export function validateProgram(raw: unknown, catalog: CatalogExercise[], option
   if (rescuedByName) warnings.push(t("{count} exercise(s) had a wrong id and were matched by name.", { count: rescuedByName }))
   if (droppedSessions) warnings.push(t("{count} session(s) were removed (invalid date, outside the 4-week window, or no valid exercises).", { count: droppedSessions }))
   if (movedSessions) warnings.push(t("{count} session(s) were moved to your chosen training days.", { count: movedSessions }))
+  const thin = sessionVolumeWarnings({ sessions })
+  if (thin.length) warnings.push(t("{count} session(s) have fewer than {minTotal} exercises or fewer than {minStrength} strength exercises.", { count: thin.length, minTotal: MIN_EXERCISES_PER_SESSION, minStrength: MIN_STRENGTH_PER_SESSION }))
   if (offScheduleSessions) warnings.push(t("{count} session(s) fall on days that were not selected as training days.", { count: offScheduleSessions }))
 
   const aiWarnings = Array.isArray(root.warnings)
