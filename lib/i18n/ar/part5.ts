@@ -24,6 +24,7 @@ export const part5: Record<string, string> = {
   "Move up": "نقل لأعلى",
   "Move down": "نقل لأسفل",
   "Selfie required": "السيلفي إلزامي",
+  "This can take up to a minute.": "قد يستغرق ذلك حتى دقيقة.",
   "Progress": "التقدم",
   "Profile": "الملف الشخصي",
   "Back": "رجوع",

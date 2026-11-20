@@ -358,7 +358,7 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
             <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 p-6 text-center">
               <Loader2 className="size-8 animate-spin text-violet-500" />
               <p className="text-sm font-medium">{t("Gemini is designing the program…")}</p>
-              <p className="text-xs text-muted-foreground">{t("This usually takes 10–20 seconds.")}</p>
+              <p className="text-xs text-muted-foreground">{t("This can take up to a minute.")}</p>
             </CardContent>
           </Card>
         )}

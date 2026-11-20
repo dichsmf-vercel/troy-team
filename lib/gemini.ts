@@ -10,7 +10,7 @@
  */
 
 import { describeProgramEdits } from "@/lib/program-edits"
-import { validateProgram, validatePromptText } from "@/lib/gemini-validate"
+import { expandWeekTemplate, validateProgram, validatePromptText } from "@/lib/gemini-validate"
 import type { CatalogExercise, GeminiProgramOutput } from "@/lib/gemini-types"
 import type { TFunction } from "@/lib/i18n/translate"
 
@@ -200,29 +200,28 @@ Session time: ${input.time}
 ${exerciseList}
 
 ## Instructions
-1. Create ${input.weekdays.length} sessions per week for 4 weeks (${input.weekdays.length * 4} sessions total).
+1. Design ONE training week: ${input.weekdays.length} session(s), one per training day in this order: ${trainingDays}. The app repeats this week for 4 weeks, so put the 4-week progression in load_by_week (and optionally sets_by_week).
 2. Each session must include exercises from these sections in order: Warm-up, Mobility, Strength/Power, Accessory, Cooldown.
    Volume (head coach's standing rule): every session has at least 7 exercises (aim for 7-9) and at least 2 Strength/Power exercises (aim for 2-3). Five exercises or a single strength exercise per session is too little.
 3. Use ONLY exercises from the "Available exercises" list above, and copy the exact id.
 4. For each exercise provide: sets (integer), reps (string like "8" or "8-12" or "30 sec"), tempo (optional, e.g. "3-1-2"), load_percentage (null for bodyweight/mobility), notes (optional coaching cue).
-5. Progress load across the 4 weeks (e.g. 60% → 70% → 80% → 85% for strength exercises).
+5. Progress load across the 4 weeks: for every loaded exercise give load_by_week with four numbers for weeks 1-4 (e.g. [60, 70, 80, 85]); use null for bodyweight/mobility. Optionally give sets_by_week (four integers).
 6. Derive a short training goal for this athlete based on their profile.
 7. Write a brief rationale paragraph (2-3 sentences) explaining the program design.
 8. List any safety warnings or contraindications based on injury notes and assessment scores.
-9. Each session must have: date (YYYY-MM-DD, only on the training days above, within the 4 weeks from ${input.startDate}), time (${input.time}), week (1–4), exercises array.
+9. Each week_template entry has: day (1-${input.weekdays.length}, in the training-day order above) and an exercises array. Do not output dates.
 
 ## Required JSON format
 {
   "goal": "short training goal label",
   "rationale": "2-3 sentence explanation of program design",
   "warnings": ["warning if any"],
-  "sessions": [
+  "week_template": [
     {
-      "date": "YYYY-MM-DD",
-      "time": "${input.time}",
-      "week": 1,
+      "day": 1,
       "exercises": [
-        { "id": "exercise-uuid-from-list", "name_en": "Exercise Name", "section": "Warm-up", "sets": 2, "reps": "10", "tempo": null, "load_percentage": null, "notes": null }
+        { "id": "exercise-uuid-from-list", "name_en": "Exercise Name", "section": "Warm-up", "sets": 2, "reps": "10", "tempo": null, "load_by_week": null, "notes": null },
+        { "id": "exercise-uuid-from-list", "name_en": "Exercise Name", "section": "Strength/Power", "sets": 3, "reps": "6", "tempo": "3-1-1", "load_by_week": [65, 70, 75, 80], "sets_by_week": [3, 3, 4, 4], "notes": null }
       ]
     }
   ]
@@ -243,7 +242,8 @@ export async function generateProgramWithGemini(
       models: resolveModels("generation"),
     })
 
-    const validated = validateProgram(extractJson(raw), input.exercises, {
+    const expanded = expandWeekTemplate(extractJson(raw), { startDate: input.startDate, weekdays: input.weekdays, time: input.time })
+    const validated = validateProgram(expanded, input.exercises, {
       startDate: input.startDate,
       weekdays: input.weekdays,
       t: input.t,
