@@ -178,3 +178,10 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Arabic text uses Cairo. Unlayered so it wins over the font-sans utility on <body>: the Latin font comes
+   first there and its system fallback would draw the Arabic letters. Letter-spacing breaks joined letters. */
+[dir='rtl'] body {
+  font-family: var(--font-cairo), var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
