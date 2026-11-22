@@ -115,14 +115,15 @@ export function ProgramSessionRunner({
     saveProgress(done)
     setError(null)
 
-    if (activeIndex < exercises.length - 1) {
-      setActiveIndex((index) => index + 1)
+    const next = exercises.findIndex((_, index) => index > activeIndex && !done.includes(index))
+    if (next >= 0) {
+      setActiveIndex(next)
     } else if (done.length < exercises.length) {
       // No exercise may be skipped: go back to the first one that is not done.
       setActiveIndex(exercises.findIndex((_, index) => !done.includes(index)))
       setError(t.plural(exercises.length - done.length, "{count} exercise is not done yet. Complete every exercise to finish the session.", "{count} exercises are not done yet. Complete every exercise to finish the session."))
     } else {
-      // Reached the end
+      // Everything is done
       if (showExerciseRecap) {
         setRecapPage(true)
       } else {
