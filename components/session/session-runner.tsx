@@ -84,7 +84,8 @@ export function SessionRunner({
   const [attendedAt, setAttendedAt] = useState(initialAttendedAt)
   const [activeIndex, setActiveIndex] = useState(() => {
     // start on the first incomplete exercise
-    const firstIncomplete = initialCompletions.findIndex((c) => !c.completed)
+    const done = new Set(initialCompletions.filter((c) => c.completed).map((c) => c.session_exercise_id))
+    const firstIncomplete = exercises.findIndex((ex) => !done.has(ex.sessionExerciseId))
     return firstIncomplete >= 0 ? firstIncomplete : 0
   })
   const [completedSet, setCompletedSet] = useState<Set<string>>(
@@ -155,8 +156,10 @@ export function SessionRunner({
       )
       if (nextIndex >= 0) {
         setActiveIndex(nextIndex)
-      } else if (activeIndex < exercises.length - 1) {
-        setActiveIndex(activeIndex + 1)
+      } else {
+        // Nothing left after this one: go back to the first exercise that was passed over.
+        const earlier = exercises.findIndex((ex) => !completedSet.has(ex.sessionExerciseId) && ex.sessionExerciseId !== sessionExerciseId)
+        if (earlier >= 0) setActiveIndex(earlier)
       }
     })
   }

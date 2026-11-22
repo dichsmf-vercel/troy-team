@@ -30,6 +30,17 @@ export async function sessionHasExercise(supabase: SupabaseClient, sessionPostId
   return !!data
 }
 
+/** How many exercises of an assigned session are not completed yet (null when it could not be checked). */
+export async function countMissingExercises(supabase: SupabaseClient, sessionPostId: string, sessionAthleteId: string): Promise<number | null> {
+  const [exercises, completions] = await Promise.all([
+    supabase.from("session_exercises").select("id").eq("session_post_id", sessionPostId),
+    supabase.from("exercise_completions").select("session_exercise_id").eq("session_athlete_id", sessionAthleteId).eq("completed", true),
+  ])
+  if (exercises.error || completions.error) return null
+  const done = new Set((completions.data ?? []).map((row) => row.session_exercise_id))
+  return (exercises.data ?? []).filter((row) => !done.has(row.id)).length
+}
+
 /** True when the athlete program belongs to the user. */
 export async function ownsProgram(supabase: SupabaseClient, userId: string, programId: string): Promise<boolean> {
   if (!programId) return false
