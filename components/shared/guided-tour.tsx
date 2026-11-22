@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { useT } from "@/components/providers/language-provider"
+import { LanguageSwitchButton } from "@/components/language-switch-button"
+import { useLanguage } from "@/components/providers/language-provider"
 import { createClient } from "@/lib/supabase/client"
 import { tx } from "@/lib/i18n/translate"
 
@@ -106,7 +107,7 @@ function findTarget(name?: string): HTMLElement | null {
 }
 
 export function GuidedTour({ role }: { role: TourRole }) {
-  const t = useT()
+  const { t, language } = useLanguage()
   const [key, setKey] = useState<string | null>(null)
   const [step, setStep] = useState<number | null>(null)
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -166,6 +167,13 @@ export function GuidedTour({ role }: { role: TourRole }) {
     return () => { window.clearTimeout(timer); window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true) }
   }, [step, steps, measure, openTabs])
 
+  // Switching language mirrors the page, so the highlighted area moves.
+  useEffect(() => {
+    const timer = window.setTimeout(measure, 350)
+    measure()
+    return () => window.clearTimeout(timer)
+  }, [language, measure])
+
   const close = useCallback(() => {
     if (key) write(key, { ...read(key), done: true })
     setStep(null)
@@ -207,9 +215,13 @@ export function GuidedTour({ role }: { role: TourRole }) {
         <div className="fixed inset-0 bg-black/55" />
       )}
       <div className="fixed flex flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground shadow-xl" style={cardStyle}>
-        <p className="text-xs text-muted-foreground">{t("Step {current} of {total}", { current: step + 1, total: steps.length })}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">{t("Step {current} of {total}", { current: step + 1, total: steps.length })}</p>
+          {/* The overlay covers the top bar, so the language can be changed from here too. */}
+          <LanguageSwitchButton className="h-8 px-2 text-xs" />
+        </div>
         <p className="text-base font-semibold">{t(current.title)}</p>
-        <div key={step} className="min-h-0 overflow-y-auto text-sm">
+        <div key={step} className="min-h-0 overflow-y-auto pb-1.5 pe-2 text-sm leading-relaxed">
           <p className="text-muted-foreground">{t(current.body)}</p>
           {current.how ? (
             <>

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react"
 import { Download, FileSpreadsheet, Upload } from "lucide-react"
-import { importAthletesFromExcel, type ImportCredential, type ImportSkipped } from "@/app/admin/actions/imports"
+import { importAthletesFromExcel, type ImportCredential, type ImportOutcome } from "@/app/admin/actions/imports"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -32,6 +32,17 @@ function download(data: BlobPart, filename: string, type: string) {
 
 const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`
 
+function OutcomeCell({ outcome, label }: { outcome: ImportOutcome; label: string }) {
+  const color = { new: "text-emerald-700 dark:text-emerald-300", update: "text-sky-800 dark:text-sky-300", unchanged: "text-muted-foreground", skipped: "text-amber-700 dark:text-amber-300" }[outcome.kind]
+  return (
+    <>
+      <span className={`font-medium ${color}`}>{label}</span>
+      {outcome.changes.map((change) => <span key={change} className="block">{change}</span>)}
+      {outcome.note ? <span className="block text-amber-700 dark:text-amber-300">{outcome.note}</span> : null}
+    </>
+  )
+}
+
 export function ExcelAthleteImport() {
   const { language } = useLanguage()
   const t = useT()
@@ -42,7 +53,8 @@ export function ExcelAthleteImport() {
   const [rows, setRows] = useState<ParsedAthleteRow[]>([])
   const [problems, setProblems] = useState<{ rowNumber: number; message: string }[]>([])
   const [credentials, setCredentials] = useState<ImportCredential[]>([])
-  const [skipped, setSkipped] = useState<ImportSkipped[]>([])
+  /** Per-row outcome: the preview in the review step, the real result afterwards. */
+  const [outcomes, setOutcomes] = useState<ImportOutcome[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -53,7 +65,7 @@ export function ExcelAthleteImport() {
     setRows([])
     setProblems([])
     setCredentials([])
-    setSkipped([])
+    setOutcomes([])
     setMessage(null)
     setProgress(null)
     if (fileInput.current) fileInput.current.value = ""
@@ -70,6 +82,7 @@ export function ExcelAthleteImport() {
   async function handleFile(file: File | undefined) {
     setRows([])
     setProblems([])
+    setOutcomes([])
     setMessage(null)
     if (!file) return
     setFileName(file.name)
@@ -83,11 +96,48 @@ export function ExcelAthleteImport() {
       }
       if (parsed.athletes.length > MAX_ROWS) return setMessage(t("The file has {athletesCount} athletes. Import at most {MAX_ROWS} at a time.", { athletesCount: parsed.athletes.length, MAX_ROWS }))
       setRows(parsed.athletes)
-      setProblems(findRowProblems(parsed.athletes, t))
+      const found = findRowProblems(parsed.athletes, t)
+      setProblems(found)
       setStep("review")
+      if (!found.length) await preview(parsed.athletes)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t("Could not read the spreadsheet."))
     }
+  }
+
+  /** Runs the whole file in small batches; a dry run only reports what would happen. */
+  async function runBatches(list: ParsedAthleteRow[], dryRun: boolean, onBatch?: (credentials: ImportCredential[]) => void) {
+    const collected: ImportCredential[] = []
+    const all: ImportOutcome[] = []
+    let handledIds: string[] = []
+    let failure: string | null = null
+    try {
+      for (let start = 0; start < list.length; start += IMPORT_CHUNK_SIZE) {
+        setProgress({ done: start, total: list.length })
+        const result = await importAthletesFromExcel(list.slice(start, start + IMPORT_CHUNK_SIZE), { dryRun, handledIds })
+        collected.push(...result.credentials)
+        all.push(...result.rows)
+        onBatch?.([...collected])
+        if (result.error) {
+          failure = result.error
+          break
+        }
+        handledIds = result.handledIds
+      }
+    } catch (error) {
+      failure = error instanceof Error ? error.message : t("An error occurred during the import.")
+    } finally {
+      setProgress(null)
+    }
+    return { all, failure }
+  }
+
+  async function preview(list: ParsedAthleteRow[]) {
+    setBusy(true)
+    const { all, failure } = await runBatches(list, true)
+    setOutcomes(failure ? [] : all)
+    setMessage(failure)
+    setBusy(false)
   }
 
   async function importRows() {
@@ -95,44 +145,18 @@ export function ExcelAthleteImport() {
     setBusy(true)
     setMessage(null)
     setCredentials([])
-    setSkipped([])
-
-    const collected: ImportCredential[] = []
-    const skippedRows: ImportSkipped[] = []
-    let imported = 0
-    let failure: string | null = null
-
-    try {
-      // Small batches keep each request fast; the server skips players that already exist.
-      for (let start = 0; start < rows.length; start += IMPORT_CHUNK_SIZE) {
-        setProgress({ done: start, total: rows.length })
-        const result = await importAthletesFromExcel(rows.slice(start, start + IMPORT_CHUNK_SIZE))
-        collected.push(...result.credentials)
-        skippedRows.push(...result.skipped)
-        imported += result.imported
-        setCredentials([...collected])
-        if (result.error) {
-          failure = result.error
-          break
-        }
-      }
-    } catch (error) {
-      failure = error instanceof Error ? error.message : t("An error occurred during the import.")
-    } finally {
-      setProgress(null)
-      setBusy(false)
-    }
-
-    setSkipped(skippedRows)
-    setMessage(
-      failure
-        ? `${failure} ${t.plural(imported, "{count} athlete was imported before the problem.", "{count} athletes were imported before the problem.")} ${t("Fix it and upload the file again: players already imported are skipped.")}`
-        : skippedRows.length
-          ? t.plural(imported, "Imported {count} athlete, skipped {skipped} that already exist.", "Imported {count} athletes, skipped {skipped} that already exist.", { skipped: skippedRows.length })
-          : t.plural(imported, "Imported {count} athlete.", "Imported {count} athletes."),
-    )
+    const { all, failure } = await runBatches(rows, false, setCredentials)
+    setOutcomes(all)
+    setBusy(false)
+    const count = (kind: ImportOutcome["kind"]) => all.filter((row) => row.kind === kind).length
+    const summary = t("{added} added, {updated} updated, {unchanged} already up to date, {skipped} skipped.", { added: count("new"), updated: count("update"), unchanged: count("unchanged"), skipped: count("skipped") })
+    setMessage(failure ? `${failure} ${summary} ${t("Fix it and upload the file again: rows already saved are not repeated.")}` : summary)
     setStep("done")
   }
+
+  const countOf = (kind: ImportOutcome["kind"]) => outcomes.filter((row) => row.kind === kind).length
+  const outcomeOf = (rowNumber: number) => outcomes.find((row) => row.rowNumber === rowNumber)
+  const outcomeLabel = (row: ImportOutcome) => ({ new: t("New athlete"), update: t("Update"), unchanged: t("No changes"), skipped: t("Skipped") })[row.kind]
 
   function downloadCredentials() {
     const lines = [["Athlete", "Troy ID", "Temporary password"].map(csvCell).join(",")]
@@ -184,7 +208,7 @@ export function ExcelAthleteImport() {
                   {t("Only the name is required. Empty cells are simply left empty.")}
                 </li>
                 <li>{t("Do not change, move or delete the header row. The “Example” sheet shows three filled-in players.")}</li>
-                <li>{t("Players that already exist (same name and birth year) are skipped, so re-uploading is safe.")}</li>
+                <li>{t("Athletes who already exist (same name, and same birth year or club) are updated: filled cells replace the saved values, empty cells change nothing. You see every change before saving.")}</li>
               </ol>
 
               <div className="overflow-x-auto rounded-lg border">
@@ -262,6 +286,7 @@ export function ExcelAthleteImport() {
                       <th className="p-2 font-medium">{t("Position")}</th>
                       <th className="p-2 font-medium">{t("Birth year")}</th>
                       <th className="p-2 font-medium">{t("FMS total")}</th>
+                      <th className="p-2 font-medium">{t("What will happen")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -274,6 +299,7 @@ export function ExcelAthleteImport() {
                         <td className="p-2">{row.position ?? "—"}</td>
                         <td className="p-2">{row.birthYear ?? "—"}</td>
                         <td className="p-2">{row.fmsTotal ?? "—"}</td>
+                        <td className="min-w-48 p-2">{outcomeOf(row.rowNumber) ? <OutcomeCell outcome={outcomeOf(row.rowNumber)!} label={outcomeLabel(outcomeOf(row.rowNumber)!)} /> : busy ? "…" : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -281,10 +307,15 @@ export function ExcelAthleteImport() {
               </div>
               {progress && (
                 <p role="status" className="text-xs text-muted-foreground">
-                  {t("Importing… {done} of {total}", { done: progress.done, total: progress.total })}
+                  {outcomes.length ? t("Importing… {done} of {total}", { done: progress.done, total: progress.total }) : t("Checking… {done} of {total}", { done: progress.done, total: progress.total })}
                 </p>
               )}
-              {message && <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">{message}</p>}
+              {!busy && outcomes.length > 0 && (
+                <p role="status" className="text-sm font-medium">
+                  {t("{added} new, {updated} to update, {unchanged} already up to date, {skipped} skipped.", { added: countOf("new"), updated: countOf("update"), unchanged: countOf("unchanged"), skipped: countOf("skipped") })}
+                </p>
+              )}
+              {message && <p role="alert" className="rounded-lg bg-destructive/10 p-2 text-xs text-destructive">{message}</p>}
             </div>
           )}
 
@@ -322,15 +353,23 @@ export function ExcelAthleteImport() {
                   </div>
                 </>
               )}
-              {skipped.length > 0 && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer font-medium">{t("{skippedCount} skipped (already exist)", { skippedCount: skipped.length })}</summary>
-                  <ul className="mt-1 list-disc pl-5">
-                    {skipped.map((entry) => (
-                      <li key={`${entry.rowNumber}-${entry.name}`}>{t("Row {rowNumber}: {name}", { rowNumber: entry.rowNumber, name: entry.name })}</li>
-                    ))}
-                  </ul>
-                </details>
+              {(["update", "skipped", "unchanged"] as const).map((kind) =>
+                countOf(kind) ? (
+                  <details key={kind} className="text-xs" open={kind === "skipped"}>
+                    <summary className="cursor-pointer font-medium">
+                      {kind === "update" ? t("{count} updated", { count: countOf(kind) }) : kind === "skipped" ? t("{count} skipped", { count: countOf(kind) }) : t("{count} already up to date", { count: countOf(kind) })}
+                    </summary>
+                    <ul className="mt-1 list-disc ps-5">
+                      {outcomes.filter((row) => row.kind === kind).map((row) => (
+                        <li key={`${row.rowNumber}-${row.name}`}>
+                          {t("Row {rowNumber}: {name}", { rowNumber: row.rowNumber, name: row.name })}
+                          {row.changes.length ? ` — ${row.changes.join(" · ")}` : ""}
+                          {row.note ? ` — ${row.note}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null,
               )}
             </div>
           )}
@@ -342,8 +381,8 @@ export function ExcelAthleteImport() {
                 <Button type="button" variant="outline" disabled={busy} onClick={reset}>
                   {t("Choose another file")}
                 </Button>
-                <Button type="button" disabled={busy || problems.length > 0} onClick={() => void importRows()}>
-                  {busy ? t("Importing…") : t.plural(rows.length, "Import {count} athlete", "Import {count} athletes")}
+                <Button type="button" disabled={busy || problems.length > 0 || !(countOf("new") + countOf("update"))} onClick={() => void importRows()}>
+                  {busy ? (outcomes.length ? t("Importing…") : t("Checking…")) : t("Save: {added} new, {updated} updated", { added: countOf("new"), updated: countOf("update") })}
                 </Button>
               </>
             )}

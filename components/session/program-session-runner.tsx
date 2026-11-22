@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import { Check, ChevronLeft, ChevronRight, CheckCircle2, ListChecks, ArrowRight, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -57,6 +57,31 @@ export function ProgramSessionRunner({
   const active = exercises[activeIndex]
   const allDone = exercises.length > 0 && completed.length === exercises.length
 
+  // Keep progress on this device: no exercise can be skipped, so a reload must not start over.
+  const progressKey = `troy-session:${programId}:${date}`
+  useEffect(() => {
+    if (initialCompleted) return
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(progressKey) ?? "[]")
+      const done = Array.isArray(saved) ? [...new Set(saved)].filter((index): index is number => Number.isInteger(index) && index >= 0 && index < exercises.length) : []
+      if (!done.length) return
+      setCompleted(done)
+      setActiveIndex(Math.max(0, exercises.findIndex((_, index) => !done.includes(index))))
+    } catch {
+      // Storage unavailable: progress simply starts empty.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressKey])
+
+  function saveProgress(done: number[] | null) {
+    try {
+      if (done) localStorage.setItem(progressKey, JSON.stringify(done))
+      else localStorage.removeItem(progressKey)
+    } catch {
+      // Progress is only a convenience.
+    }
+  }
+
   function backToExercises() {
     const missing = exercises.findIndex((_, index) => (selfieRequired && selfieState[index] !== "uploaded") || !completed.includes(index))
     if (missing >= 0) setActiveIndex(missing)
@@ -76,6 +101,7 @@ export function ProgramSessionRunner({
       if (result.error) {
         setError(result.error)
       } else {
+        saveProgress(null)
         setFinished(true)
         setFeedbackPage(false)
         setRecapPage(false)
@@ -84,12 +110,17 @@ export function ProgramSessionRunner({
   }
 
   function handleExerciseComplete() {
-    setCompleted((current) =>
-      current.includes(activeIndex) ? current : [...current, activeIndex]
-    )
+    const done = completed.includes(activeIndex) ? completed : [...completed, activeIndex]
+    setCompleted(done)
+    saveProgress(done)
+    setError(null)
 
     if (activeIndex < exercises.length - 1) {
       setActiveIndex((index) => index + 1)
+    } else if (done.length < exercises.length) {
+      // No exercise may be skipped: go back to the first one that is not done.
+      setActiveIndex(exercises.findIndex((_, index) => !done.includes(index)))
+      setError(t.plural(exercises.length - done.length, "{count} exercise is not done yet. Complete every exercise to finish the session.", "{count} exercises are not done yet. Complete every exercise to finish the session."))
     } else {
       // Reached the end
       if (showExerciseRecap) {
@@ -376,6 +407,7 @@ export function ProgramSessionRunner({
           )}
         </div>
 
+        {error ? <p role="alert" className="rounded-lg bg-destructive/10 p-2 text-xs text-destructive">{error}</p> : null}
         {selfieRequired && selfieState[activeIndex] !== "uploaded" && !completed.includes(activeIndex) ? (
           <p className="text-xs text-muted-foreground">{t("Upload a selfie first to mark this exercise complete.")}</p>
         ) : null}

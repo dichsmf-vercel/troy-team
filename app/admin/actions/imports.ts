@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createAthleteAuthUser, deleteAthleteCompletely } from "@/lib/admin/athlete-accounts"
 import { parseCsvObjects, parseCsvRows } from "@/lib/admin/csv"
 import { nameKey, validateImportRows } from "@/lib/admin/athlete-import-validation"
+import { matchRow, planAssessment, rowResults, withFmsTotal, type AssessmentPlan, type KnownAthlete, type SavedAssessment } from "@/lib/admin/athlete-import-plan"
 import { getT } from "@/lib/i18n/get-language"
 import type { ParsedAthleteRow } from "@/lib/excel-import"
 import { clubKey } from "@/lib/import-dictionary"
@@ -155,12 +156,21 @@ export async function importAthletesCsv(formData: FormData) {
 // ─── Athletes: Excel roster (Troy ID based) ───────────────────────────────────
 
 export type ImportCredential = { name: string; troyId: string; temporaryPassword: string }
-export type ImportSkipped = { rowNumber: number; name: string; reason: string }
+export type ImportOutcome = {
+  rowNumber: number
+  name: string
+  kind: "new" | "update" | "unchanged" | "skipped"
+  /** What changes for an existing athlete, ready to show. */
+  changes: string[]
+  /** Why a row is skipped, or something the coach should check. */
+  note: string | null
+}
 export type ExcelImportResult = {
   error: string | null
-  imported: number
   credentials: ImportCredential[]
-  skipped: ImportSkipped[]
+  rows: ImportOutcome[]
+  /** Athletes already created/updated by this file; pass back with the next batch so a repeated row is not applied twice. */
+  handledIds: string[]
 }
 
 /** Loads every row of a table in 1000-row pages (PostgREST caps a single response at 1000). */
@@ -182,9 +192,21 @@ async function fetchAllRows<T>(
   return { data: rows, error: null }
 }
 
-export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promise<ExcelImportResult> {
+type ProfileRow = { id: string; full_name: string | null; full_name_ar: string | null }
+type AthleteRow = { id: string; birth_year: number | null; sport: string | null; position: string | null }
+
+/**
+ * Adds new athletes and updates existing ones from a roster sheet. For an existing athlete only filled
+ * cells count: sport, position, missing birth year / Arabic name, an extra club and new test results.
+ * Passwords, settings, programs and clubs already assigned are never touched.
+ * `dryRun` saves nothing and only reports what would happen (the preview in the import dialog).
+ */
+export async function importAthletesFromExcel(
+  input: ParsedAthleteRow[],
+  options: { dryRun?: boolean; handledIds?: string[] } = {},
+): Promise<ExcelImportResult> {
   const t = await getT()
-  const result: ExcelImportResult = { error: null, imported: 0, credentials: [], skipped: [] }
+  const result: ExcelImportResult = { error: null, credentials: [], rows: [], handledIds: [] }
   const stop = (error: string): ExcelImportResult => ({ ...result, error })
 
   const auth = await requireAdmin(t("Only admins can import athletes."))
@@ -192,39 +214,28 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
 
   const validated = validateImportRows(input, t)
   if (!validated.ok) return stop(validated.error)
+  const dryRun = options?.dryRun === true
+  const handled = new Set((Array.isArray(options?.handledIds) ? options.handledIds : []).filter((id) => typeof id === "string").slice(0, 1000))
 
   const service = createAdminClient()
 
-  // Existing athletes → skip duplicates so re-uploading a file never doubles the roster.
-  const profiles = await fetchAllRows<{ id: string; full_name: string | null; full_name_ar: string | null }>(service, "profiles", "id, full_name, full_name_ar", { column: "role", value: "athlete" })
-  const athletes = await fetchAllRows<{ id: string; birth_year: number | null }>(service, "athletes", "id, birth_year")
-  if (profiles.error || athletes.error) return stop(t("Could not check existing athletes: {error}", { error: profiles.error ?? athletes.error }))
+  const profiles = await fetchAllRows<ProfileRow>(service, "profiles", "id, full_name, full_name_ar", { column: "role", value: "athlete" })
+  const athletes = await fetchAllRows<AthleteRow>(service, "athletes", "id, birth_year, sport, position")
   const memberships = await fetchAllRows<{ athlete_id: string; team_id: string }>(service, "athlete_teams", "athlete_id, team_id")
-  if (memberships.error) return stop(t("Could not check existing athletes: {error}", { error: memberships.error }))
-  const birthYearById = new Map(athletes.data.map((athlete) => [athlete.id, athlete.birth_year]))
+  const loadError = profiles.error ?? athletes.error ?? memberships.error
+  if (loadError) return stop(t("Could not check existing athletes: {error}", { error: loadError }))
+
+  const athleteById = new Map(athletes.data.map((athlete) => [athlete.id, athlete]))
+  const profileById = new Map(profiles.data.map((profile) => [profile.id, profile]))
   const teamsByAthlete = new Map<string, Set<string>>()
   for (const row of memberships.data) teamsByAthlete.set(row.athlete_id, (teamsByAthlete.get(row.athlete_id) ?? new Set()).add(row.team_id))
-  type Known = { birthYear: number | null; teamIds: Set<string> }
-  const seen = new Map<string, Known[]>()
-  const remember = (names: (string | null | undefined)[], known: Known) => {
-    for (const name of names) {
-      const key = nameKey(name ?? "")
-      if (key) seen.set(key, [...(seen.get(key) ?? []), known])
-    }
+  const knownByName = new Map<string, KnownAthlete[]>()
+  const remember = (names: (string | null | undefined)[], known: KnownAthlete) => {
+    for (const key of new Set(names.map((name) => nameKey(name ?? "")).filter(Boolean))) knownByName.set(key, [...(knownByName.get(key) ?? []), known])
   }
   for (const profile of profiles.data) {
-    remember([profile.full_name, profile.full_name_ar], { birthYear: birthYearById.get(profile.id) ?? null, teamIds: teamsByAthlete.get(profile.id) ?? new Set() })
+    remember([profile.full_name, profile.full_name_ar], { id: profile.id, birthYear: athleteById.get(profile.id)?.birth_year ?? null, teamIds: teamsByAthlete.get(profile.id) ?? new Set() })
   }
-  // Same player = same name (English or Arabic spelling) AND
-  //  - same birth year when both are known, otherwise
-  //  - same club when either birth year is missing ("Mohamed Ahmed" is a common name: a name alone is not enough).
-  const sameAthlete = (existing: Known, birthYear: number | null, teamId: string | null) => {
-    if (existing.birthYear != null && birthYear != null) return existing.birthYear === birthYear
-    if (teamId && existing.teamIds.size) return existing.teamIds.has(teamId)
-    return existing.birthYear == null && birthYear == null && !teamId && !existing.teamIds.size
-  }
-  const isDuplicate = (names: (string | null | undefined)[], birthYear: number | null, teamId: string | null) =>
-    names.some((name) => (seen.get(nameKey(name ?? "")) ?? []).some((existing) => sameAthlete(existing, birthYear, teamId)))
 
   const { data: existingTeams, error: teamsError } = await service.from("teams").select("id,name_en,name_ar")
   if (teamsError) return stop(t("Could not load teams: {message}", { message: teamsError.message }))
@@ -236,46 +247,124 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
   for (const row of validated.rows) {
     const fullName = row.fullName.trim()
     const birthYear = row.birthYear ?? null
+    const outcome = (kind: ImportOutcome["kind"], changes: string[] = [], note: string | null = null) =>
+      result.rows.push({ rowNumber: row.rowNumber, name: fullName, kind, changes, note })
+    const fail = (message: string) => stop(t("Row {rowNumber}: {message}", { rowNumber: row.rowNumber, message }))
 
-    const club = row.clubName?.trim()
-    const knownTeamId = club && club.toLocaleLowerCase() !== "not set" ? teamIdByName.get(clubKey(row.clubNameAr ?? club)) ?? null : null
-    if (isDuplicate([row.fullName, row.fullNameAr], birthYear, knownTeamId)) {
-      result.skipped.push({ rowNumber: row.rowNumber, name: fullName, reason: "An athlete with this name already exists." })
+    // "الطيران", "طيران " and "Al Tayaran" are the same club.
+    const clubName = row.clubName?.trim() && row.clubName.trim().toLocaleLowerCase() !== "not set" ? row.clubName.trim() : null
+    const teamKey = clubName ? clubKey(row.clubNameAr ?? clubName) : null
+    const knownTeamId = teamKey ? (teamIdByName.get(teamKey) ?? null) : null
+    const ensureTeam = async (): Promise<{ id: string | null; error: string | null }> => {
+      if (!clubName || !teamKey) return { id: null, error: null }
+      const existing = teamIdByName.get(teamKey)
+      if (existing) return { id: existing, error: null }
+      const { data: team, error } = await service
+        .from("teams")
+        .insert({ name_en: clubName, name_ar: row.clubNameAr ?? clubName, color_hex: "#2563eb" })
+        .select("id")
+        .single()
+      if (error || !team) return { id: null, error: t("could not create team \"{club}\": {error}", { club: clubName, error: error?.message ?? t("no team returned") }) }
+      teamIdByName.set(teamKey, team.id)
+      return { id: team.id, error: null }
+    }
+
+    const sameName = [row.fullName, row.fullNameAr].flatMap((name) => knownByName.get(nameKey(name ?? "")) ?? [])
+    const match = matchRow(sameName, birthYear, knownTeamId)
+
+    if (match.kind === "ambiguous") {
+      outcome("skipped", [], t("More than one athlete has this name. Add a birth year or club to the sheet, or edit the profile by hand."))
       continue
     }
 
-    // Club → team (created on first use).
-    let teamId: string | null = null
-    const clubName = row.clubName?.trim()
-    if (clubName && clubName.toLocaleLowerCase() !== "not set") {
-      // "الطيران", "طيران " and "Al Tayaran" are the same club.
-      const key = clubKey(row.clubNameAr ?? clubName)
-      teamId = teamIdByName.get(key) ?? null
-      if (!teamId) {
-        const { data: team, error } = await service
-          .from("teams")
-          .insert({ name_en: clubName, name_ar: row.clubNameAr ?? clubName, color_hex: "#2563eb" })
-          .select("id")
-          .single()
-        if (error || !team) return stop(t("Row {row}: could not create team \"{club}\": {error}", { row: row.rowNumber, club: clubName, error: error?.message ?? t("no team returned") }))
-        teamId = team.id
-        teamIdByName.set(key, team.id)
+    // ── Existing athlete ─────────────────────────────────────────────────────
+    if (match.kind === "existing") {
+      const athleteId = match.known.id
+      if (!athleteId || handled.has(athleteId)) {
+        outcome("skipped", [], t("This athlete appears more than once in the file. Only the first row is used."))
+        continue
       }
+      handled.add(athleteId)
+      const athlete = athleteById.get(athleteId)
+      const profile = profileById.get(athleteId)
+      const changes: string[] = []
+      const athleteUpdate: Record<string, string | number> = {}
+      const change = (label: string, before: string | number | null | undefined, after: string | number) =>
+        changes.push(before == null || before === "" ? `${label}: ${after}` : `${label}: ${before} → ${after}`)
+
+      const sport = fieldValue(row.sport)
+      if (sport && sport.toLocaleLowerCase() !== fieldValue(athlete?.sport).toLocaleLowerCase()) {
+        athleteUpdate.sport = sport
+        change(t("Sport"), fieldValue(athlete?.sport), sport)
+      }
+      const position = fieldValue(row.position)
+      if (position && position.toLocaleLowerCase() !== fieldValue(athlete?.position).toLocaleLowerCase()) {
+        athleteUpdate.position = position
+        change(t("Position"), fieldValue(athlete?.position), position)
+      }
+      if (birthYear != null && athlete?.birth_year == null) {
+        athleteUpdate.birth_year = birthYear
+        change(t("Birth year"), null, birthYear)
+      }
+      const nameAr = !profile?.full_name_ar?.trim() && row.fullNameAr?.trim() ? row.fullNameAr.trim() : null
+      if (nameAr) change(t("Arabic name"), null, nameAr)
+      const addClub = !!clubName && !(knownTeamId && match.known.teamIds.has(knownTeamId))
+      if (addClub) change(t("Club added"), null, clubName)
+
+      const saved = await loadLatestAssessment(service, athleteId)
+      if (saved.error) return fail(saved.error)
+      const plan = planAssessment(saved.assessment, row, new Date().toISOString().slice(0, 10))
+      let note: string | null = null
+      if (plan.action === "insert" || plan.action === "update") changes.push(t.plural(plan.changed.length, "{count} test result", "{count} test results"))
+      if (plan.action === "older") note = t("The sheet's test date is older than the saved results, so the saved results are kept.")
+
+      if (!dryRun) {
+        if (Object.keys(athleteUpdate).length) {
+          const { error } = await service.from("athletes").update(athleteUpdate).eq("id", athleteId)
+          if (error) return fail(t("Athlete profile save failed: {message}", { message: error.message }))
+        }
+        if (nameAr) {
+          const { error } = await service.from("profiles").update({ full_name_ar: nameAr }).eq("id", athleteId)
+          if (error) return fail(t("Profile save failed: {message}", { message: error.message }))
+        }
+        if (addClub) {
+          const team = await ensureTeam()
+          if (team.error) return fail(team.error)
+          const { error } = await service.from("athlete_teams").upsert({ athlete_id: athleteId, team_id: team.id }, { onConflict: "athlete_id,team_id", ignoreDuplicates: true })
+          if (error) return fail(t("Team assignment failed: {message}", { message: error.message }))
+        }
+        if (plan.action === "insert" || plan.action === "update") {
+          const stored = await saveAssessmentPlan(service, athleteId, row, plan, saved, t)
+          if (stored.error) return fail(stored.error)
+        }
+      }
+      outcome(changes.length ? "update" : "unchanged", changes, note)
+      continue
     }
 
+    // ── New athlete ──────────────────────────────────────────────────────────
+    const newNote = match.sameName ? t("Another athlete has the same name but a different birth year or club. Check that this is a new person.") : null
+    if (dryRun) {
+      remember([row.fullName, row.fullNameAr], { id: null, birthYear, teamIds: new Set(knownTeamId ? [knownTeamId] : []) })
+      outcome("new", [], newNote)
+      continue
+    }
+
+    const team = await ensureTeam()
+    if (team.error) return fail(team.error)
     const created = await createAthleteAuthUser(service, fullName)
-    if (!created.ok) return stop(t("Row {rowNumber}: {error}", { rowNumber: row.rowNumber, error: created.error }))
+    if (!created.ok) return fail(created.error)
     const athleteId = created.id
 
     const rollback = async (message: string) => {
       await deleteAthleteCompletely(service, athleteId)
-      return stop(t("Row {rowNumber}: {message}", { rowNumber: row.rowNumber, message }))
+      return fail(message)
     }
 
     const { error: profileError } = await service.from("profiles").upsert({
       id: athleteId,
       full_name: fullName,
-      full_name_ar: row.fullNameAr ?? (/[\u0600-\u06ff]/.test(fullName) ? fullName : null),
+      full_name_ar: row.fullNameAr ?? (/[؀-ۿ]/.test(fullName) ? fullName : null),
       role: "athlete",
       troy_id: created.troyId,
       password_change_required: true,
@@ -294,27 +383,77 @@ export async function importAthletesFromExcel(input: ParsedAthleteRow[]): Promis
     })
     if (athleteError) return rollback(t("Athlete profile save failed: {message}", { message: athleteError.message }))
 
-    if (teamId) {
-      const { error } = await service.from("athlete_teams").insert({ athlete_id: athleteId, team_id: teamId })
+    if (team.id) {
+      const { error } = await service.from("athlete_teams").insert({ athlete_id: athleteId, team_id: team.id })
       if (error) return rollback(t("Team assignment failed: {message}", { message: error.message }))
     }
 
-    const saved = await saveImportedAssessment(service, athleteId, row, t)
-    if (saved.error) return rollback(saved.error)
+    const stored = await insertAssessment(service, athleteId, row, toAnswers(withFmsTotal(rowResults(row))), t)
+    if (stored.error) return rollback(stored.error)
 
+    handled.add(athleteId)
     result.credentials.push({ name: fullName, troyId: created.troyId, temporaryPassword: created.temporaryPassword })
-    result.imported++
-    remember([row.fullName, row.fullNameAr], { birthYear, teamIds: new Set(teamId ? [teamId] : []) })
+    remember([row.fullName, row.fullNameAr], { id: athleteId, birthYear, teamIds: new Set(team.id ? [team.id] : []) })
+    outcome("new", [], newNote)
   }
 
-  revalidatePath("/admin")
+  result.handledIds = [...handled]
+  if (!dryRun) revalidatePath("/admin")
   return result
 }
 
-async function saveImportedAssessment(service: SupabaseClient, athleteId: string, row: ParsedAthleteRow, t: TFunction): Promise<{ error: string | null }> {
-  const fms = [row.deepSquat, row.hurdleStep, row.inlineLunge, row.shoulderMobility, row.activeStraightLegRaise, row.trunkStability, row.rotaryStability]
-  const fmsTotal = fms.every((score) => typeof score === "number") ? fms.reduce<number>((total, score) => total + (score ?? 0), 0) : null
+type Answer = { question_key: string; answer_json: unknown }
+type LatestAssessment = { error: string | null; id: string | null; answers: Map<string, unknown>; assessment: SavedAssessment | null }
 
+const toAnswers = (results: Record<string, unknown>): Answer[] => Object.entries(results).map(([question_key, value]) => ({ question_key, answer_json: { value } }))
+
+/** The record the admin screens show: newest by submitted_at (same order as app/admin/page.tsx). */
+async function loadLatestAssessment(service: SupabaseClient, athleteId: string): Promise<LatestAssessment> {
+  const { data, error } = await service
+    .from("athlete_assessments")
+    .select("id,status,submitted_at,coach_notes,athlete_assessment_answers(question_key,answer_json)")
+    .eq("athlete_id", athleteId)
+    .order("submitted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) return { error: error.message, id: null, answers: new Map(), assessment: null }
+  if (!data) return { error: null, id: null, answers: new Map(), assessment: null }
+  const answers = new Map(((data.athlete_assessment_answers ?? []) as Answer[]).map((answer) => [answer.question_key, answer.answer_json]))
+  const results = Object.fromEntries([...answers].map(([key, json]) => [key, (json as { value?: unknown } | null)?.value ?? null]))
+  const notes = data.coach_notes ?? ""
+  const dateIsImportDay = notes.startsWith("Imported from Excel roster") && !notes.includes("Assessment date:")
+  return { error: null, id: data.id, answers, assessment: { date: data.submitted_at, status: data.status, results, dateIsImportDay } }
+}
+
+async function saveAssessmentPlan(
+  service: SupabaseClient,
+  athleteId: string,
+  row: ParsedAthleteRow,
+  plan: Extract<AssessmentPlan, { action: "insert" | "update" }>,
+  saved: LatestAssessment,
+  t: TFunction,
+): Promise<{ error: string | null }> {
+  // Keep untouched answers exactly as stored (some are not plain numbers).
+  const touched = new Set([...plan.changed, "fms_total"])
+  const answers = Object.entries(plan.results).map(([question_key, value]) => ({
+    question_key,
+    answer_json: !touched.has(question_key) && saved.answers.has(question_key) ? saved.answers.get(question_key) : { value },
+  }))
+  if (plan.action === "insert" || !saved.id) return insertAssessment(service, athleteId, row, answers, t)
+
+  const { error } = await service
+    .from("athlete_assessment_answers")
+    .upsert(answers.filter((answer) => touched.has(answer.question_key)).map((answer) => ({ assessment_id: saved.id, ...answer })), { onConflict: "assessment_id,question_key" })
+  if (error) return { error: t("Assessment measurements save failed: {message}", { message: error.message }) }
+  if (plan.removed.length) {
+    const { error: removeError } = await service.from("athlete_assessment_answers").delete().eq("assessment_id", saved.id).in("question_key", plan.removed)
+    if (removeError) return { error: t("Assessment measurements save failed: {message}", { message: removeError.message }) }
+  }
+  await service.from("athlete_assessments").update({ updated_at: new Date().toISOString() }).eq("id", saved.id)
+  return { error: null }
+}
+
+async function insertAssessment(service: SupabaseClient, athleteId: string, row: ParsedAthleteRow, answers: Answer[], t: TFunction): Promise<{ error: string | null }> {
   const notes = ["Imported from Excel roster", row.assessmentDate ? `Assessment date: ${row.assessmentDate}` : null, row.rawNotes]
     .filter(Boolean)
     .join("\n")
@@ -328,35 +467,12 @@ async function saveImportedAssessment(service: SupabaseClient, athleteId: string
     .single()
   if (error || !assessment) return { error: t("Assessment save failed: {error}", { error: error?.message ?? t("no assessment returned") }) }
 
-  const values: [string, number | null | undefined][] = [
-    ["deep_squat", row.deepSquat],
-    ["hurdle_step", row.hurdleStep],
-    ["inline_lunge", row.inlineLunge],
-    ["shoulder_mobility", row.shoulderMobility],
-    ["active_straight_leg_raise", row.activeStraightLegRaise],
-    ["trunk_stability", row.trunkStability],
-    ["rotary_stability", row.rotaryStability],
-    ["fms_total", fmsTotal],
-    ["v_jump_cm", row.verticalJumpCm],
-    ["horizontal_jump_cm", row.horizontalJumpCm],
-    ["sprint_20m_seconds", row.sprint20mSec],
-    ["t_test_seconds", row.tTestSec],
-    ["agility_505_r_seconds", row.agility505RSec],
-    ["agility_505_l_seconds", row.agility505LSec],
-    ["push_ups", row.pushUps],
-    ["pull_ups", row.pullUps],
-    ["plank_seconds", row.plankSec],
-    ["beep_test_level", row.beepTestLevel],
-    ["row_machine_result", row.rowMachineResult],
-    ["row_machine_watts", row.rowMachineWatts],
-  ]
-  const answers = values
-    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]))
-    .map(([question_key, value]) => ({ assessment_id: assessment.id, question_key, answer_json: { value } }))
-
   if (answers.length) {
-    const { error: answersError } = await service.from("athlete_assessment_answers").insert(answers)
-    if (answersError) return { error: t("Assessment measurements save failed: {message}", { message: answersError.message }) }
+    const { error: answersError } = await service.from("athlete_assessment_answers").insert(answers.map((answer) => ({ assessment_id: assessment.id, ...answer })))
+    if (answersError) {
+      await service.from("athlete_assessments").delete().eq("id", assessment.id)
+      return { error: t("Assessment measurements save failed: {message}", { message: answersError.message }) }
+    }
   }
   return { error: null }
 }

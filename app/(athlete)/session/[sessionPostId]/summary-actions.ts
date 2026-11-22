@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation"
 import { requireUser } from "@/lib/auth/guards"
-import { getOwnedSessionAthlete } from "@/lib/auth/ownership"
+import { countMissingExercises, getOwnedSessionAthlete } from "@/lib/auth/ownership"
 import { getT } from "@/lib/i18n/get-language"
 
 const inRange = (value: unknown, min: number, max: number) => typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
@@ -30,6 +30,11 @@ export async function submitSessionSummary(
   if (![input.rpe, input.overallRating, input.sleepQuality, input.sorenessLevel].every((value) => inRange(value, 0, 10))) {
     return { error: t("Ratings must be between 0 and 10.") }
   }
+
+  // No exercise may be skipped, even when the summary page is opened directly.
+  const missing = await countMissingExercises(supabase, sessionPostId, sessionAthleteId)
+  if (missing === null) return { error: t("Could not check your exercises. Try again.") }
+  if (missing > 0) return { error: t.plural(missing, "{count} exercise is not done yet. Complete every exercise to finish the session.", "{count} exercises are not done yet. Complete every exercise to finish the session.") }
 
   const { error } = await supabase.from("session_summaries").upsert(
     {
