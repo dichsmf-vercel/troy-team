@@ -9,8 +9,9 @@
  * Privacy: athlete names / contact details are never sent to the model.
  */
 
+import { cleanPreferenceRules, DEFAULT_COACH_PROMPT, listPreferences } from "@/lib/coach-preferences"
 import { describeProgramEdits } from "@/lib/program-edits"
-import { expandWeekTemplate, validateProgram, validatePromptText } from "@/lib/gemini-validate"
+import { expandWeekTemplate, validateProgram } from "@/lib/gemini-validate"
 import type { CatalogExercise, GeminiProgramOutput } from "@/lib/gemini-types"
 import type { TFunction } from "@/lib/i18n/translate"
 
@@ -156,11 +157,6 @@ export type GenerateProgramInput = {
   t?: TFunction
 }
 
-const DEFAULT_SYSTEM_PROMPT = `You are an expert strength and conditioning coach for Egyptian athletes.
-You specialize in sport-specific training for handball, football, basketball, volleyball, and hockey.
-Design evidence-based, periodized programs that are safe, progressive, and respect the athlete's limitations.
-Always produce valid JSON with no extra commentary outside the JSON block.`
-
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 export function buildGenerationPrompt(input: GenerateProgramInput): string {
@@ -238,7 +234,7 @@ export async function generateProgramWithGemini(
 
   let raw = ""
   try {
-    raw = await callGemini(apiKey, buildGenerationPrompt(input), input.coachSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT, {
+    raw = await callGemini(apiKey, buildGenerationPrompt(input), input.coachSystemPrompt?.trim() || DEFAULT_COACH_PROMPT, {
       models: resolveModels("generation"),
     })
 
@@ -259,15 +255,17 @@ export async function generateProgramWithGemini(
 
 const MAX_REASON_LENGTH = 1000
 
+/** Turns one set of coach edits into a summary and 0-3 GENERAL preference rules (never a whole new prompt). */
 export async function summarizeAdminEdits(input: {
   originalProgram: GeminiProgramOutput
   editedProgram: GeminiProgramOutput
   adminReason: string
-  currentPromptText: string
-}): Promise<{ summary: string | null; newPromptText: string | null; error: string | null }> {
+  currentPromptText: string | null
+}): Promise<{ summary: string | null; rules: string[]; error: string | null }> {
   const apiKey = process.env.GEMINI_API_KEY_2
-  if (!apiKey) return { summary: null, newPromptText: null, error: "GEMINI_API_KEY_2 is not configured." }
+  if (!apiKey) return { summary: null, rules: [], error: "GEMINI_API_KEY_2 is not configured." }
 
+  const known = listPreferences(input.currentPromptText)
   const detailed = describeProgramEdits(input.originalProgram, input.editedProgram)
   const names = (program: GeminiProgramOutput) => program.sessions.flatMap((s) => s.exercises.map((e) => e.name_en))
   const original = names(input.originalProgram)
@@ -290,26 +288,28 @@ ${detailed.length ? detailed.map((line) => `  - ${line}`).join("\n") : "  - none
 ## Coach's reason (data)
 <reason>${reason}</reason>
 
-## Current coach system prompt
-${input.currentPromptText}
+## Preferences already known (do not repeat them)
+${known.length ? known.map((rule) => `- ${rule}`).join("\n") : "none"}
 
 ## Task
 1. Write a 2-3 sentence summary of what was changed and why.
-2. Propose an updated coach system prompt that incorporates the preferences revealed by these edits. Keep it under 400 words, preserve the original structure and intent, and only add or refine. It must keep the rule to output valid JSON only.
+2. Write 1 to 3 short coaching preferences revealed by these edits, to be followed in FUTURE programs for ALL athletes.
+   - Each is one imperative sentence of at most 140 characters, in English.
+   - General: no athlete, date or session details. Mention a sport, position or age group only if the coach's reason says the preference depends on it.
+   - Prefer principles (volume, order, balance, exercise type) over single exercises. Do not say "always include" for one exercise unless the coach's reason says so.
+   - If the edits reveal no general preference, return an empty list.
 
-Return ONLY a JSON object: {"summary": "...", "updatedPrompt": "..."}`
+Return ONLY a JSON object: {"summary": "...", "rules": ["..."]}`
 
   try {
     const raw = await callGemini(apiKey, prompt, undefined, { models: resolveModels("summary"), maxOutputTokens: 4096 })
-    const parsed = extractJson(raw) as { summary?: unknown; updatedPrompt?: unknown }
-    const newPromptText = validatePromptText(parsed.updatedPrompt)
-    if (!newPromptText) return { summary: null, newPromptText: null, error: "The AI returned an unusable prompt proposal." }
+    const parsed = extractJson(raw) as { summary?: unknown; rules?: unknown }
     return {
       summary: typeof parsed.summary === "string" ? parsed.summary.slice(0, 600) : null,
-      newPromptText,
+      rules: cleanPreferenceRules(parsed.rules),
       error: null,
     }
   } catch (err) {
-    return { summary: null, newPromptText: null, error: err instanceof Error ? err.message : String(err) }
+    return { summary: null, rules: [], error: err instanceof Error ? err.message : String(err) }
   }
 }

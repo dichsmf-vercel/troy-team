@@ -31,6 +31,7 @@ import { AthletePicker, defaultTrainingDays, type PickableAthlete } from "@/comp
 import { todayInAppZone } from "@/lib/dates"
 import { actionErrorMessage } from "@/lib/client-errors"
 import { ExerciseMediaPreview } from "@/components/admin/exercise-media-preview"
+import { PROMPT_PROPOSED_EVENT } from "@/components/admin/prompt-proposals-panel"
 import type { AdminExercise } from "@/lib/admin/types"
 import { PROGRAM_SECTIONS } from "@/lib/gemini-validate"
 import { sessionVolumeWarnings } from "@/lib/program-edits"
@@ -159,8 +160,11 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
         setSaveMsg(
           learned.error
             ? t("Program saved for admin review. The learning step failed: {error}", { error: learned.error })
-            : t("Program saved for admin review. A prompt improvement was proposed and is waiting for admin approval."),
+            : learned.proposed
+              ? t("Program saved for admin review. A prompt improvement was proposed and is waiting for admin approval.")
+              : t("Program saved for admin review. These edits did not add a new general preference."),
         )
+        if (learned.proposed) window.dispatchEvent(new Event(PROMPT_PROPOSED_EVENT))
         return
       }
 
@@ -284,7 +288,7 @@ export function AIProgramGenerator({ athletes, exercises = [] }: { athletes: Ath
           <Button
             onClick={handleGenerate}
             disabled={!athleteId || !days.length || generating}
-            className="gap-2 bg-violet-600 hover:bg-violet-700"
+            className="gap-2"
           >
             {generating ? (
               <><Loader2 className="size-4 animate-spin" />{t("Generating…")}</>

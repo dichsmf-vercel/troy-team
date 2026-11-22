@@ -3,14 +3,11 @@
 import { firstRelation } from "@/lib/utils"
 import { useMemo, useState } from "react"
 import { Search, UserRound, Filter, SlidersHorizontal, AlertTriangle, Camera } from "lucide-react"
-import { importAthletesCsv } from "@/app/admin/actions/imports"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ExcelAthleteImport } from "@/components/admin/excel-athlete-import"
 import { AthleteDrawer } from "@/components/admin/athlete-drawer"
-import { actionErrorMessage, isStaleActionError } from "@/lib/client-errors"
 import type { AthleteSessionSummary, AthleteExercisePain } from "@/components/admin/athlete-feedback-panel"
 import type { AdminAthlete, AdminAthleteProfile, AdminSelfie } from "@/lib/admin/types"
 import { fieldValue, sportLabel, statusLabel } from "@/lib/i18n/labels"
@@ -39,8 +36,6 @@ export function AthletesPanel({
   const ln = useLn()
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all")
-  const [importMessage, setImportMessage] = useState<string | null>(null)
-  const [importing, setImporting] = useState(false)
   const [selectedAthlete, setSelectedAthlete] = useState<any | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -94,121 +89,76 @@ export function AthletesPanel({
 
   return (
     <div className="grid gap-5">
-      {/* Search + import bar */}
-      <Card>
-        <CardHeader className="gap-4 p-4 sm:p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-xl">{t("Athlete Roster")}</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t("Manage profiles, assessments, training schedules, and direct credentials.")}
-              </p>
-            </div>
-            <form
-              onSubmit={async (event) => {
-                event.preventDefault()
-                setImporting(true)
-                setImportMessage(null)
-                try {
-                  const result = await importAthletesCsv(new FormData(event.currentTarget))
-                  setImportMessage(result.error ?? t.plural(result.imported ?? 0, "Imported {count} athlete.", "Imported {count} athletes."))
-                } catch (err) {
-                  if (isStaleActionError(err)) {
-                    setImportMessage(t("App was recently updated. Please refresh the page (Ctrl + F5)."))
-                  } else {
-                    setImportMessage(actionErrorMessage(err, t(t("An error occurred during CSV import.")), t))
-                  }
-                } finally {
-                  setImporting(false)
-                }
-              }}
-              className="flex flex-wrap items-center gap-2"
-            >
-              <Input type="file" name="file" accept=".csv,text/csv" className="h-8 text-xs max-w-xs" />
-              <Button type="submit" variant="outline" size="sm" disabled={importing} className="h-8 text-xs">
-                {importing ? t("Importing…") : t("Import CSV")}
-              </Button>
-            </form>
-          </div>
-
-          {importMessage && (
-            <p role="status" className="rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
-              {importMessage}
-            </p>
-          )}
-
-          {/* Search and filters */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
-              <Input
-                aria-label={t("Search athletes")}
-                placeholder={t("Search name, Troy ID, sport…")}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="pl-9 h-9 text-xs"
-              />
-            </div>
-
-            {/* Filter Pills */}
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setStatusFilter("all")}
-                className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  statusFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {t("All ({athletesCount})", { athletesCount: athletes.length })}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("active")}
-                className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                  statusFilter === "active" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {t("Active ({count})", { count: athletes.length - pausedCount })}
-              </button>
-              {pausedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("paused")}
-                  className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                    statusFilter === "paused" ? "bg-amber-600 text-white" : "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20"
-                  }`}
-                >
-                  {t("Paused ({pausedCount})", { pausedCount })}
-                </button>
-              )}
-              {totalPainAthletes > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("pain")}
-                  className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                    statusFilter === "pain" ? "bg-red-600 text-white" : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
-                  }`}
-                >
-                  {t("Pain reports ({totalPainAthletes})", { totalPainAthletes })}
-                </button>
-              )}
-              {totalSelfieAthletes > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("selfies")}
-                  className={`rounded-full px-3 py-1 font-medium transition-colors ${
-                    statusFilter === "selfies" ? "bg-violet-600 text-white" : "bg-violet-500/10 text-violet-700 hover:bg-violet-500/20"
-                  }`}
-                >
-                  {t("Selfies ({totalSelfieAthletes})", { totalSelfieAthletes })}
-                </button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
       <ExcelAthleteImport />
+
+      {/* Search and filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
+          <Input
+            aria-label={t("Search athletes")}
+            placeholder={t("Search name, Troy ID, sport…")}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="pl-9 h-9 bg-card text-xs"
+          />
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setStatusFilter("all")}
+            className={`rounded-full px-3 py-1 font-medium transition-colors ${
+              statusFilter === "all" ? "bg-foreground text-background dark:bg-primary dark:text-primary-foreground" : "bg-card text-card-foreground hover:bg-card/80"
+            }`}
+          >
+            {t("All ({athletesCount})", { athletesCount: athletes.length })}
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("active")}
+            className={`rounded-full px-3 py-1 font-medium transition-colors ${
+              statusFilter === "active" ? "bg-foreground text-background dark:bg-primary dark:text-primary-foreground" : "bg-card text-card-foreground hover:bg-card/80"
+            }`}
+          >
+            {t("Active ({count})", { count: athletes.length - pausedCount })}
+          </button>
+          {pausedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter("paused")}
+              className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                statusFilter === "paused" ? "bg-amber-600 text-white" : "bg-card text-amber-700 hover:bg-card/80 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+              }`}
+            >
+              {t("Paused ({pausedCount})", { pausedCount })}
+            </button>
+          )}
+          {totalPainAthletes > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter("pain")}
+              className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                statusFilter === "pain" ? "bg-red-600 text-white" : "bg-card text-red-600 hover:bg-card/80 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+              }`}
+            >
+              {t("Pain reports ({totalPainAthletes})", { totalPainAthletes })}
+            </button>
+          )}
+          {totalSelfieAthletes > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter("selfies")}
+              className={`rounded-full px-3 py-1 font-medium transition-colors ${
+                statusFilter === "selfies" ? "bg-sky-600 text-white" : "bg-card text-sky-800 hover:bg-card/80 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-500/25"
+              }`}
+            >
+              {t("Selfies ({totalSelfieAthletes})", { totalSelfieAthletes })}
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Roster list */}
       <section aria-label={t("Athlete roster")}>
@@ -269,7 +219,7 @@ export function AthletesPanel({
                     </Badge>
                   )}
                   {selfieCount > 0 && (
-                    <Badge variant="secondary" className="bg-violet-500/10 text-violet-700 text-[10px]">
+                    <Badge variant="secondary" className="bg-sky-500/15 text-sky-800 text-[10px] dark:text-sky-300">
                       <Camera className="mr-1 size-3" /> {selfieCount}
                     </Badge>
                   )}

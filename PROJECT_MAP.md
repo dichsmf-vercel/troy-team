@@ -72,12 +72,17 @@ public/ data/  assets, CSVs, 2 empty xlsx assessment templates (unreferenced)
 ## 5b. Future work — full problem list (from QA 2026-11-18/19, details in `docs/qa/results-2026-11-18.md`)
 Status: [ ] open · [~] in progress · [x] done
 
-**Owner requests 2026-11-20 (not started)**
-- [ ] **First-run walkthrough**: a skippable guided tour shown on a user's first 5 visits, explaining the main buttons and features — separate tours for the admin side and the athlete side. Remember "skipped/finished" per user.
-- [ ] **Selfie requirement toggle**: per athlete (or per session), whether submitting a selfie is required. Re-test selfie upload on the athlete side and viewing/reviewing it on the admin side.
-- [ ] **Re-import**: re-run the roster import end to end on real sheets (duplicates, updates to existing athletes, new athletes) and fix what it finds.
-- [ ] **Hide upcoming exercises toggle**: on the athlete Program tab, athletes should not see the full exercise list of future sessions; make it a coach toggle (per athlete or global).
-- [ ] **AI generation learns from coach edits**: when the coach edits a generated program (add/remove/reorder/replace exercises, any position), store the change and feed it into the prompt for future generations. Coach Ahmed's standing feedback to include: 5 exercises per session and a single strength exercise are too few. Test it for real (generate → edit → generate again and check the new prompt/output); if it cannot be observed directly, add console logging and read it in the browser console (in-app browser, or Chrome if needed).
+**Owner requests 2026-11-20 — status after shipping PR #19 + #20 (live 2026-11-20, migration 202611200001 run)**
+- [x] **First-run walkthrough**: `components/shared/guided-tour.tsx`; auto-opens on a user's first 5 visits until finished/skipped, "?" in the top bar replays it. Each tab step has numbered how-to-use instructions (2026-11-22). The automatic run opens each tab; a replay only points (so it cannot discard unsaved work). Checked locally with fake data: all admin steps, Arabic athlete steps at phone size. Not yet checked: the automatic athlete run on the live site (it navigates between real pages).
+- [~] **Selfie required toggle** (athlete drawer): built + migration run. Not yet tested live: turn it on for the QA athlete, check both runners block completion until a selfie is uploaded, then view the selfie in the admin drawer; turn it off again.
+- [~] **Show upcoming exercises toggle** (athlete drawer, default off = future sessions show date + count only): built, live. Not yet tested on the athlete Program tab.
+- [~] **AI learns from coach edits**: editor add/remove/reorder/replace works live; generation now asks for one week + load_by_week and the app expands it to 4 weeks (34 s instead of timing out); 7+ exercises / 2+ strength rule works (12 sessions × 7). Saving edits creates a prompt proposal (tested live).
+  - [x] **Proposal overwrote the whole coach prompt** (fixed 2026-11-22): `lib/coach-preferences.ts` keeps the base prompt and only appends 1-3 GENERAL rules per edit to a "Coach preferences" list (max 18, deduplicated, oldest dropped). Approving merges into the prompt active at that moment and becomes the newest version (two pending proposals used to overwrite each other; approving an older one had no effect). The panel lists only the new rules and refreshes after a save. Still to test live: edit → save → proposal → approve → generate again. There is no UI yet to remove an approved rule (reject bad proposals instead).
+- [ ] **Re-import**: waiting on the owner — does this mean re-testing the existing import, or a new feature where re-importing an updated sheet UPDATES existing athletes (today they are skipped)?
+- [x] **Roster card**: removed with its old CSV form; search + filter chips are a slim bar right above the list; selfie chip/badge is blue instead of purple, readable in both themes. The server action `importAthletesCsv` (email-based CSV) is no longer used by any screen.
+- [ ] Light theme: Troy IDs are lime on white and the header logo is white on lime (both hard to read; not changed).
+
+**QA leftovers from 2026-11-20 testing (production)**: a pending AI program for Claude QA Tester (2026-11-20) awaiting review — reject or leave; four Gemini test images in `Desktop\Claude Images for Troy` (not used by the app).
 
 **Athlete side**
 - [x] Parent View: now a guarded-public server action (`app/parent/actions.ts`) that accepts the profile code. Was: the code on the profile (`athletes.parent_link_code`) is rejected; `redeem_parent_link` (dashboard-only SQL) reads `parent_links`, which nothing creates.
