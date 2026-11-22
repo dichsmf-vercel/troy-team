@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache"
 import { requireAdmin, requireStaff } from "@/lib/auth/guards"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getActiveCoachPrompt, proposeCoachPrompt, type CoachPrompt } from "@/lib/admin/coach-prompts"
-import { validateProgram } from "@/lib/gemini-validate"
+import { DEFAULT_COACH_PROMPT, listPreferences, mergePreferences, newPreferences } from "@/lib/coach-preferences"
+import { validateProgram, validatePromptText } from "@/lib/gemini-validate"
 import { getT } from "@/lib/i18n/get-language"
 import type { CatalogExercise, GeminiProgramOutput } from "@/lib/gemini-types"
 import type { TFunction } from "@/lib/i18n/translate"
@@ -160,7 +161,7 @@ export async function saveAdminEditsAndLearn(input: {
 }) {
   const t = await getT()
   const auth = await requireStaff()
-  if (!auth.ok) return { error: auth.error, summary: null }
+  if (!auth.ok) return { error: auth.error, summary: null, proposed: false }
   const { user } = auth.ctx
 
   const service = createAdminClient()
@@ -169,12 +170,12 @@ export async function saveAdminEditsAndLearn(input: {
     .select("generation_reason, month_start")
     .eq("id", input.programId)
     .single()
-  if (!program) return { error: t("Program not found."), summary: null }
+  if (!program) return { error: t("Program not found."), summary: null, proposed: false }
 
   const reason = (program.generation_reason ?? {}) as { schedule?: { weekdays?: number[] } } & Record<string, unknown>
   const schedule = { startDate: String(program.month_start), weekdays: reason.schedule?.weekdays ?? [] }
   const checked = checkProgramFromClient(input.editedProgram, await loadCatalog(), { athleteId: "-", time: "00:00", ...schedule }, t)
-  if (checked.error || !checked.program) return { error: checked.error, summary: null }
+  if (checked.error || !checked.program) return { error: checked.error, summary: null, proposed: false }
 
   const { error: updateError } = await service
     .from("athlete_programs")
@@ -183,7 +184,7 @@ export async function saveAdminEditsAndLearn(input: {
       goal: checked.program.goal,
     })
     .eq("id", input.programId)
-  if (updateError) return { error: updateError.message, summary: null }
+  if (updateError) return { error: updateError.message, summary: null, proposed: false }
   revalidatePath("/admin")
 
   const activePrompt = await getActiveCoachPrompt(service)
@@ -192,14 +193,19 @@ export async function saveAdminEditsAndLearn(input: {
     originalProgram: input.originalProgram,
     editedProgram: checked.program,
     adminReason: input.adminReason,
-    currentPromptText: activePrompt?.prompt_text ?? "",
+    currentPromptText: activePrompt?.prompt_text ?? null,
   })
-  if (learned.error || !learned.newPromptText) return { error: learned.error ?? t("No prompt proposal was produced."), summary: null }
+  if (learned.error) return { error: learned.error, summary: null, proposed: false }
 
-  const proposal = await proposeCoachPrompt(service, { promptText: learned.newPromptText, summary: learned.summary ?? input.adminReason, userId: user.id })
-  if (proposal.error) return { error: proposal.error, summary: learned.summary }
+  // Edits only ADD general preferences below the current (or built-in) prompt.
+  const promptText = mergePreferences(activePrompt?.prompt_text, learned.rules)
+  if (!newPreferences(activePrompt?.prompt_text, promptText).length) return { error: null, summary: learned.summary, proposed: false }
+  if (!validatePromptText(promptText)) return { error: t("No prompt proposal was produced."), summary: learned.summary, proposed: false }
 
-  return { error: null, summary: learned.summary }
+  const proposal = await proposeCoachPrompt(service, { promptText, summary: learned.summary ?? input.adminReason, userId: user.id })
+  if (proposal.error) return { error: proposal.error, summary: learned.summary, proposed: false }
+
+  return { error: null, summary: learned.summary, proposed: true }
 }
 
 // ─── Prompt proposals (admin approval) ────────────────────────────────────────
@@ -221,7 +227,7 @@ export async function getPendingPromptProposals(): Promise<{ error: string | nul
   if (error) return { error: error.code === "42703" ? null : error.message, proposals: [], currentPrompt: "" }
 
   const active = await getActiveCoachPrompt(service)
-  return { error: null, proposals: (data ?? []) as PromptProposal[], currentPrompt: active?.prompt_text ?? "" }
+  return { error: null, proposals: (data ?? []) as PromptProposal[], currentPrompt: active?.prompt_text ?? DEFAULT_COACH_PROMPT }
 }
 
 export async function reviewPromptProposal(id: string, decision: "approve" | "reject") {
@@ -230,15 +236,24 @@ export async function reviewPromptProposal(id: string, decision: "approve" | "re
   if (!auth.ok) return { error: auth.error }
   if (decision !== "approve" && decision !== "reject") return { error: t("Invalid decision.") }
 
-  const { error } = await createAdminClient()
-    .from("coach_system_prompts")
-    .update({
-      status: decision === "approve" ? "active" : "rejected",
-      reviewed_by: auth.ctx.user.id,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("status", "pending")
+  const service = createAdminClient()
+  const review = { reviewed_by: auth.ctx.user.id, reviewed_at: new Date().toISOString() }
+  let update: Record<string, unknown> = { ...review, status: "rejected" }
+
+  if (decision === "approve") {
+    const { data: proposal, error: loadError } = await service.from("coach_system_prompts").select("prompt_text").eq("id", id).eq("status", "pending").maybeSingle()
+    if (loadError) return { error: loadError.message }
+    if (!proposal) return { error: t("This proposal was already reviewed.") }
+    // Add its preferences to the prompt active NOW (another proposal may have been approved since it was
+    // written) and make it the newest version, because the highest active version is the one in use.
+    const active = await getActiveCoachPrompt(service)
+    const { data: latest } = await service.from("coach_system_prompts").select("version").order("version", { ascending: false }).limit(1).maybeSingle()
+    const promptText = mergePreferences(active?.prompt_text, listPreferences(proposal.prompt_text))
+    if (!validatePromptText(promptText)) return { error: t("No prompt proposal was produced.") }
+    update = { ...review, status: "active", prompt_text: promptText, version: (latest?.version ?? 0) + 1 }
+  }
+
+  const { error } = await service.from("coach_system_prompts").update(update).eq("id", id).eq("status", "pending")
   if (error) return { error: error.message }
 
   revalidatePath("/admin")

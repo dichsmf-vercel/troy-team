@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Brain, Check, X } from "lucide-react"
+import { newPreferences } from "@/lib/coach-preferences"
 import { getPendingPromptProposals, reviewPromptProposal, type PromptProposal } from "@/app/admin/actions/ai"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +12,9 @@ import { useT } from "@/components/providers/language-provider"
  * Lists AI-proposed coach-prompt improvements. Nothing changes until an admin approves it.
  * Renders nothing when there is nothing to review (or the viewer is not an admin).
  */
+/** Fired after a save that created a proposal, so the panel reloads without a page refresh. */
+export const PROMPT_PROPOSED_EVENT = "troy:prompt-proposed"
+
 export function PromptProposalsPanel() {
   const t = useT()
   const [proposals, setProposals] = useState<PromptProposal[]>([])
@@ -31,6 +35,9 @@ export function PromptProposalsPanel() {
 
   useEffect(() => {
     void load()
+    const refresh = () => void load()
+    window.addEventListener(PROMPT_PROPOSED_EVENT, refresh)
+    return () => window.removeEventListener(PROMPT_PROPOSED_EVENT, refresh)
   }, [load])
 
   async function decide(id: string, decision: "approve" | "reject") {
@@ -57,7 +64,7 @@ export function PromptProposalsPanel() {
           {t("AI prompt proposals ({proposalsCount})", { proposalsCount: proposals.length })}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          {t("The AI suggested these changes to the coach system prompt after program edits. Review them before they are used.")}
+          {t("Preferences the AI learned from your program edits. Approved ones are followed in every future AI program.")}
         </p>
       </CardHeader>
       <CardContent className="grid gap-3 pt-0">
@@ -70,12 +77,20 @@ export function PromptProposalsPanel() {
           <div key={proposal.id} className="grid gap-2 rounded-lg border p-3">
             <p className="text-sm font-medium">{t("Version {version}", { version: proposal.version })}</p>
             {proposal.change_summary && <p className="text-xs text-muted-foreground">{proposal.change_summary}</p>}
+            <div className="rounded-lg bg-muted/50 p-2 text-sm">
+              <p className="text-xs font-medium text-muted-foreground">{t("New preferences")}</p>
+              <ul className="mt-1 list-disc ps-5" dir="ltr">
+                {newPreferences(currentPrompt, proposal.prompt_text).map((rule) => (
+                  <li key={rule}>{rule}</li>
+                ))}
+              </ul>
+            </div>
             <details className="text-xs">
               <summary className="cursor-pointer font-medium">{t("Compare with current prompt")}</summary>
               <div className="mt-2 grid gap-2 md:grid-cols-2">
                 <div>
                   <p className="mb-1 font-medium text-muted-foreground">{t("Current")}</p>
-                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-muted/50 p-2">{currentPrompt || t("(built-in default)")}</pre>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-muted/50 p-2">{currentPrompt}</pre>
                 </div>
                 <div>
                   <p className="mb-1 font-medium text-muted-foreground">{t("Proposed")}</p>
