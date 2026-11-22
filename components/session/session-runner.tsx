@@ -51,7 +51,7 @@ export function SessionRunner({
   initialSessionAthleteId,
   initialAttendedAt,
   initialCompletions,
-  initialSelfieUploaded,
+  initialSelfies,
   selfieRequired = false,
 }: {
   language: Language
@@ -67,7 +67,8 @@ export function SessionRunner({
   initialSessionAthleteId: string | null
   initialAttendedAt: string | null
   initialCompletions: { session_exercise_id: string; completed: boolean }[]
-  initialSelfieUploaded: boolean
+  /** Session-exercise ids whose selfie is already uploaded (so a reload does not ask again). */
+  initialSelfies: string[]
   selfieRequired?: boolean
 }) {
   const t = useT()
@@ -91,7 +92,7 @@ export function SessionRunner({
   )
 
   // Per-exercise selfie state
-  const [selfieStates, setSelfieStates] = useState<Record<string, SelfieState>>({})
+  const [selfieStates, setSelfieStates] = useState<Record<string, SelfieState>>(() => Object.fromEntries(initialSelfies.map((id) => [id, "done" as const])))
   const [selfieErrors, setSelfieErrors] = useState<Record<string, string>>({})
 
   // Pain dialog

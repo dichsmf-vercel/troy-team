@@ -78,7 +78,7 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
     }
   })
 
-  const [{ data: feedback }, { data: completion }] = await Promise.all([
+  const [{ data: feedback }, { data: completion }, { data: selfies }] = await Promise.all([
     supabase
       .from("program_session_feedback")
       .select("exercise_index,difficulty,pain_notes,enjoyment")
@@ -92,6 +92,12 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
       .eq("athlete_program_id", assignment.id)
       .eq("session_date", date)
       .maybeSingle(),
+    supabase
+      .from("program_exercise_selfies")
+      .select("exercise_index")
+      .eq("athlete_id", user.id)
+      .eq("athlete_program_id", assignment.id)
+      .eq("session_date", date),
   ])
 
   return (
@@ -107,6 +113,7 @@ export default async function ProgramSessionPage({ params }: { params: Promise<{
           initialCompleted={completion?.status === "completed"}
           showExerciseRecap={toggles.showExerciseRecap}
           selfieRequired={toggles.selfieRequired}
+          initialSelfies={(selfies ?? []).map((row: { exercise_index: number }) => row.exercise_index)}
         />
       </main>
     </div>
