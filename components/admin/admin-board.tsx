@@ -51,7 +51,7 @@ export function AdminBoard({ teams = [], sessions = [], athletes = [], exercises
         <h1 className="text-3xl font-bold">{t("Coach operations")}</h1>
       </header>
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-6 gap-1 overflow-hidden p-1">
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 overflow-hidden p-1 sm:grid-cols-6">
           <TabsTrigger value="sessions" data-tour="tab-sessions">{t("Sessions")}</TabsTrigger>
           <TabsTrigger value="athletes" data-tour="tab-athletes">{t("Athletes")}</TabsTrigger>
           <TabsTrigger value="feedback" data-tour="tab-feedback">
