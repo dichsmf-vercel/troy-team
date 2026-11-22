@@ -63,6 +63,9 @@ export default async function SessionPage({
       .eq("session_athlete_id", sessionAthlete.id)
     completions = data ?? []
   }
+  const { data: selfies } = sessionAthlete?.id
+    ? await supabase.from("session_exercise_selfies").select("session_exercise_id").eq("session_athlete_id", sessionAthlete.id)
+    : { data: [] as { session_exercise_id: string }[] }
 
   return (
     <SessionRunner
@@ -94,7 +97,7 @@ export default async function SessionPage({
       initialSessionAthleteId={sessionAthlete?.id ?? null}
       initialAttendedAt={sessionAthlete?.attended_at ?? null}
       initialCompletions={completions}
-      initialSelfieUploaded={false}
+      initialSelfies={(selfies ?? []).map((row: { session_exercise_id: string }) => row.session_exercise_id)}
       selfieRequired={toggles.selfieRequired}
     />
   )

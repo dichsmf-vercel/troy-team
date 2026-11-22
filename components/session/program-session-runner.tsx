@@ -24,6 +24,7 @@ export function ProgramSessionRunner({
   initialCompleted = false,
   showExerciseRecap = true,
   selfieRequired = false,
+  initialSelfies = [],
 }: {
   programId: string
   date: string
@@ -33,6 +34,8 @@ export function ProgramSessionRunner({
   initialCompleted?: boolean
   showExerciseRecap?: boolean
   selfieRequired?: boolean
+  /** Exercise indexes whose selfie is already uploaded (so a reload does not ask again). */
+  initialSelfies?: number[]
 }) {
   const t = useT()
   const { language } = useLanguage()
@@ -47,12 +50,19 @@ export function ProgramSessionRunner({
   const [recapPage, setRecapPage] = useState(false)
   const [feedbackPage, setFeedbackPage] = useState(false)
   const [viewRecapAfterFinished, setViewRecapAfterFinished] = useState(false)
-  const [selfieState, setSelfieState] = useState<Record<number, "uploaded" | "error">>({})
+  const [selfieState, setSelfieState] = useState<Record<number, "uploaded" | "error">>(() => Object.fromEntries(initialSelfies.map((index) => [index, "uploaded" as const])))
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   const active = exercises[activeIndex]
   const allDone = exercises.length > 0 && completed.length === exercises.length
+
+  function backToExercises() {
+    const missing = exercises.findIndex((_, index) => (selfieRequired && selfieState[index] !== "uploaded") || !completed.includes(index))
+    if (missing >= 0) setActiveIndex(missing)
+    setError(null)
+    setFeedbackPage(false)
+  }
 
   function finishSession() {
     startTransition(async () => {
@@ -276,6 +286,9 @@ export function ProgramSessionRunner({
 
         <Button onClick={finishSession} disabled={pending} className="w-full font-semibold">
           {pending ? t("Saving feedback…") : t("Submit Feedback & Complete")}
+        </Button>
+        <Button variant="outline" onClick={backToExercises} disabled={pending} className="w-full gap-2">
+          <ChevronLeft className="size-4 rtl:rotate-180" aria-hidden="true" /> {t("Back to exercises")}
         </Button>
 
         {error && (
